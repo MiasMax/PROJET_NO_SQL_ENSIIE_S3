@@ -2,12 +2,13 @@
 Implémentation MongoDB du ListingRepository.
 Gère la persistance des annonces dans la collection 'listings'.
 """
-from typing import List, Optional
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
+
 from app.domain.entities.listing import Listing
+from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.value_objects.card_condition import CardCondition
 from app.domain.value_objects.listing_status import ListingStatus
-from app.domain.repositories.listing_repository import ListingRepository
 
 
 class MongoListingRepository(ListingRepository):
@@ -19,18 +20,15 @@ class MongoListingRepository(ListingRepository):
         doc["_id"] = listing.id
         await self.collection.replace_one({"_id": listing.id}, doc, upsert=True)
 
-    async def get_by_id(self, listing_id: str) -> Optional[Listing]:
+    async def get_by_id(self, listing_id: str) -> Listing | None:
         doc = await self.collection.find_one({"_id": listing_id})
         if not doc:
             return None
         return self._to_entity(doc)
 
     async def list_listings(
-        self,
-        status: Optional[ListingStatus] = None,
-        limit: int = 50,
-        skip: int = 0
-    ) -> List[Listing]:
+        self, status: ListingStatus | None = None, limit: int = 50, skip: int = 0
+    ) -> list[Listing]:
         query = {}
         if status:
             query["status"] = status.value if isinstance(status, ListingStatus) else status
@@ -39,13 +37,13 @@ class MongoListingRepository(ListingRepository):
         docs = await cursor.to_list(length=limit)
         return [self._to_entity(d) for d in docs]
 
-    async def count_by_status(self, status: Optional[ListingStatus] = None) -> int:
+    async def count_by_status(self, status: ListingStatus | None = None) -> int:
         query = {}
         if status:
             query["status"] = status.value if isinstance(status, ListingStatus) else status
         return await self.collection.count_documents(query)
 
-    async def get_recent(self, limit: int = 10) -> List[Listing]:
+    async def get_recent(self, limit: int = 10) -> list[Listing]:
         return await self.list_listings(status=ListingStatus.ACTIVE, limit=limit, skip=0)
 
     def _to_entity(self, doc: dict) -> Listing:

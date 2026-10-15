@@ -2,8 +2,9 @@
 Implémentation MongoDB du CardRepository.
 Stocke le catalogue officiel des cartes Pokémon dans la collection 'cards'.
 """
-from typing import List, Optional
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
+
 from app.domain.entities.card import Card
 from app.domain.repositories.card_repository import CardRepository
 
@@ -12,13 +13,13 @@ class MongoCardRepository(CardRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db["cards"]
 
-    async def get_by_id(self, card_id: str) -> Optional[Card]:
+    async def get_by_id(self, card_id: str) -> Card | None:
         doc = await self.collection.find_one({"_id": card_id})
         if not doc:
             return None
         return self._to_entity(doc)
 
-    async def list_cards(self, limit: int = 50, skip: int = 0, search: Optional[str] = None) -> List[Card]:
+    async def list_cards(self, limit: int = 50, skip: int = 0, search: str | None = None) -> list[Card]:
         query = {}
         if search:
             query = {"name": {"$regex": search, "$options": "i"}}
@@ -31,13 +32,13 @@ class MongoCardRepository(CardRepository):
         data["_id"] = card.id
         await self.collection.replace_one({"_id": card.id}, data, upsert=True)
 
-    async def bulk_save(self, cards: List[Card]) -> int:
+    async def bulk_save(self, cards: list[Card]) -> int:
         if not cards:
             return 0
         from pymongo import ReplaceOne
+
         operations = [
-            ReplaceOne({"_id": card.id}, {**card.to_dict(), "_id": card.id}, upsert=True)
-            for card in cards
+            ReplaceOne({"_id": card.id}, {**card.to_dict(), "_id": card.id}, upsert=True) for card in cards
         ]
         result = await self.collection.bulk_write(operations)
         return result.upserted_count + result.modified_count + result.matched_count

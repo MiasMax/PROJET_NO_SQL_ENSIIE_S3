@@ -1,8 +1,9 @@
 """
 Port abstrait pour le cache, compteurs temps-réel et structures ordonnées (e.g. Redis).
 """
+
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 
 class CacheRepository(ABC):
@@ -27,7 +28,7 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_recent_items(self, list_key: str, limit: int = 10) -> List[str]:
+    async def get_recent_items(self, list_key: str, limit: int = 10) -> list[str]:
         """Récupère les derniers éléments d'une liste."""
         pass
 
@@ -37,7 +38,7 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_trending_card_ids(self, limit: int = 5) -> List[Dict[str, Any]]:
+    async def get_trending_card_ids(self, limit: int = 5) -> list[dict[str, Any]]:
         """Récupère les cartes les plus consultées avec leur score."""
         pass
 
@@ -52,22 +53,22 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_favorites(self, user_id: str) -> List[str]:
+    async def get_favorites(self, user_id: str) -> list[str]:
         """Récupère la liste des favoris (Redis SMEMBERS)."""
         pass
 
     @abstractmethod
-    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+    async def set_user_session(self, token: str, user_data: dict[str, Any], ttl_seconds: int = 86400) -> None:
         """Enregistre une session utilisateur avec expiration TTL dans Redis."""
         pass
 
     @abstractmethod
-    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+    async def get_user_session(self, token: str) -> dict[str, Any] | None:
         """Récupère la session utilisateur active depuis Redis."""
         pass
 
     @abstractmethod
-    async def get_json(self, key: str) -> Optional[Any]:
+    async def get_json(self, key: str) -> Any | None:
         """Récupère une valeur mise en cache JSON."""
         pass
 
@@ -82,6 +83,6 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Récupère des métriques Redis (mémoire, connexions, uptime)."""
         pass

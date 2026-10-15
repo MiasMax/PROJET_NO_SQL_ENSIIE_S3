@@ -2,13 +2,15 @@
 Tests unitaires des entités du domaine métier (TDD).
 Vérifie les invariants métier stricts sans dépendance aux bases de données.
 """
+
 import pytest
+
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
+from app.domain.exceptions import InvalidPriceError, ListingAlreadySoldError
 from app.domain.value_objects.card_condition import CardCondition
 from app.domain.value_objects.listing_status import ListingStatus
-from app.domain.exceptions import InvalidPriceError, ListingAlreadySoldError
 
 
 def test_card_creation_and_serialization():

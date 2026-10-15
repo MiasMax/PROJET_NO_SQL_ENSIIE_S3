@@ -2,40 +2,38 @@
 Point d'entrée principal de l'API FastAPI PokéVinted.
 Initialise les connexions NoSQL au démarrage et gère le cycle de vie de l'application.
 """
+
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 from app.config import settings
 from app.domain.exceptions import (
     CardNotFoundError,
-    ListingNotFoundError,
-    ListingAlreadySoldError,
-    InvalidPriceError,
     InvalidConditionError,
+    InvalidPriceError,
+    ListingAlreadySoldError,
+    ListingNotFoundError,
 )
+from app.infrastructure.persistence.elastic.client import ElasticClientManager
+from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
 from app.infrastructure.persistence.mongo.client import MongoClientManager
 from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
 from app.infrastructure.persistence.mongo.mongo_listing_repository import MongoListingRepository
-from app.infrastructure.persistence.elastic.client import ElasticClientManager
-from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
 from app.infrastructure.persistence.redis.client import RedisClientManager
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
-from app.application.use_cases.seed_catalog import SeedCatalogUseCase
-
+from app.interfaces.api.admin import router as admin_router
 from app.interfaces.api.cards import router as cards_router
 from app.interfaces.api.listings import router as listings_router
 from app.interfaces.api.orders import router as orders_router
-from app.interfaces.api.admin import router as admin_router
 from app.interfaces.api.users import router as users_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("pokevinted")
 
 
@@ -102,6 +100,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Handlers d'exceptions métier
 @app.exception_handler(CardNotFoundError)

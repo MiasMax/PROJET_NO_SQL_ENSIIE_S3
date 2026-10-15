@@ -1,21 +1,21 @@
 """
 Routes API pour les annonces du Marketplace (Création, Recherche, Achat).
 """
-from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.application.dtos.listing_dtos import CreateListingRequest, ListingResponse, SearchListingsResponse
-from app.application.dtos.order_dtos import PurchaseListingRequest, OrderResponse
-from app.application.use_cases.create_listing import CreateListingUseCase, CreateListingCommand
-from app.application.use_cases.purchase_listing import PurchaseListingUseCase, PurchaseListingCommand
-from app.application.use_cases.search_listings import SearchListingsUseCase, SearchListingsQuery
+from app.application.dtos.order_dtos import OrderResponse, PurchaseListingRequest
+from app.application.use_cases.create_listing import CreateListingCommand, CreateListingUseCase
+from app.application.use_cases.purchase_listing import PurchaseListingCommand, PurchaseListingUseCase
+from app.application.use_cases.search_listings import SearchListingsQuery, SearchListingsUseCase
 from app.domain.repositories.listing_repository import ListingRepository
 from app.interfaces.dependencies import (
+    get_cache_repository,
     get_create_listing_use_case,
+    get_listing_repository,
     get_purchase_listing_use_case,
     get_search_listings_use_case,
-    get_listing_repository,
-    get_cache_repository,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
@@ -44,12 +44,12 @@ async def create_listing(
 
 @router.get("", response_model=SearchListingsResponse)
 async def search_listings(
-    q: Optional[str] = Query(None, description="Recherche textuelle floue sur nom, série ou vendeur"),
-    set_name: Optional[str] = Query(None, description="Filtre par extension"),
-    condition: Optional[str] = Query(None, description="Filtre par état (MINT, NEAR_MINT, etc.)"),
-    min_price: Optional[float] = Query(None, ge=0, description="Prix minimum"),
-    max_price: Optional[float] = Query(None, ge=0, description="Prix maximum"),
-    status: Optional[str] = Query("ACTIVE", description="Statut de l'annonce"),
+    q: str | None = Query(None, description="Recherche textuelle floue sur nom, série ou vendeur"),
+    set_name: str | None = Query(None, description="Filtre par extension"),
+    condition: str | None = Query(None, description="Filtre par état (MINT, NEAR_MINT, etc.)"),
+    min_price: float | None = Query(None, ge=0, description="Prix minimum"),
+    max_price: float | None = Query(None, ge=0, description="Prix maximum"),
+    status: str | None = Query("ACTIVE", description="Statut de l'annonce"),
     sort_by: str = Query("created_at", description="Tri : created_at, price, name"),
     sort_order: str = Query("desc", description="Ordre de tri : asc, desc"),
     limit: int = Query(20, ge=1, le=100),
@@ -62,6 +62,7 @@ async def search_listings(
     Met en évidence la différence de latence entre Redis Cache HIT (<1ms) et Elasticsearch/Mongo.
     """
     import time
+
     start_time = time.perf_counter()
 
     # Clé de cache normalisée

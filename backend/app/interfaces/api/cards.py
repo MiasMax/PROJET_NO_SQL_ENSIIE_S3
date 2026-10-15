@@ -1,20 +1,21 @@
 """
 Routes API pour le catalogue de cartes de référence.
 """
-from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
-from app.interfaces.dependencies import get_card_repository, get_cache_repository
+from app.interfaces.dependencies import get_cache_repository, get_card_repository
 
 router = APIRouter(prefix="/api/cards", tags=["Cards Catalog"])
 
 
-@router.get("", response_model=List[dict])
+@router.get("", response_model=list[dict])
 async def list_cards(
     limit: int = Query(50, ge=1, le=100),
     skip: int = Query(0, ge=0),
-    search: Optional[str] = Query(None, description="Filtrer par nom de Pokémon"),
+    search: str | None = Query(None, description="Filtrer par nom de Pokémon"),
     card_repo: MongoCardRepository = Depends(get_card_repository),
 ):
     """Retourne la liste des cartes officielles disponibles dans le catalogue."""
@@ -47,7 +48,7 @@ async def track_card_view(
     return {"status": "tracked", "card_id": card_id}
 
 
-@router.get("/trending/top", response_model=List[dict])
+@router.get("/trending/top", response_model=list[dict])
 async def get_trending_cards(
     limit: int = Query(5, ge=1, le=10),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
@@ -62,8 +63,10 @@ async def get_trending_cards(
     for item in trending_scores:
         card = await card_repo.get_by_id(item["card_id"])
         if card:
-            enriched.append({
-                **card.to_dict(),
-                "views": item["views"],
-            })
+            enriched.append(
+                {
+                    **card.to_dict(),
+                    "views": item["views"],
+                }
+            )
     return enriched

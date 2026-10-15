@@ -5,14 +5,15 @@ Garantit la cohérence entre les 3 systèmes NoSQL :
 2. Elasticsearch : Mise à jour du statut dans l'index de recherche
 3. Redis : Décrémentation du compteur d'annonces actives, incrémentation du volume des ventes
 """
+
 from dataclasses import dataclass
+
 from app.domain.entities.order import Order
-from app.domain.entities.listing import Listing
+from app.domain.exceptions import ListingNotFoundError
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
-from app.domain.exceptions import ListingNotFoundError, ListingAlreadySoldError
 
 
 @dataclass

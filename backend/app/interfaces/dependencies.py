@@ -2,22 +2,23 @@
 Conteneur d'injection de dépendances pour FastAPI.
 Assure l'instanciation des adaptateurs et la transmission aux Use Cases DDD.
 """
+
 from fastapi import Depends
+
+from app.application.use_cases.create_listing import CreateListingUseCase
+from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
+from app.application.use_cases.purchase_listing import PurchaseListingUseCase
+from app.application.use_cases.search_listings import SearchListingsUseCase
+from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 from app.config import settings
+from app.infrastructure.persistence.elastic.client import ElasticClientManager
+from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
 from app.infrastructure.persistence.mongo.client import MongoClientManager
 from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
 from app.infrastructure.persistence.mongo.mongo_listing_repository import MongoListingRepository
 from app.infrastructure.persistence.mongo.mongo_order_repository import MongoOrderRepository
-from app.infrastructure.persistence.elastic.client import ElasticClientManager
-from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
 from app.infrastructure.persistence.redis.client import RedisClientManager
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
-
-from app.application.use_cases.create_listing import CreateListingUseCase
-from app.application.use_cases.purchase_listing import PurchaseListingUseCase
-from app.application.use_cases.search_listings import SearchListingsUseCase
-from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
-from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 
 
 def get_mongo_db():

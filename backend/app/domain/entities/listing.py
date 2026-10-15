@@ -2,32 +2,32 @@
 Entité Annonce Marketplace (Listing).
 Représente la mise en vente d'un exemplaire physique par un utilisateur (style Vinted).
 """
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-import uuid
-from typing import Optional
 
+import uuid
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+from app.domain.exceptions import InvalidPriceError, ListingAlreadySoldError
 from app.domain.value_objects.card_condition import CardCondition
 from app.domain.value_objects.listing_status import ListingStatus
-from app.domain.exceptions import InvalidPriceError, ListingAlreadySoldError
 
 
 @dataclass
 class Listing:
     id: str
-    card_id: str                     # Référence vers la carte du catalogue
-    card_name: str                   # Nom dénormalisé pour requêtes rapides
-    set_name: str                    # Nom de l'extension dénormalisé
-    rarity: str                      # Rareté dénormalisée
-    image_url: str                   # Image affichée (photo vendeur ou image HD catalogue)
-    price: float                     # Prix demandé par le vendeur en €
-    condition: CardCondition         # État d'usure
-    seller_name: str                 # Pseudo du vendeur (ex: 'Sacha_du_Bourg_Palette')
-    description: str                 # Description textuelle personnalisée
+    card_id: str  # Référence vers la carte du catalogue
+    card_name: str  # Nom dénormalisé pour requêtes rapides
+    set_name: str  # Nom de l'extension dénormalisé
+    rarity: str  # Rareté dénormalisée
+    image_url: str  # Image affichée (photo vendeur ou image HD catalogue)
+    price: float  # Prix demandé par le vendeur en €
+    condition: CardCondition  # État d'usure
+    seller_name: str  # Pseudo du vendeur (ex: 'Sacha_du_Bourg_Palette')
+    description: str  # Description textuelle personnalisée
     status: ListingStatus = ListingStatus.ACTIVE
-    buyer_name: Optional[str] = None
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    sold_at: Optional[str] = None
+    buyer_name: str | None = None
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    sold_at: str | None = None
 
     def __post_init__(self):
         # Invariant métier : le prix doit être strictement positif
@@ -48,7 +48,7 @@ class Listing:
         condition: CardCondition,
         seller_name: str,
         description: str = "",
-        custom_image_url: Optional[str] = None,
+        custom_image_url: str | None = None,
     ) -> "Listing":
         """Factory pour initialiser une nouvelle annonce valide."""
         return cls(
@@ -74,7 +74,7 @@ class Listing:
 
         self.status = ListingStatus.SOLD
         self.buyer_name = buyer_name.strip()
-        self.sold_at = datetime.now(timezone.utc).isoformat()
+        self.sold_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -85,7 +85,9 @@ class Listing:
             "rarity": self.rarity,
             "image_url": self.image_url,
             "price": self.price,
-            "condition": self.condition.value if isinstance(self.condition, CardCondition) else self.condition,
+            "condition": self.condition.value
+            if isinstance(self.condition, CardCondition)
+            else self.condition,
             "seller_name": self.seller_name,
             "description": self.description,
             "status": self.status.value if isinstance(self.status, ListingStatus) else self.status,

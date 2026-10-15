@@ -2,8 +2,10 @@
 Implémentation Redis de CacheRepository.
 Gère les compteurs atomiques, listes récentes (LPUSH/LTRIM) et popularité (ZINCRBY).
 """
+
 import json
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 import redis.asyncio as aioredis
 from app.domain.repositories.cache_repository import CacheRepository
 
@@ -33,13 +35,13 @@ class RedisCacheRepository(CacheRepository):
             pipe.ltrim(list_key, 0, max_items - 1)
             await pipe.execute()
 
-    async def get_recent_items(self, list_key: str, limit: int = 10) -> List[str]:
+    async def get_recent_items(self, list_key: str, limit: int = 10) -> list[str]:
         return await self.client.lrange(list_key, 0, limit - 1)
 
     async def track_card_view(self, card_id: str) -> None:
         await self.client.zincrby("cards:trending_views", 1, card_id)
 
-    async def get_trending_card_ids(self, limit: int = 5) -> List[Dict[str, Any]]:
+    async def get_trending_card_ids(self, limit: int = 5) -> list[dict[str, Any]]:
         results = await self.client.zrevrange("cards:trending_views", 0, limit - 1, withscores=True)
         return [{"card_id": card_id, "views": int(score)} for card_id, score in results]
 
@@ -49,17 +51,17 @@ class RedisCacheRepository(CacheRepository):
     async def remove_favorite(self, user_id: str, card_id: str) -> None:
         await self.client.srem(f"user:{user_id}:favorites", card_id)
 
-    async def get_favorites(self, user_id: str) -> List[str]:
+    async def get_favorites(self, user_id: str) -> list[str]:
         members = await self.client.smembers(f"user:{user_id}:favorites")
         return list(members)
 
-    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+    async def set_user_session(self, token: str, user_data: dict[str, Any], ttl_seconds: int = 86400) -> None:
         await self.set_json(f"session:{token}", user_data, ttl_seconds=ttl_seconds)
 
-    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+    async def get_user_session(self, token: str) -> dict[str, Any] | None:
         return await self.get_json(f"session:{token}")
 
-    async def get_json(self, key: str) -> Optional[Any]:
+    async def get_json(self, key: str) -> Any | None:
         val = await self.client.get(key)
         if not val:
             return None
@@ -74,7 +76,7 @@ class RedisCacheRepository(CacheRepository):
     async def delete(self, key: str) -> None:
         await self.client.delete(key)
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         info = await self.client.info()
         return {
             "used_memory_human": info.get("used_memory_human", "N/A"),

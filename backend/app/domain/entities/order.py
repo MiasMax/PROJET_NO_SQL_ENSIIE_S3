@@ -2,9 +2,10 @@
 Entité Transaction / Commande (Order).
 Enregistre immuablement un acte d'achat effectué sur la plateforme.
 """
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+
 import uuid
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -16,7 +17,7 @@ class Order:
     price: float
     seller_name: str
     buyer_name: str
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     @classmethod
     def create(

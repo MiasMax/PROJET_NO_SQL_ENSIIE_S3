@@ -2,12 +2,14 @@
 Catalogue initial de cartes Pokémon officielles avec images officielles HD.
 Permet d'avoir une application vivante immédiatement au démarrage sans dépendance réseau externe.
 """
-from typing import List, Tuple
+
+from typing import Any
+
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.value_objects.card_condition import CardCondition
 
-RAW_CARDS = [
+RAW_CARDS: list[dict[str, Any]] = [
     {
         "id": "sv3pt5-006",
         "name": "Dracaufeu ex",
@@ -266,31 +268,31 @@ RAW_CARDS = [
 ]
 
 
-def get_default_catalog_cards() -> List[Card]:
+def get_default_catalog_cards() -> list[Card]:
     """Retourne la liste des entités Card du catalogue."""
     return [
         Card(
-            id=c["id"],
-            name=c["name"],
-            supertype=c["supertype"],
-            subtypes=c["subtypes"],
-            hp=c["hp"],
-            types=c["types"],
-            set_id=c["set_id"],
-            set_name=c["set_name"],
-            set_series=c["set_series"],
-            number=c["number"],
-            rarity=c["rarity"],
-            image_small=c["image_small"],
-            image_large=c["image_large"],
-            market_price=c["market_price"],
-            illustrator=c["illustrator"],
+            id=str(c["id"]),
+            name=str(c["name"]),
+            supertype=str(c["supertype"]),
+            subtypes=[str(x) for x in c.get("subtypes", [])],
+            hp=str(c["hp"]) if c.get("hp") else None,
+            types=[str(x) for x in c.get("types", [])],
+            set_id=str(c["set_id"]),
+            set_name=str(c["set_name"]),
+            set_series=str(c["set_series"]),
+            number=str(c["number"]),
+            rarity=str(c["rarity"]),
+            image_small=str(c["image_small"]),
+            image_large=str(c["image_large"]),
+            market_price=float(c["market_price"]),
+            illustrator=str(c["illustrator"]) if c.get("illustrator") else None,
         )
         for c in RAW_CARDS
     ]
 
 
-def get_initial_marketplace_listings() -> List[Listing]:
+def get_initial_marketplace_listings() -> list[Listing]:
     """Génère quelques annonces initiales pour peupler le marketplace."""
     return [
         Listing.create(

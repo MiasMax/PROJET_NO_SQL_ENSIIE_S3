@@ -1,8 +1,9 @@
 """
 Client et initialisation des schémas d'index Elasticsearch.
 """
+
 import logging
-from typing import Optional
+
 from elasticsearch import AsyncElasticsearch
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ LISTINGS_MAPPING = {
 
 
 class ElasticClientManager:
-    client: Optional[AsyncElasticsearch] = None
+    client: AsyncElasticsearch | None = None
 
     @classmethod
     def connect(cls, host: str = "http://localhost:9200") -> AsyncElasticsearch:

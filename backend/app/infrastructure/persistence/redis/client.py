@@ -1,15 +1,16 @@
 """
 Client et gestionnaire de connexion Redis (redis.asyncio).
 """
+
 import logging
-from typing import Optional
+
 import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
 
 class RedisClientManager:
-    client: Optional[aioredis.Redis] = None
+    client: aioredis.Redis | None = None
 
     @classmethod
     def connect(cls, url: str = "redis://localhost:6379/0") -> aioredis.Redis:

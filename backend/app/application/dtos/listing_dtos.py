@@ -1,10 +1,10 @@
 """
 Schémas DTO pour les annonces du marketplace (Pydantic V2).
 """
+
 from pydantic import BaseModel, Field
-from typing import Optional, List
+
 from app.domain.value_objects.card_condition import CardCondition
-from app.domain.value_objects.listing_status import ListingStatus
 
 
 class CreateListingRequest(BaseModel):
@@ -13,7 +13,7 @@ class CreateListingRequest(BaseModel):
     condition: CardCondition = Field(..., description="État d'usure de la carte")
     seller_name: str = Field(..., min_length=2, max_length=50, description="Pseudo du vendeur")
     description: str = Field(default="", max_length=1000, description="Description de l'annonce")
-    custom_image_url: Optional[str] = Field(default=None, description="URL d'une photo personnalisée")
+    custom_image_url: str | None = Field(default=None, description="URL d'une photo personnalisée")
 
 
 class ListingResponse(BaseModel):
@@ -28,14 +28,14 @@ class ListingResponse(BaseModel):
     seller_name: str
     description: str
     status: str
-    buyer_name: Optional[str] = None
+    buyer_name: str | None = None
     created_at: str
-    sold_at: Optional[str] = None
+    sold_at: str | None = None
 
 
 class SearchListingsResponse(BaseModel):
     total: int
-    items: List[ListingResponse]
-    source: Optional[str] = None
-    cache_hit: Optional[bool] = False
-    response_time_ms: Optional[float] = 0.0
+    items: list[ListingResponse]
+    source: str | None = None
+    cache_hit: bool | None = False
+    response_time_ms: float | None = 0.0

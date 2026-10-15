@@ -2,41 +2,42 @@
 Tests unitaires des Use Cases (TDD).
 Valide que chaque action métier orchestre scrupuleusement la persistance multi-NoSQL.
 """
-import pytest
-from typing import List, Optional, Dict, Any
 
+from typing import Any
+
+import pytest
+
+from app.application.use_cases.create_listing import CreateListingCommand, CreateListingUseCase
+from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
+from app.application.use_cases.purchase_listing import PurchaseListingCommand, PurchaseListingUseCase
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
-from app.domain.value_objects.card_condition import CardCondition
-from app.domain.value_objects.listing_status import ListingStatus
-from app.domain.exceptions import CardNotFoundError, ListingAlreadySoldError
+from app.domain.exceptions import CardNotFoundError
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
-from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.order_repository import OrderRepository
-from app.application.use_cases.create_listing import CreateListingUseCase, CreateListingCommand
-from app.application.use_cases.purchase_listing import PurchaseListingUseCase, PurchaseListingCommand
-from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
-
+from app.domain.repositories.search_repository import SearchRepository
+from app.domain.value_objects.listing_status import ListingStatus
 
 # --- REPOSITORIES MOCKS POUR TEST PUR ---
 
+
 class MockCardRepository(CardRepository):
-    def __init__(self, cards: List[Card] = None):
+    def __init__(self, cards: list[Card] = None):
         self.cards = {c.id: c for c in (cards or [])}
 
-    async def get_by_id(self, card_id: str) -> Optional[Card]:
+    async def get_by_id(self, card_id: str) -> Card | None:
         return self.cards.get(card_id)
 
-    async def list_cards(self, limit: int = 50, skip: int = 0, search: Optional[str] = None) -> List[Card]:
-        return list(self.cards.values())[skip:skip + limit]
+    async def list_cards(self, limit: int = 50, skip: int = 0, search: str | None = None) -> list[Card]:
+        return list(self.cards.values())[skip : skip + limit]
 
     async def save(self, card: Card) -> None:
         self.cards[card.id] = card
 
-    async def bulk_save(self, cards: List[Card]) -> int:
+    async def bulk_save(self, cards: list[Card]) -> int:
         for c in cards:
             self.cards[c.id] = c
         return len(cards)
@@ -52,21 +53,23 @@ class MockListingRepository(ListingRepository):
     async def save(self, listing: Listing) -> None:
         self.listings[listing.id] = listing
 
-    async def get_by_id(self, listing_id: str) -> Optional[Listing]:
+    async def get_by_id(self, listing_id: str) -> Listing | None:
         return self.listings.get(listing_id)
 
-    async def list_listings(self, status: Optional[ListingStatus] = None, limit: int = 50, skip: int = 0) -> List[Listing]:
+    async def list_listings(
+        self, status: ListingStatus | None = None, limit: int = 50, skip: int = 0
+    ) -> list[Listing]:
         items = list(self.listings.values())
         if status:
             items = [item for item in items if item.status == status]
-        return items[skip:skip + limit]
+        return items[skip : skip + limit]
 
-    async def count_by_status(self, status: Optional[ListingStatus] = None) -> int:
+    async def count_by_status(self, status: ListingStatus | None = None) -> int:
         if status:
             return sum(1 for item in self.listings.values() if item.status == status)
         return len(self.listings)
 
-    async def get_recent(self, limit: int = 10) -> List[Listing]:
+    async def get_recent(self, limit: int = 10) -> list[Listing]:
         return list(self.listings.values())[-limit:]
 
 
@@ -80,17 +83,19 @@ class MockSearchRepository(SearchRepository):
     async def delete_listing(self, listing_id: str) -> None:
         self.indexed.pop(listing_id, None)
 
-    async def search_listings(self, **kwargs) -> Dict[str, Any]:
+    async def search_listings(self, **kwargs) -> dict[str, Any]:
         return {"total": len(self.indexed), "items": list(self.indexed.values())}
 
     async def get_indexed_count(self) -> int:
         return len(self.indexed)
 
-    async def get_aggregations(self) -> Dict[str, Any]:
+    async def get_aggregations(self) -> dict[str, Any]:
         return {
             "by_status": {"buckets": [{"key": "ACTIVE", "doc_count": len(self.indexed)}]},
             "by_condition": {"buckets": [{"key": "NEAR_MINT", "doc_count": len(self.indexed)}]},
-            "by_set": {"buckets": [{"key": "151", "doc_count": len(self.indexed), "avg_price": {"value": 45.0}}]},
+            "by_set": {
+                "buckets": [{"key": "151", "doc_count": len(self.indexed), "avg_price": {"value": 45.0}}]
+            },
         }
 
 
@@ -120,13 +125,13 @@ class MockCacheRepository(CacheRepository):
         self.lists[list_key].insert(0, item_id)
         self.lists[list_key] = self.lists[list_key][:max_items]
 
-    async def get_recent_items(self, list_key: str, limit: int = 10) -> List[str]:
+    async def get_recent_items(self, list_key: str, limit: int = 10) -> list[str]:
         return self.lists.get(list_key, [])[:limit]
 
     async def track_card_view(self, card_id: str) -> None:
         self.trending[card_id] = self.trending.get(card_id, 0) + 1
 
-    async def get_trending_card_ids(self, limit: int = 5) -> List[Dict[str, Any]]:
+    async def get_trending_card_ids(self, limit: int = 5) -> list[dict[str, Any]]:
         sorted_items = sorted(self.trending.items(), key=lambda x: x[1], reverse=True)[:limit]
         return [{"card_id": k, "views": v} for k, v in sorted_items]
 
@@ -139,16 +144,16 @@ class MockCacheRepository(CacheRepository):
         if user_id in self.favorites:
             self.favorites[user_id].discard(card_id)
 
-    async def get_favorites(self, user_id: str) -> List[str]:
+    async def get_favorites(self, user_id: str) -> list[str]:
         return list(self.favorites.get(user_id, set()))
 
-    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+    async def set_user_session(self, token: str, user_data: dict[str, Any], ttl_seconds: int = 86400) -> None:
         self.sessions[token] = user_data
 
-    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+    async def get_user_session(self, token: str) -> dict[str, Any] | None:
         return self.sessions.get(token)
 
-    async def get_json(self, key: str) -> Optional[Any]:
+    async def get_json(self, key: str) -> Any | None:
         return self.cache.get(key)
 
     async def set_json(self, key: str, value: Any, ttl_seconds: int = 300) -> None:
@@ -157,7 +162,7 @@ class MockCacheRepository(CacheRepository):
     async def delete(self, key: str) -> None:
         self.cache.pop(key, None)
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         return {"used_memory_human": "1.2M", "connected_clients": 1}
 
 
@@ -168,17 +173,18 @@ class MockOrderRepository(OrderRepository):
     async def save(self, order: Order) -> None:
         self.orders[order.id] = order
 
-    async def get_by_id(self, order_id: str) -> Optional[Order]:
+    async def get_by_id(self, order_id: str) -> Order | None:
         return self.orders.get(order_id)
 
-    async def list_orders(self, limit: int = 50, skip: int = 0) -> List[Order]:
-        return list(self.orders.values())[skip:skip + limit]
+    async def list_orders(self, limit: int = 50, skip: int = 0) -> list[Order]:
+        return list(self.orders.values())[skip : skip + limit]
 
     async def count(self) -> int:
         return len(self.orders)
 
 
 # --- TESTS ASYNCHRONES ---
+
 
 @pytest.fixture
 def fake_card():
@@ -279,9 +285,7 @@ async def test_purchase_listing_updates_all_stores(fake_card):
 
     # Achat par un acheteur
     purchase_uc = PurchaseListingUseCase(listing_repo, order_repo, search_repo, cache_repo)
-    order = await purchase_uc.execute(
-        PurchaseListingCommand(listing_id=listing.id, buyer_name="Regis")
-    )
+    order = await purchase_uc.execute(PurchaseListingCommand(listing_id=listing.id, buyer_name="Regis"))
 
     # 1. Vérification MongoDB
     updated_listing = listing_repo.listings[listing.id]

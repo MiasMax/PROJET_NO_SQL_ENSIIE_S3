@@ -1,16 +1,17 @@
 """
 Client et gestionnaire de connexion MongoDB (Motor async).
 """
+
 import logging
-from typing import Optional
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
 
 class MongoClientManager:
-    client: Optional[AsyncIOMotorClient] = None
-    db: Optional[AsyncIOMotorDatabase] = None
+    client: AsyncIOMotorClient | None = None
+    db: AsyncIOMotorDatabase | None = None
 
     @classmethod
     def connect(cls, uri: str, db_name: str = "pokevinted") -> AsyncIOMotorDatabase:

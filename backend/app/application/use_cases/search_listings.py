@@ -3,28 +3,28 @@ Use Case : Recherche et consultation d'annonces.
 Interroge Elasticsearch pour les filtres et la recherche plein-texte,
 avec un fallback résilient vers MongoDB en cas de problème réseau.
 """
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
-import logging
 
-from app.domain.entities.listing import Listing
-from app.domain.value_objects.card_condition import CardCondition
-from app.domain.value_objects.listing_status import ListingStatus
+import logging
+from dataclasses import dataclass
+from typing import Any
+
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
+from app.domain.value_objects.card_condition import CardCondition
+from app.domain.value_objects.listing_status import ListingStatus
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class SearchListingsQuery:
-    query: Optional[str] = None
-    set_name: Optional[str] = None
-    condition: Optional[str] = None
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
-    status: Optional[str] = "ACTIVE"
+    query: str | None = None
+    set_name: str | None = None
+    condition: str | None = None
+    min_price: float | None = None
+    max_price: float | None = None
+    status: str | None = "ACTIVE"
     sort_by: str = "created_at"
     sort_order: str = "desc"
     limit: int = 20
@@ -42,7 +42,7 @@ class SearchListingsUseCase:
         self.listing_repo = listing_repo
         self.cache_repo = cache_repo
 
-    async def execute(self, query_params: SearchListingsQuery) -> Dict[str, Any]:
+    async def execute(self, query_params: SearchListingsQuery) -> dict[str, Any]:
         cond_enum = None
         if query_params.condition:
             try:

@@ -2,7 +2,9 @@
 Configuration centrale de l'application PokéVinted.
 Lit les variables d'environnement avec des valeurs par défaut adaptées à Docker Compose et au dev local.
 """
+
 import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

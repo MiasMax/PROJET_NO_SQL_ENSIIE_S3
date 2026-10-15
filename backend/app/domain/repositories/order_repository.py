@@ -1,8 +1,9 @@
 """
 Port abstrait du repository Commandes / Transactions (Audit des ventes).
 """
+
 from abc import ABC, abstractmethod
-from typing import List, Optional
+
 from app.domain.entities.order import Order
 
 
@@ -13,12 +14,12 @@ class OrderRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_by_id(self, order_id: str) -> Optional[Order]:
+    async def get_by_id(self, order_id: str) -> Order | None:
         """Récupère une commande par son ID."""
         pass
 
     @abstractmethod
-    async def list_orders(self, limit: int = 50, skip: int = 0) -> List[Order]:
+    async def list_orders(self, limit: int = 50, skip: int = 0) -> list[Order]:
         """Liste les commandes triées par date décroissante."""
         pass
 

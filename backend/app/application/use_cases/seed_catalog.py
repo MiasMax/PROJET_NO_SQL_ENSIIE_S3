@@ -2,14 +2,13 @@
 Use Case : Peuplement initial du catalogue et du marketplace (Seed).
 Injecte des cartes réelles avec images HD officielles et crée les premières annonces.
 """
-from typing import List
+
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
-from app.domain.value_objects.card_condition import CardCondition
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
 
 
 class SeedCatalogUseCase:
@@ -25,7 +24,7 @@ class SeedCatalogUseCase:
         self.search_repo = search_repo
         self.cache_repo = cache_repo
 
-    async def execute(self, cards: List[Card], initial_listings: List[Listing]) -> dict:
+    async def execute(self, cards: list[Card], initial_listings: list[Listing]) -> dict:
         # 1. Sauvegarde des cartes de référence dans MongoDB
         saved_cards_count = await self.card_repo.bulk_save(cards)
 

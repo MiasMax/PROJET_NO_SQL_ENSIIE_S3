@@ -4,14 +4,14 @@ Met en valeur l'usage de Redis :
 - Sessions avec TTL (Key-Value éphémère haute performance)
 - Liste de favoris via des Redis Sets (SADD, SREM, SMEMBERS)
 """
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+
 import uuid
 
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
+
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
-from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
-from app.interfaces.dependencies import get_cache_repository, get_card_repository
+from app.interfaces.dependencies import get_cache_repository
 
 router = APIRouter(prefix="/api/users", tags=["User Sessions & Watchlist (Redis)"])
 
@@ -29,7 +29,7 @@ class SwitchUserRequest(BaseModel):
 
 @router.get("/me")
 async def get_current_user(
-    x_session_token: Optional[str] = Header(None),
+    x_session_token: str | None = Header(None),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """Récupère l'utilisateur actuellement connecté depuis sa session Redis."""
@@ -65,7 +65,7 @@ async def switch_user(
     return session_data
 
 
-@router.get("/favorites", response_model=List[str])
+@router.get("/favorites", response_model=list[str])
 async def get_user_favorites(
     user_id: str = "sacha",
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),

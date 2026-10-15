@@ -5,16 +5,16 @@ Orchestre la persistance multi-systèmes exigée par le sujet :
 2. Elasticsearch : Indexation pour recherche floue et filtres facettés
 3. Redis : Compteurs atomiques, flux des nouveautés et purge du cache
 """
+
 from dataclasses import dataclass
-from typing import Optional
 
 from app.domain.entities.listing import Listing
-from app.domain.value_objects.card_condition import CardCondition
+from app.domain.exceptions import CardNotFoundError, InvalidConditionError
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
-from app.domain.exceptions import CardNotFoundError, InvalidConditionError
+from app.domain.value_objects.card_condition import CardCondition
 
 
 @dataclass
@@ -24,7 +24,7 @@ class CreateListingCommand:
     condition: str
     seller_name: str
     description: str = ""
-    custom_image_url: Optional[str] = None
+    custom_image_url: str | None = None
 
 
 class CreateListingUseCase:
@@ -50,7 +50,7 @@ class CreateListingUseCase:
         try:
             condition = CardCondition(command.condition.upper())
         except ValueError:
-            raise InvalidConditionError(command.condition)
+            raise InvalidConditionError(command.condition) from None
 
         # 3. Création de l'entité Listing (invariants vérifiés à l'instanciation)
         listing = Listing.create(

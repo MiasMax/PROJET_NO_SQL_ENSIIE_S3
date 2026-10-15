@@ -1,8 +1,10 @@
 """
 Schémas DTO pour le bilan Admin et les métriques NoSQL.
 """
+
+from typing import Any
+
 from pydantic import BaseModel
-from typing import Dict, Any, List
 
 
 class TerminalCommandInfo(BaseModel):
@@ -12,7 +14,7 @@ class TerminalCommandInfo(BaseModel):
 
 
 class AdminStatsResponse(BaseModel):
-    summary: Dict[str, Any]
-    systems: Dict[str, Any]
-    consistency_check: Dict[str, Any]
-    terminal_commands: List[TerminalCommandInfo]
+    summary: dict[str, Any]
+    systems: dict[str, Any]
+    consistency_check: dict[str, Any]
+    terminal_commands: list[TerminalCommandInfo]

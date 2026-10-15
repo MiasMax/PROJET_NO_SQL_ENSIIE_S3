@@ -2,12 +2,15 @@
 Implémentation Elasticsearch de SearchRepository.
 Effectue des recherches multi-champs floues (fuzzy search), filtres et tri.
 """
-from typing import List, Optional, Dict, Any
+
+from typing import Any
+
 from elasticsearch import AsyncElasticsearch
+
 from app.domain.entities.listing import Listing
+from app.domain.repositories.search_repository import SearchRepository
 from app.domain.value_objects.card_condition import CardCondition
 from app.domain.value_objects.listing_status import ListingStatus
-from app.domain.repositories.search_repository import SearchRepository
 from app.infrastructure.persistence.elastic.client import LISTINGS_INDEX
 
 
@@ -31,19 +34,19 @@ class ElasticSearchRepository(SearchRepository):
 
     async def search_listings(
         self,
-        query: Optional[str] = None,
-        set_name: Optional[str] = None,
-        condition: Optional[CardCondition] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        status: Optional[ListingStatus] = ListingStatus.ACTIVE,
+        query: str | None = None,
+        set_name: str | None = None,
+        condition: CardCondition | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        status: ListingStatus | None = ListingStatus.ACTIVE,
         sort_by: str = "created_at",
         sort_order: str = "desc",
         limit: int = 20,
         skip: int = 0,
-    ) -> Dict[str, Any]:
-        must_clauses: List[Dict[str, Any]] = []
-        filter_clauses: List[Dict[str, Any]] = []
+    ) -> dict[str, Any]:
+        must_clauses: list[dict[str, Any]] = []
+        filter_clauses: list[dict[str, Any]] = []
 
         # 1. Filtre statut
         if status:
@@ -52,19 +55,21 @@ class ElasticSearchRepository(SearchRepository):
 
         # 2. Recherche textuelle floue sur nom, extension, vendeur ou description
         if query and query.strip():
-            must_clauses.append({
-                "multi_match": {
-                    "query": query.strip(),
-                    "fields": [
-                        "card_name^3",
-                        "card_name.suggest^2",
-                        "set_name^2",
-                        "seller_name",
-                        "description",
-                    ],
-                    "fuzziness": "AUTO",
+            must_clauses.append(
+                {
+                    "multi_match": {
+                        "query": query.strip(),
+                        "fields": [
+                            "card_name^3",
+                            "card_name.suggest^2",
+                            "set_name^2",
+                            "seller_name",
+                            "description",
+                        ],
+                        "fuzziness": "AUTO",
+                    }
                 }
-            })
+            )
 
         # 3. Filtre par extension (exact match)
         if set_name and set_name.strip():
@@ -84,7 +89,7 @@ class ElasticSearchRepository(SearchRepository):
                 range_clause["lte"] = max_price
             filter_clauses.append({"range": {"price": range_clause}})
 
-        bool_query: Dict[str, Any] = {}
+        bool_query: dict[str, Any] = {}
         if must_clauses:
             bool_query["must"] = must_clauses
         else:
@@ -124,7 +129,7 @@ class ElasticSearchRepository(SearchRepository):
         res = await self.client.count(index=self.index_name)
         return res["count"]
 
-    async def get_aggregations(self) -> Dict[str, Any]:
+    async def get_aggregations(self) -> dict[str, Any]:
         """Agrégations analytiques Elasticsearch exploitant la structure JSON des annonces."""
         aggs_query = {
             "by_status": {"terms": {"field": "status"}},

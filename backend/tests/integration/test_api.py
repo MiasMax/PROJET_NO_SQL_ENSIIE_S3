@@ -2,27 +2,25 @@
 Tests d'intégration des routes API FastAPI avec injection de dépendances.
 Simule le cycle complet : Catalogue -> Publication d'annonce -> Recherche -> Achat -> Bilan Admin.
 """
+
 import pytest
 from starlette.testclient import TestClient
 
-from app.main import app
-from app.domain.entities.card import Card
-from app.domain.entities.listing import Listing
-from app.domain.value_objects.card_condition import CardCondition
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards
-from tests.unit.test_use_cases import (
-    MockCardRepository,
-    MockListingRepository,
-    MockSearchRepository,
-    MockCacheRepository,
-    MockOrderRepository,
-)
 from app.interfaces.dependencies import (
+    get_cache_repository,
     get_card_repository,
     get_listing_repository,
-    get_search_repository,
-    get_cache_repository,
     get_order_repository,
+    get_search_repository,
+)
+from app.main import app
+from tests.unit.test_use_cases import (
+    MockCacheRepository,
+    MockCardRepository,
+    MockListingRepository,
+    MockOrderRepository,
+    MockSearchRepository,
 )
 
 
@@ -100,7 +98,7 @@ def test_complete_marketplace_flow(test_env):
     assert cache_repo.counters["stats:active_listings"] == 1
 
     # 2. Étape Consultation & Recherche
-    search_res = client.get(f"/api/listings?q=Dracaufeu")
+    search_res = client.get("/api/listings?q=Dracaufeu")
     assert search_res.status_code == 200
     search_items = search_res.json()["items"]
     assert any(i["id"] == listing_id for i in search_items)

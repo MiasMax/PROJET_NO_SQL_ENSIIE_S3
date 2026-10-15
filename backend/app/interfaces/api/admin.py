@@ -2,12 +2,18 @@
 Routes API pour la vue Admin (Bilan d'activité et Supervision NoSQL).
 Fournit les métriques combinées Mongo + Elastic + Redis et les commandes d'inspection terminal.
 """
+
 from fastapi import APIRouter, Depends
+
 from app.application.dtos.stats_dtos import AdminStatsResponse
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
 from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
-from app.interfaces.dependencies import get_admin_stats_use_case, get_seed_catalog_use_case, get_search_repository
+from app.interfaces.dependencies import (
+    get_admin_stats_use_case,
+    get_search_repository,
+    get_seed_catalog_use_case,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["Admin & Supervision"])
 

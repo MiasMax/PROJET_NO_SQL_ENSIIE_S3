@@ -2,28 +2,28 @@
 Entité Carte de Référence (Catalogue officiel TCG).
 Représente une carte Pokémon reconnue avec ses métadonnées officielles.
 """
-from dataclasses import dataclass, field
-from typing import Optional, List
+
+from dataclasses import dataclass
 
 
 @dataclass
 class Card:
-    id: str                          # Ex: "sv3pt5-006" (Dracaufeu ex 151)
-    name: str                        # "Dracaufeu ex"
-    supertype: str                   # "Pokémon" / "Dresseur" / "Énergie"
-    subtypes: List[str]              # ["Stage 2", "ex"]
-    hp: Optional[str]                # "330"
-    types: List[str]                 # ["Fire"]
-    set_id: str                      # "sv3pt5"
-    set_name: str                    # "151"
-    set_series: str                  # "Scarlet & Violet"
-    number: str                      # "006"
-    rarity: str                      # "Double Rare", "Special Illustration Rare"
-    image_small: str                 # URL image basse déf (grille)
-    image_large: str                 # URL image HD (vue détaillée / brillance)
-    market_price: float              # Cote moyenne de référence en €
-    illustrator: Optional[str] = None
-    created_at: Optional[str] = None
+    id: str  # Ex: "sv3pt5-006" (Dracaufeu ex 151)
+    name: str  # "Dracaufeu ex"
+    supertype: str  # "Pokémon" / "Dresseur" / "Énergie"
+    subtypes: list[str]  # ["Stage 2", "ex"]
+    hp: str | None  # "330"
+    types: list[str]  # ["Fire"]
+    set_id: str  # "sv3pt5"
+    set_name: str  # "151"
+    set_series: str  # "Scarlet & Violet"
+    number: str  # "006"
+    rarity: str  # "Double Rare", "Special Illustration Rare"
+    image_small: str  # URL image basse déf (grille)
+    image_large: str  # URL image HD (vue détaillée / brillance)
+    market_price: float  # Cote moyenne de référence en €
+    illustrator: str | None = None
+    created_at: str | None = None
 
     def to_dict(self) -> dict:
         return {

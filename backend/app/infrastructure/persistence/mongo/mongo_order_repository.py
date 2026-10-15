@@ -2,8 +2,9 @@
 Implémentation MongoDB de OrderRepository.
 Enregistre les transactions dans la collection 'orders'.
 """
-from typing import List, Optional
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
+
 from app.domain.entities.order import Order
 from app.domain.repositories.order_repository import OrderRepository
 
@@ -17,13 +18,13 @@ class MongoOrderRepository(OrderRepository):
         doc["_id"] = order.id
         await self.collection.replace_one({"_id": order.id}, doc, upsert=True)
 
-    async def get_by_id(self, order_id: str) -> Optional[Order]:
+    async def get_by_id(self, order_id: str) -> Order | None:
         doc = await self.collection.find_one({"_id": order_id})
         if not doc:
             return None
         return self._to_entity(doc)
 
-    async def list_orders(self, limit: int = 50, skip: int = 0) -> List[Order]:
+    async def list_orders(self, limit: int = 50, skip: int = 0) -> list[Order]:
         cursor = self.collection.find({}).sort("timestamp", -1).skip(skip).limit(limit)
         docs = await cursor.to_list(length=limit)
         return [self._to_entity(d) for d in docs]

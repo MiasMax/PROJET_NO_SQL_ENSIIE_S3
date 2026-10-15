@@ -3,14 +3,14 @@ Use Case : Bilan Admin & Supervision NoSQL en temps réel.
 Agrège les métriques des 3 moteurs de persistance (Mongo, Elastic, Redis)
 et fournit les commandes exactes pour vérification en terminal par le professeur.
 """
-from dataclasses import dataclass
-from typing import Dict, Any, List
 
+from typing import Any
+
+from app.domain.repositories.cache_repository import CacheRepository
+from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
-from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.value_objects.listing_status import ListingStatus
 
 
@@ -29,7 +29,7 @@ class GetAdminStatsUseCase:
         self.search_repo = search_repo
         self.cache_repo = cache_repo
 
-    async def execute(self) -> Dict[str, Any]:
+    async def execute(self) -> dict[str, Any]:
         # --- 1. MÉTRIQUES MONGODB ---
         mongo_cards_count = await self.card_repo.count()
         mongo_total_listings = await self.listing_repo.count_by_status(None)
@@ -73,18 +73,18 @@ class GetAdminStatsUseCase:
             {
                 "system": "MongoDB",
                 "command": "docker exec -it pokevinted-mongodb mongosh pokevinted --eval 'db.listings.find({}, {card_name:1, price:1, status:1}).pretty()'",
-                "description": "Inspecte les annonces persistées en base documentaire"
+                "description": "Inspecte les annonces persistées en base documentaire",
             },
             {
                 "system": "Elasticsearch",
                 "command": "curl -s http://localhost:9200/pokevinted_listings/_search | jq '.hits.hits[]._source | {card_name, price, status}'",
-                "description": "Vérifie l'indexation de recherche plein-texte"
+                "description": "Vérifie l'indexation de recherche plein-texte",
             },
             {
                 "system": "Redis",
                 "command": "docker exec -it pokevinted-redis redis-cli MGET stats:active_listings stats:total_sales_count stats:total_sales_volume",
-                "description": "Lit les compteurs atomiques temps réel"
-            }
+                "description": "Lit les compteurs atomiques temps réel",
+            },
         ]
 
         return {
