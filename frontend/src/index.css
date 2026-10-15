@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ==========================================================
    POKÉVINTED DESIGN SYSTEM
    Modern Dark Gaming / Marketplace Theme with Holographic Accents
