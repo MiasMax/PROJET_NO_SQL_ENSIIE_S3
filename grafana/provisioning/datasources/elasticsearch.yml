@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: Elasticsearch-PokéVinted
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    isDefault: true
+    jsonData:
+      database: "pokevinted_listings"
+      timeField: "created_at"
+      version: "8.0.0"
+      esVersion: "8.0.0"
+      maxConcurrentShardRequests: 5
+    editable: true

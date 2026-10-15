@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / React
+node_modules/
+dist/
+dist-ssr/
+*.local
+.pnpm-debug.log*
+
+# Docker & Storage volumes
+data/
+*.log
+
+# Env
+.env
+.DS_Store
+Thumbs.db
