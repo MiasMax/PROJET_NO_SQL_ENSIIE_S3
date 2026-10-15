@@ -1,30 +1,104 @@
 """
-User Sessions and Watchlist Router (Redis).
-Highlights Redis features:
-- Ephemeral user sessions with TTL.
-- Favorite cards stored as Redis Sets (SADD, SREM, SMEMBERS).
+User accounts, sessions, and watchlist router (Redis).
+Manages member profiles, account registration, active sessions, and favorites.
 """
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.domain.entities.user import User
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.interfaces.dependencies import get_cache_repository
 
-router = APIRouter(prefix="/api/users", tags=["User Sessions & Watchlist (Redis)"])
+router = APIRouter(prefix="/api/users", tags=["Users & Sessions (Redis)"])
 
-# Preset demo trainer profiles
-PRESET_USERS = {
-    "sacha": {"id": "sacha", "name": "Sacha du Bourg-Palette", "role": "Kanto Trainer", "balance": 250.0},
-    "ondine": {"id": "ondine", "name": "Ondine d'Azuria", "role": "Cerulean Gym Leader", "balance": 480.0},
-    "chen": {"id": "chen", "name": "Professeur Chen", "role": "Pokémon Professor", "balance": 1500.0},
+# Seed user registry (in-memory persistent state across sessions)
+USERS_STORE: dict[str, dict[str, Any]] = {
+    "sacha": {
+        "id": "sacha",
+        "username": "sacha",
+        "name": "Sacha",
+        "role": "Dresseur Kanto",
+        "balance": 250.0,
+        "is_admin": False,
+    },
+    "ondine": {
+        "id": "ondine",
+        "username": "ondine",
+        "name": "Ondine",
+        "role": "Championne Azuria",
+        "balance": 480.0,
+        "is_admin": False,
+    },
+    "chen": {
+        "id": "chen",
+        "username": "chen",
+        "name": "Professeur Chen",
+        "role": "Administrateur",
+        "balance": 1500.0,
+        "is_admin": True,
+    },
 }
+
+ACTIVE_USER_ID: str = "sacha"
 
 
 class SwitchUserRequest(BaseModel):
     user_id: str
+
+
+class RegisterUserRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=30)
+    name: str = Field(..., min_length=2, max_length=50)
+    role: str = Field("Dresseur", max_length=40)
+    balance: float = Field(100.0, ge=0.0, le=100000.0)
+    is_admin: bool = False
+
+
+@router.get("", response_model=list[dict[str, Any]])
+async def list_users():
+    """List all registered members and administrators."""
+    return list(USERS_STORE.values())
+
+
+@router.post("/register", response_model=dict[str, Any])
+async def register_user(
+    payload: RegisterUserRequest,
+    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+):
+    """Register a new marketplace member or administrator and initialize session."""
+    global ACTIVE_USER_ID
+    user_id = payload.username.lower().strip().replace(" ", "_")
+    if user_id in USERS_STORE:
+        raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
+
+    new_user = User.create(
+        username=payload.username,
+        name=payload.name,
+        role=payload.role,
+        balance=payload.balance,
+        is_admin=payload.is_admin,
+        user_id=user_id,
+    )
+
+    user_dict: dict[str, Any] = {
+        "id": new_user.id,
+        "username": new_user.username,
+        "name": new_user.name,
+        "role": new_user.role,
+        "balance": new_user.balance,
+        "is_admin": new_user.is_admin,
+    }
+    USERS_STORE[user_id] = user_dict
+    ACTIVE_USER_ID = user_id
+
+    token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
+    session_data = {**user_dict, "token": token}
+    await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
+    return session_data
 
 
 @router.get("/me")
@@ -38,8 +112,9 @@ async def get_current_user(
         if session:
             return session
 
-    # Default fallback session: Sacha
-    default_user = PRESET_USERS["sacha"]
+    # Default fallback session: last active user or Sacha
+    user_id = ACTIVE_USER_ID if ACTIVE_USER_ID in USERS_STORE else "sacha"
+    default_user = USERS_STORE[user_id]
     token = f"sess_{default_user['id']}"
     session_data = {**default_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
@@ -52,11 +127,13 @@ async def switch_user(
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """Switch active trainer account and persist session in Redis."""
-    user_id = payload.user_id.lower()
-    if user_id not in PRESET_USERS:
-        raise HTTPException(status_code=400, detail="Unknown trainer profile.")
+    global ACTIVE_USER_ID
+    user_id = payload.user_id.lower().strip()
+    if user_id not in USERS_STORE:
+        raise HTTPException(status_code=400, detail="Profil utilisateur inconnu.")
 
-    user = PRESET_USERS[user_id]
+    user = USERS_STORE[user_id]
+    ACTIVE_USER_ID = user_id
     token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
     session_data = {**user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)

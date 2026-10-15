@@ -51,11 +51,11 @@ export default function TrendingBar({ onSelectCard }) {
             borderRadius: '999px',
             fontWeight: 700
           }}>
-            Redis Sorted Set (ZSET)
+            En Direct
           </span>
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Calculé instantanément par <code>ZINCRBY</code> / <code>ZREVRANGE</code>
+          Cartes les plus recherchées aujourd'hui
         </span>
       </div>
 

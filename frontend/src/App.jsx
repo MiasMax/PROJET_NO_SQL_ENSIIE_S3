@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Search, BarChart3, Store, Sparkles, Filter, RefreshCw, User, Zap, Heart, Database, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Search, BarChart3, Store, Sparkles, Filter, RefreshCw, User, Zap, Heart, ShieldCheck, UserPlus } from 'lucide-react';
 import PokemonCard3D from './components/PokemonCard3D';
 import TrendingBar from './components/TrendingBar';
 import SellCardModal from './components/SellCardModal';
 import BuyModal from './components/BuyModal';
 import AdminDashboard from './components/AdminDashboard';
+import RegisterModal from './components/RegisterModal';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('marketplace'); // 'marketplace' | 'admin'
@@ -15,8 +16,9 @@ export default function App() {
   // Redis cache metrics
   const [cacheMetrics, setCacheMetrics] = useState({ hit: false, timeMs: 0, source: 'elasticsearch' });
 
-  // Redis user session
-  const [currentUser, setCurrentUser] = useState({ id: 'sacha', name: 'Sacha du Bourg-Palette', role: 'Dresseur Kanto', balance: 250 });
+  // User profiles & sessions
+  const [currentUser, setCurrentUser] = useState({ id: 'sacha', name: 'Sacha du Bourg-Palette', role: 'Dresseur Kanto', balance: 250, is_admin: false });
+  const [allUsers, setAllUsers] = useState([]);
   const [favorites, setFavorites] = useState(new Set());
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
@@ -29,6 +31,7 @@ export default function App() {
 
   // Modals
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [selectedListingForBuy, setSelectedListingForBuy] = useState(null);
 
   // Toast notification
@@ -37,6 +40,18 @@ export default function App() {
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const fetchUsersList = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const users = await res.json();
+        setAllUsers(users);
+      }
+    } catch (e) {
+      console.error("Erreur chargement utilisateurs :", e);
+    }
   };
 
   // Load active user session and favorites from Redis
@@ -69,12 +84,27 @@ export default function App() {
       if (res.ok) {
         const user = await res.json();
         setCurrentUser(user);
-        loadUserAndFavorites(user.id);
-        showToast(`👤 Session Redis basculée sur : ${user.name} (TTL 24h)`);
+        const favRes = await fetch(`/api/users/favorites?user_id=${user.id}`);
+        if (favRes.ok) {
+          const favList = await favRes.json();
+          setFavorites(new Set(favList));
+        }
+        showToast(`👤 Connecté en tant que : ${user.name}`);
       }
     } catch (e) {
       console.error("Erreur switch session :", e);
     }
+  };
+
+  const handleUserRegistered = async (newUser) => {
+    setCurrentUser(newUser);
+    fetchUsersList();
+    const favRes = await fetch(`/api/users/favorites?user_id=${newUser.id}`);
+    if (favRes.ok) {
+      const favList = await favRes.json();
+      setFavorites(new Set(favList));
+    }
+    showToast(`🎉 Bienvenue ${newUser.name} ! Votre compte est créé.`);
   };
 
   const handleToggleFavorite = async (cardId) => {
@@ -134,6 +164,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    fetchUsersList();
     loadUserAndFavorites();
   }, []);
 
@@ -184,7 +215,7 @@ export default function App() {
           </svg>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="logo-text">PokéVinted</span>
-            <span className="logo-badge">NoSQL S3</span>
+            <span className="logo-badge">Marketplace</span>
           </div>
         </div>
 
@@ -194,7 +225,7 @@ export default function App() {
             <Search size={18} className="navbar-search-icon" />
             <input
               type="text"
-              placeholder="Rechercher (Dracaufeu, 151, Pikachu...)"
+              placeholder="Rechercher une carte, une rareté, une série..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="form-input navbar-search-input"
@@ -202,9 +233,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Trainer profile selector (Redis session) and actions */}
+        {/* Trainer profile selector and actions */}
         <div className="navbar-actions">
-          {/* Profile badge and Redis session switcher */}
+          {/* Profile badge and user switcher */}
           <div className="navbar-session-badge">
             <User size={16} color="var(--accent-secondary)" />
             <select
@@ -219,29 +250,51 @@ export default function App() {
                 cursor: 'pointer',
                 outline: 'none',
               }}
-              title="Changer de session dresseur (Session stockée avec TTL dans Redis)"
+              title="Changer de profil dresseur"
             >
-              <option value="sacha" style={{ background: '#121826' }}>🧢 Sacha (250€)</option>
-              <option value="ondine" style={{ background: '#121826' }}>🌊 Ondine (480€)</option>
-              <option value="chen" style={{ background: '#121826' }}>🧪 Prof. Chen (1500€)</option>
+              {allUsers.length > 0 ? (
+                allUsers.map((u) => (
+                  <option key={u.id} value={u.id} style={{ background: '#121826' }}>
+                    {u.is_admin ? '🛡️' : '🧢'} {u.name} ({u.balance}€)
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="sacha" style={{ background: '#121826' }}>🧢 Sacha (250€)</option>
+                  <option value="ondine" style={{ background: '#121826' }}>🌊 Ondine (480€)</option>
+                  <option value="chen" style={{ background: '#121826' }}>🛡️ Prof. Chen (Admin)</option>
+                </>
+              )}
             </select>
             <span style={{ fontSize: '0.7rem', color: '#38bdf8', background: 'rgba(6,182,212,0.15)', padding: '1px 6px', borderRadius: '4px' }}>
-              Redis Session
+              {currentUser.is_admin ? 'Admin' : `${currentUser.balance} €`}
             </span>
           </div>
 
           <button
-            onClick={() => setCurrentView(currentView === 'marketplace' ? 'admin' : 'marketplace')}
-            className={`btn ${currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="btn btn-secondary btn-responsive"
+            title="Créer un nouveau profil dresseur ou administrateur"
           >
-            {currentView === 'admin' ? (
-              <><Store size={18} /><span className="btn-label-desktop">Marketplace</span></>
-            ) : (
-              <><BarChart3 size={18} /><span className="btn-label-desktop">Bilan Admin NoSQL</span><span className="btn-label-mobile">Admin</span></>
-            )}
+            <UserPlus size={16} />
+            <span className="btn-label-desktop">S'inscrire</span>
           </button>
 
-          <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold">
+          {currentUser.is_admin && (
+            <button
+              onClick={() => setCurrentView(currentView === 'admin' ? 'marketplace' : 'admin')}
+              className={`btn ${currentView === 'admin' ? 'btn-primary' : 'btn-secondary'} btn-responsive`}
+              title="Accéder au panneau de supervision"
+            >
+              {currentView === 'admin' ? (
+                <><Store size={18} /><span className="btn-label-desktop">Marketplace</span></>
+              ) : (
+                <><ShieldCheck size={18} color="#38bdf8" /><span className="btn-label-desktop">Administration</span><span className="btn-label-mobile">Admin</span></>
+              )}
+            </button>
+          )}
+
+          <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold btn-responsive">
             <PlusCircle size={18} /><span className="btn-label-desktop">Vendre une carte</span><span className="btn-label-mobile">Vendre</span>
           </button>
         </div>
@@ -257,21 +310,26 @@ export default function App() {
             <div style={{ maxWidth: '720px', position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '999px', fontSize: '0.85rem', color: '#a5b4fc', marginBottom: '16px' }}>
                 <Sparkles size={14} color="var(--accent-gold)" />
-                Cartes Pokémon officielles • Extensions récentes
+                La marketplace officielle dédiée aux passionnés de Pokémon
               </div>
               <h1 className="hero-title">
-                Achetez & Vendez vos cartes <span>Pokémon</span> au juste prix.
+                Achetez & Vendez vos cartes <span>Pokémon</span> en toute confiance.
               </h1>
               <p className="hero-subtitle">
-                Marketplace Pokémon style Vinted haute performance combinant <strong>MongoDB</strong> (source de vérité documents JSON), <strong>Elasticsearch</strong> (recherche floue & analytics Grafana) et <strong>Redis</strong> (sessions, favoris, cache et top cartes en direct).
+                Trouvez les pépites sous sleeve et toploader, négociez au meilleur prix et complétez vos master sets directement entre dresseurs certifiés.
               </p>
               <div className="hero-actions">
-                <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold" style={{ padding: '12px 28px' }}>
-                  <PlusCircle size={18} /> Mettre une carte en vente
+                <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold hero-btn" style={{ padding: '12px 28px' }}>
+                  <PlusCircle size={18} /> Vendre une carte
                 </button>
-                <button onClick={() => setCurrentView('admin')} className="btn btn-secondary" style={{ padding: '12px 24px' }}>
-                  <BarChart3 size={18} /> Consulter le Bilan Admin NoSQL
+                <button onClick={() => setIsRegisterModalOpen(true)} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
+                  <UserPlus size={18} /> Créer un compte
                 </button>
+                {currentUser.is_admin && (
+                  <button onClick={() => setCurrentView('admin')} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
+                    <ShieldCheck size={18} /> Administration
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -407,6 +465,26 @@ export default function App() {
               ))}
             </div>
           )}
+          {/* Marketplace footer */}
+          <footer style={{ marginTop: '60px', padding: '32px 0 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <div>
+              <strong>PokéVinted</strong> — La marketplace de référence des cartes Pokémon.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <button
+                onClick={() => {
+                  if (!currentUser.is_admin) {
+                    handleSwitchUser('chen');
+                  }
+                  setCurrentView('admin');
+                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ShieldCheck size={14} /> Espace Administration
+              </button>
+              <span>© 2026 PokéVinted</span>
+            </div>
+          </footer>
         </main>
       )}
 
@@ -423,6 +501,12 @@ export default function App() {
         onClose={() => setSelectedListingForBuy(null)}
         listing={selectedListingForBuy}
         onPurchaseComplete={handlePurchaseComplete}
+      />
+
+      <RegisterModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onUserRegistered={handleUserRegistered}
       />
     </div>
   );

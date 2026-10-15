@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Layers, Server, Copy, Check } from 'lucide-react';
+import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Layers, Server, Copy, Check, Store } from 'lucide-react';
 
 export default function AdminDashboard({ onBackToMarketplace }) {
   const [stats, setStats] = useState(null);
@@ -79,7 +79,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap', marginBottom: '32px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 800 }}>Bilan & Supervision NoSQL</h1>
+            <h1 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 800 }}>Tableau de Bord d'Administration</h1>
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -93,18 +93,21 @@ export default function AdminDashboard({ onBackToMarketplace }) {
               fontWeight: 700
             }}>
               <CheckCircle2 size={16} />
-              {consistency_check.is_in_sync ? 'Synchronisation Multi-Stores : 100%' : 'Désynchronisation détectée'}
+              {consistency_check.is_in_sync ? 'Bases synchronisées à 100%' : 'Désynchronisation détectée'}
             </span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Tableau de bord de monitoring et d'audit des flux de données persistés dans MongoDB, Elasticsearch et Redis.
+            Supervision de la marketplace, suivi des transactions en direct et santé des services de données.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={onBackToMarketplace} className="btn btn-secondary">
+            <Store size={16} /> Retour Marketplace
+          </button>
           <button onClick={handleSeed} disabled={seedLoading} className="btn btn-secondary">
             <RefreshCw size={16} className={seedLoading ? "animate-spin" : ""} />
-            {seedLoading ? 'Peuplement...' : 'Ré-amorcer Seed'}
+            {seedLoading ? 'Peuplement...' : 'Ré-amorcer Catalogue'}
           </button>
           <button onClick={fetchStats} className="btn btn-primary">
             <Activity size={16} /> Rafraîchir
