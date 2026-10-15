@@ -13,33 +13,33 @@ Le backend est structuré selon les principes de la **Clean Architecture / DDD**
 ```text
 backend/
 ├── app/
-│   ├── domain/               # CŒUR MÉTIER PUR (Aucune dépendance externe)
-│   │   ├── entities/         # Card, Listing (Annonce), Order (Transaction), User
-│   │   ├── value_objects/    # CardCondition (Mint, NearMint...), Price, SetInfo
-│   │   ├── repositories/     # Interfaces abstraites (ListingRepository, SearchRepository, CacheRepository)
-│   │   └── exceptions/       # Erreurs métier (ListingAlreadySold, CardNotFound...)
+│   ├── domain/               # Pure domain core (zero external dependencies)
+│   │   ├── entities/         # Card, Listing, Order, User
+│   │   ├── value_objects/    # CardCondition, ListingStatus
+│   │   ├── repositories/     # Abstract interfaces (ListingRepository, SearchRepository, CacheRepository)
+│   │   └── exceptions/       # Domain exceptions (ListingAlreadySold, CardNotFound...)
 │   │
-│   ├── application/          # CAS D'UTILISATION (Use Cases & Orchestration)
+│   ├── application/          # Use cases and orchestration layer
 │   │   ├── use_cases/
-│   │   │   ├── create_listing.py   # Persistance multi-systèmes (Mongo + Elastic + Redis)
-│   │   │   ├── search_listings.py  # Recherche Elastic avec fallback / filtres
-│   │   │   ├── purchase_listing.py # Achat + transition d'état + invalidation cache
-│   │   │   └── get_admin_stats.py  # Métriques combinées (Mongo, Redis, Elastic)
-│   │   └── dtos/             # Schémas de validation et transfert de données
+│   │   │   ├── create_listing.py   # Multi-system persistence (Mongo + Elastic + Redis)
+│   │   │   ├── search_listings.py  # Elastic search with resilient fallback and filters
+│   │   │   ├── purchase_listing.py # Purchase workflow, state transition, and cache invalidation
+│   │   │   └── get_admin_stats.py  # Combined telemetry (Mongo, Redis, Elastic)
+│   │   └── dtos/             # Validation schemas and data transfer objects
 │   │
-│   ├── infrastructure/       # ADAPTATEURS EXTERNES & STOCKAGE
+│   ├── infrastructure/       # External adapters and persistence
 │   │   ├── persistence/
 │   │   │   ├── mongo/        # MongoListingRepository, MongoOrderRepository (motor / pymongo)
 │   │   │   ├── elastic/      # ElasticSearchRepository (elasticsearch-py)
-│   │   │   └── redis/        # RedisCacheRepository (redis-py : cache, zset, stats)
-│   │   └── seed/             # Script d'importation de vraies cartes TCG avec images HD
+│   │   │   └── redis/        # RedisCacheRepository (redis-py: cache, zset, stats)
+│   │   └── seed/             # TCG reference card catalog and HD artwork seed
 │   │
-│   └── interfaces/           # COUCHE D'ENTRÉE
-│       ├── api/              # Contrôleurs FastAPI (routes: /cards, /listings, /orders, /admin)
-│       └── dependencies.py   # Injection des dépendances
-└── tests/                    # TESTS AUTOMATISÉS (TDD)
-    ├── unit/                 # Tests unitaires du domaine & use cases (mocks)
-    └── integration/          # Tests d'intégration avec Mongo, Elastic, Redis réels
+│   └── interfaces/           # Presentation and entrypoints
+│       ├── api/              # FastAPI controllers (routes: /cards, /listings, /orders, /admin)
+│       └── dependencies.py   # Dependency injection wiring
+└── tests/                    # Automated tests (TDD)
+    ├── unit/                 # Domain and use case unit tests (mocks)
+    └── integration/          # Multi-store integration tests
 ```
 
 ---

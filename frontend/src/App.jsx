@@ -189,7 +189,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Barre de navigation */}
+      {/* Navigation bar */}
       <header className="navbar">
         <div className="logo-container" onClick={() => setCurrentView('marketplace')}>
           <svg className="logo-icon" viewBox="0 0 24 24" fill="none">
@@ -204,7 +204,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Barre de recherche */}
+        {/* Search bar */}
         {currentView === 'marketplace' && (
           <div style={{ position: 'relative', width: '340px' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -219,9 +219,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Sélecteur de profil Dresseur (Session Redis) & Actions */}
+        {/* Trainer profile selector (Redis session) and actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Badge Profil & Switcher Session Redis */}
+          {/* Profile badge and Redis session switcher */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -268,12 +268,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* Contenu principal */}
+      {/* Main content */}
       {currentView === 'admin' ? (
         <AdminDashboard onBackToMarketplace={() => setCurrentView('marketplace')} />
       ) : (
         <main className="container">
-          {/* Bannière Hero */}
+          {/* Hero banner */}
           <section className="hero-banner">
             <div style={{ maxWidth: '720px', position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '999px', fontSize: '0.85rem', color: '#a5b4fc', marginBottom: '16px' }}>
@@ -297,17 +297,17 @@ export default function App() {
             </div>
           </section>
 
-          {/* TOP 5 TENDANCES EN DIRECT (Redis ZSET) */}
+          {/* Live top 5 trending cards (Redis ZSET) */}
           <TrendingBar onSelectCard={(card) => setSearchQuery(card.name)} />
 
-          {/* Barre de Filtres Avancés & Benchmark Latence Cache */}
+          {/* Advanced filters bar and cache latency benchmark */}
           <div className="filters-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', marginRight: '8px' }}>
               <Filter size={18} />
               <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filtres :</span>
             </div>
 
-            {/* Sélecteur Série */}
+            {/* Expansion set selector */}
             <select
               value={selectedSet}
               onChange={(e) => setSelectedSet(e.target.value)}
@@ -322,7 +322,7 @@ export default function App() {
               <option value="Forces Temporelles">Forces Temporelles</option>
             </select>
 
-            {/* Sélecteur État */}
+            {/* Condition selector */}
             <select
               value={selectedCondition}
               onChange={(e) => setSelectedCondition(e.target.value)}
@@ -337,7 +337,7 @@ export default function App() {
               <option value="PLAYED">⚡ PLAYED</option>
             </select>
 
-            {/* Filtre Mes Favoris (Redis Set) */}
+            {/* Favorites filter (Redis Set) */}
             <button
               onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
               className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
@@ -347,7 +347,7 @@ export default function App() {
               Mes Favoris ({favorites.size})
             </button>
 
-            {/* INDICATEUR DE LATENCE CACHE REDIS / ELASTICSEARCH */}
+            {/* Redis cache and Elasticsearch response time indicator */}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 display: 'inline-flex',
@@ -369,7 +369,7 @@ export default function App() {
                   : `🔍 Elasticsearch Query (${cacheMetrics.timeMs} ms)`}
               </div>
 
-              {/* Tri */}
+              {/* Sort selector */}
               <select
                 value={`${sortBy}:${sortOrder}`}
                 onChange={(e) => {
@@ -391,7 +391,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Grille des annonces */}
+          {/* Listings grid */}
           {loading ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <RefreshCw className="animate-spin" size={32} color="var(--accent-primary)" style={{ margin: '0 auto 16px' }} />
@@ -429,7 +429,7 @@ export default function App() {
         </main>
       )}
 
-      {/* Modales */}
+      {/* Modals */}
       <SellCardModal
         isOpen={isSellModalOpen}
         onClose={() => setIsSellModalOpen(false)}

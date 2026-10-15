@@ -27,7 +27,7 @@
   --accent-primary-hover: #4f46e5;
   --accent-secondary: #06b6d4;     /* Cyan */
   --accent-gold: #f59e0b;          /* Rarity / Price */
-  --accent-crimson: #ef4444;       /* Pokéball red */
+  --accent-crimson: #ef4444;       /* Pokeball red */
   --accent-emerald: #10b981;       /* Mint condition / Success */
 
   --gradient-holo: linear-gradient(135deg, #ff007a 0%, #7928ca 35%, #0070f3 70%, #00dfd8 100%);
@@ -68,13 +68,13 @@ body {
   overflow-x: hidden;
 }
 
-/* Typographie spécifique */
+/* Custom typography */
 h1, h2, h3, h4, .font-display {
   font-family: 'Space Grotesk', 'Outfit', sans-serif;
   letter-spacing: -0.02em;
 }
 
-/* Boutons modernes */
+/* Button styles */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -224,7 +224,7 @@ h1, h2, h3, h4, .font-display {
   margin-bottom: 28px;
 }
 
-/* Cartes Pokémon 3D Tilt Effect */
+/* 3D tilt card styles */
 .card-item {
   position: relative;
   background: var(--bg-card);
@@ -265,7 +265,7 @@ h1, h2, h3, h4, .font-display {
   transform: scale(1.05);
 }
 
-/* Badge État / Condition */
+/* Physical condition badges */
 .condition-badge {
   display: inline-flex;
   align-items: center;
@@ -306,7 +306,7 @@ h1, h2, h3, h4, .font-display {
   border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
-/* Modales */
+/* Modal overlays and dialogs */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -332,7 +332,7 @@ h1, h2, h3, h4, .font-display {
   animation: modal-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Formulaires */
+/* Form controls */
 .form-group {
   margin-bottom: 20px;
 }

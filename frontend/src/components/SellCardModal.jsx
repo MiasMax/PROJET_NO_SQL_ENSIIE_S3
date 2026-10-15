@@ -74,7 +74,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" style={{ maxWidth: '820px' }} onClick={(e) => e.stopPropagation()}>
-        {/* En-tête */}
+        {/* Modal header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Vendre une Carte Pokémon</h2>
@@ -87,7 +87,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
           </button>
         </div>
 
-        {/* Bannière de persistance multi-systèmes */}
+        {/* Multi-store persistence banner */}
         <div style={{ padding: '12px 24px', background: 'rgba(99, 102, 241, 0.08)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Database size={18} color="var(--accent-primary)" />
           <span style={{ fontSize: '0.85rem', color: '#c7d2fe' }}>
@@ -102,9 +102,9 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', padding: '24px' }}>
-          {/* Formulaire */}
+          {/* Listing form */}
           <form onSubmit={handleSubmit}>
-            {/* Sélection de la carte */}
+            {/* Catalog card selection */}
             <div className="form-group">
               <label className="form-label">1. Choisir le Pokémon dans le catalogue</label>
               <input
@@ -129,7 +129,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
               </select>
             </div>
 
-            {/* État de la carte */}
+            {/* Physical condition */}
             <div className="form-group">
               <label className="form-label">2. État d'usure</label>
               <select
@@ -145,7 +145,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
               </select>
             </div>
 
-            {/* Prix de vente */}
+            {/* Price in EUR */}
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <label className="form-label">3. Prix demandé (€)</label>
@@ -167,7 +167,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
               />
             </div>
 
-            {/* Nom du vendeur */}
+            {/* Seller username */}
             <div className="form-group">
               <label className="form-label">4. Votre Pseudo Vendeur</label>
               <input
@@ -180,7 +180,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
               />
             </div>
 
-            {/* Description */}
+            {/* Listing description */}
             <div className="form-group">
               <label className="form-label">5. Description de l'annonce</label>
               <textarea
@@ -202,7 +202,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
             </button>
           </form>
 
-          {/* Prévisualisation en direct */}
+          {/* Real-time card preview */}
           <div style={{ background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-md)', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
               Aperçu en temps réel

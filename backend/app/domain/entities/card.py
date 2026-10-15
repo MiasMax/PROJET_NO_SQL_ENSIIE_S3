@@ -10,7 +10,7 @@ from dataclasses import dataclass
 class Card:
     id: str  # e.g. "sv3pt5-006" (Charizard ex 151)
     name: str  # e.g. "Charizard ex"
-    supertype: str  # "Pokémon", "Trainer", "Energy"
+    supertype: str  # e.g. "Pokemon", "Trainer", "Energy"
     subtypes: list[str]  # ["Stage 2", "ex"]
     hp: str | None  # "330"
     types: list[str]  # ["Fire"]

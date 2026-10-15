@@ -183,7 +183,7 @@ class MockOrderRepository(OrderRepository):
         return len(self.orders)
 
 
-# --- TESTS ASYNCHRONES ---
+# --- Async test fixtures and cases ---
 
 
 @pytest.fixture

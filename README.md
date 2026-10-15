@@ -76,11 +76,11 @@ flowchart LR
 
 ### Lancer le projet
 ```bash
-# 1. Cloner le dépôt
+# 1. Clone repository
 git clone <URL_DU_REPO_GITHUB>
 cd PROJET_NO_SQL_ENSIIE_S3
 
-# 2. Lancer l'orchestration complète
+# 2. Start full orchestration
 docker compose up --build
 ```
 
@@ -156,7 +156,7 @@ docker exec -it pokevinted-backend curl -s "http://elasticsearch:9200/pokevinted
 docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! MGET stats:active_listings stats:total_listings_created
 ```
 ```bash
-# Vérifier l'ajout dans la liste des nouveautés
+# Check newly added cards in recent feed
 docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! LRANGE listings:recent_ids 0 2
 ```
 > 👉 *Les compteurs atomiques ont été incrémentés et l'ID de l'annonce est en tête de file.*
@@ -192,7 +192,7 @@ Pour déployer sur un VPS (OVH, Hetzner, DigitalOcean, AWS EC2, etc.) :
    git clone <URL_DU_REPO_GITHUB>
    cd PROJET_NO_SQL_ENSIIE_S3
    cp .env.example .env
-   # Optionnel : nano .env pour personnaliser vos mots de passe de production
+   # Optional: customize production passwords in .env
    ```
 4. Démarrer les conteneurs :
    ```bash
