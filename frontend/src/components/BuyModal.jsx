@@ -87,7 +87,7 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div className="buy-modal-grid">
               <img
                 src={listing.image_url}
                 alt={listing.card_name}

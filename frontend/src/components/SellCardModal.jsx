@@ -101,7 +101,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', padding: '24px' }}>
+        <div className="sell-modal-grid">
           {/* Listing form */}
           <form onSubmit={handleSubmit}>
             {/* Catalog card selection */}

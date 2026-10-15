@@ -167,23 +167,7 @@ export default function App() {
     <div>
       {/* Toast Notification */}
       {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-          color: '#ffffff',
-          padding: '16px 24px',
-          borderRadius: '12px',
-          border: '1px solid #6366f1',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-          zIndex: 200,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          fontWeight: 600,
-          animation: 'modal-enter 0.25s ease-out',
-        }}>
+        <div className="toast-notification">
           <Sparkles size={20} color="var(--accent-gold)" />
           {toastMessage}
         </div>
@@ -206,31 +190,22 @@ export default function App() {
 
         {/* Search bar */}
         {currentView === 'marketplace' && (
-          <div style={{ position: 'relative', width: '340px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="navbar-search">
+            <Search size={18} className="navbar-search-icon" />
             <input
               type="text"
               placeholder="Rechercher (Dracaufeu, 151, Pikachu...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-input"
-              style={{ paddingLeft: '40px', paddingRight: '16px', background: 'rgba(255, 255, 255, 0.05)' }}
+              className="form-input navbar-search-input"
             />
           </div>
         )}
 
         {/* Trainer profile selector (Redis session) and actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="navbar-actions">
           {/* Profile badge and Redis session switcher */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-full)',
-            padding: '4px 12px',
-          }}>
+          <div className="navbar-session-badge">
             <User size={16} color="var(--accent-secondary)" />
             <select
               value={currentUser.id}
@@ -259,11 +234,15 @@ export default function App() {
             onClick={() => setCurrentView(currentView === 'marketplace' ? 'admin' : 'marketplace')}
             className={`btn ${currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            {currentView === 'admin' ? <><Store size={18} /> Marketplace</> : <><BarChart3 size={18} /> Bilan Admin NoSQL</>}
+            {currentView === 'admin' ? (
+              <><Store size={18} /><span className="btn-label-desktop">Marketplace</span></>
+            ) : (
+              <><BarChart3 size={18} /><span className="btn-label-desktop">Bilan Admin NoSQL</span><span className="btn-label-mobile">Admin</span></>
+            )}
           </button>
 
           <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold">
-            <PlusCircle size={18} /> Vendre une carte
+            <PlusCircle size={18} /><span className="btn-label-desktop">Vendre une carte</span><span className="btn-label-mobile">Vendre</span>
           </button>
         </div>
       </header>
@@ -286,7 +265,7 @@ export default function App() {
               <p className="hero-subtitle">
                 Marketplace Pokémon style Vinted haute performance combinant <strong>MongoDB</strong> (source de vérité documents JSON), <strong>Elasticsearch</strong> (recherche floue & analytics Grafana) et <strong>Redis</strong> (sessions, favoris, cache et top cartes en direct).
               </p>
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div className="hero-actions">
                 <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold" style={{ padding: '12px 28px' }}>
                   <PlusCircle size={18} /> Mettre une carte en vente
                 </button>
@@ -302,53 +281,55 @@ export default function App() {
 
           {/* Advanced filters bar and cache latency benchmark */}
           <div className="filters-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', marginRight: '8px' }}>
-              <Filter size={18} />
-              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filtres :</span>
+            <div className="filters-main">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                <Filter size={18} />
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filtres :</span>
+              </div>
+
+              {/* Expansion set selector */}
+              <select
+                value={selectedSet}
+                onChange={(e) => setSelectedSet(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', minWidth: '180px' }}
+              >
+                <option value="">Toutes les séries</option>
+                <option value="Écarlate et Violet 151">Écarlate et Violet 151</option>
+                <option value="Flammes Obsidiennes">Flammes Obsidiennes</option>
+                <option value="Écarlate et Violet">Écarlate et Violet</option>
+                <option value="Faille Paradoxe">Faille Paradoxe</option>
+                <option value="Forces Temporelles">Forces Temporelles</option>
+              </select>
+
+              {/* Condition selector */}
+              <select
+                value={selectedCondition}
+                onChange={(e) => setSelectedCondition(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', minWidth: '150px' }}
+              >
+                <option value="">Tous les états</option>
+                <option value="MINT">💎 MINT</option>
+                <option value="NEAR_MINT">✨ NEAR MINT</option>
+                <option value="EXCELLENT">👍 EXCELLENT</option>
+                <option value="GOOD">👌 GOOD</option>
+                <option value="PLAYED">⚡ PLAYED</option>
+              </select>
+
+              {/* Favorites filter (Redis Set) */}
+              <button
+                onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+                className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '8px 14px', fontSize: '0.85rem' }}
+              >
+                <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} />
+                Mes Favoris ({favorites.size})
+              </button>
             </div>
 
-            {/* Expansion set selector */}
-            <select
-              value={selectedSet}
-              onChange={(e) => setSelectedSet(e.target.value)}
-              className="form-select"
-              style={{ width: 'auto', minWidth: '180px' }}
-            >
-              <option value="">Toutes les séries</option>
-              <option value="Écarlate et Violet 151">Écarlate et Violet 151</option>
-              <option value="Flammes Obsidiennes">Flammes Obsidiennes</option>
-              <option value="Écarlate et Violet">Écarlate et Violet</option>
-              <option value="Faille Paradoxe">Faille Paradoxe</option>
-              <option value="Forces Temporelles">Forces Temporelles</option>
-            </select>
-
-            {/* Condition selector */}
-            <select
-              value={selectedCondition}
-              onChange={(e) => setSelectedCondition(e.target.value)}
-              className="form-select"
-              style={{ width: 'auto', minWidth: '150px' }}
-            >
-              <option value="">Tous les états</option>
-              <option value="MINT">💎 MINT</option>
-              <option value="NEAR_MINT">✨ NEAR MINT</option>
-              <option value="EXCELLENT">👍 EXCELLENT</option>
-              <option value="GOOD">👌 GOOD</option>
-              <option value="PLAYED">⚡ PLAYED</option>
-            </select>
-
-            {/* Favorites filter (Redis Set) */}
-            <button
-              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-              className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '8px 14px', fontSize: '0.85rem' }}
-            >
-              <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} />
-              Mes Favoris ({favorites.size})
-            </button>
-
             {/* Redis cache and Elasticsearch response time indicator */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="filters-stats">
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -413,7 +394,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '24px' }}>
+            <div className="cards-grid">
               {displayedListings.map((item) => (
                 <PokemonCard3D
                   key={item.id}

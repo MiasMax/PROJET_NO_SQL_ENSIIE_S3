@@ -36,8 +36,8 @@ export default function TrendingBar({ onSelectCard }) {
       marginBottom: '32px',
       boxShadow: '0 4px 20px rgba(239, 68, 68, 0.15)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <Flame size={20} color="#ef4444" className="animate-pulse" />
           <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Top 5 Tendances en Direct
@@ -61,7 +61,7 @@ export default function TrendingBar({ onSelectCard }) {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
         gap: '12px',
       }}>
         {trending.map((card, idx) => (

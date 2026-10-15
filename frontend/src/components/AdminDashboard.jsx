@@ -76,10 +76,10 @@ export default function AdminDashboard({ onBackToMarketplace }) {
   return (
     <div className="container">
       {/* Overview header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap', marginBottom: '32px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: 800 }}>Bilan & Supervision NoSQL</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 800 }}>Bilan & Supervision NoSQL</h1>
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -101,7 +101,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button onClick={handleSeed} disabled={seedLoading} className="btn btn-secondary">
             <RefreshCw size={16} className={seedLoading ? "animate-spin" : ""} />
             {seedLoading ? 'Peuplement...' : 'Ré-amorcer Seed'}
@@ -119,7 +119,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       )}
 
       {/* Financial and business KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+      <div className="admin-kpi-grid">
         <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Volume d'Affaires</span>
@@ -169,7 +169,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '16px' }}>
         État Détaillé des 3 Systèmes de Persistance
       </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '40px' }}>
+      <div className="admin-datastores-grid">
         {/* MongoDB */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -361,7 +361,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
 
         {/* Elasticsearch aggregation charts */}
         {aggregations && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+          <div className="admin-charts-grid">
             {/* By set */}
             <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '12px' }}>
@@ -424,7 +424,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         {orders.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Aucune commande passée pour le moment.</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
