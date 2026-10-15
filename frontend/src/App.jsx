@@ -145,7 +145,14 @@ export default function App() {
 
       if (resListings.ok) {
         const data = await resListings.json();
-        setListings(data.items || []);
+        const rawItems = data.items || [];
+        const seenIds = new Set();
+        const uniqueItems = rawItems.filter((item) => {
+          if (!item.id || seenIds.has(item.id)) return false;
+          seenIds.add(item.id);
+          return true;
+        });
+        setListings(uniqueItems);
         setCacheMetrics({
           hit: data.cache_hit || false,
           timeMs: data.response_time_ms || 1.2,
@@ -179,8 +186,12 @@ export default function App() {
   };
 
   const handleListingCreated = (newListing) => {
-    setListings((prev) => [newListing, ...prev]);
-    showToast(`🎉 Annonce publiée pour "${newListing.card_name}" ! Persistée dans Mongo, Elastic et Redis.`);
+    setListings((prev) => {
+      const exists = prev.some((l) => l.id === newListing.id);
+      if (exists) return prev;
+      return [newListing, ...prev];
+    });
+    showToast(`🎉 Votre annonce pour "${newListing.card_name}" est en ligne !`);
   };
 
   const handlePurchaseComplete = (order, listingId) => {

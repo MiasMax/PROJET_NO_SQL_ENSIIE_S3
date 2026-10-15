@@ -292,9 +292,10 @@ def get_default_catalog_cards() -> list[Card]:
 
 
 def get_initial_marketplace_listings() -> list[Listing]:
-    """Generate initial marketplace listings for local demo."""
+    """Generate initial marketplace listings with deterministic IDs for idempotent seeding."""
     return [
         Listing.create(
+            listing_id="seed-listing-dracaufeu-199",
             card_id="sv3pt5-199",
             card_name="Dracaufeu ex (Illustration Spéciale)",
             set_name="Écarlate et Violet 151",
@@ -306,6 +307,7 @@ def get_initial_marketplace_listings() -> list[Listing]:
             description="Tirée hier en display 151, immédiatement mise sous sleeve et toploader Ultra Pro. 0 rayures, centrage impeccable.",
         ),
         Listing.create(
+            listing_id="seed-listing-pikachu-025",
             card_id="sv3pt5-025",
             card_name="Pikachu",
             set_name="Écarlate et Violet 151",
@@ -317,6 +319,7 @@ def get_initial_marketplace_listings() -> list[Listing]:
             description="Petite carte Pikachu sympa pour compléter le master set 151.",
         ),
         Listing.create(
+            listing_id="seed-listing-dracaufeu-gold-223",
             card_id="sv3-223",
             card_name="Dracaufeu ex Téracristal Gold",
             set_name="Flammes Obsidiennes",
@@ -328,6 +331,7 @@ def get_initial_marketplace_listings() -> list[Listing]:
             description="Superbe Dracaufeu doré, brillant holographique splendide.",
         ),
         Listing.create(
+            listing_id="seed-listing-miraidon-245",
             card_id="sv1-245",
             card_name="Miraidon ex",
             set_name="Écarlate et Violet",
@@ -339,6 +343,7 @@ def get_initial_marketplace_listings() -> list[Listing]:
             description="Excellente carte jouable en tournoi ou pour collection Paldea.",
         ),
         Listing.create(
+            listing_id="seed-listing-mew-151",
             card_id="sv3pt5-151",
             card_name="Mew ex",
             set_name="Écarlate et Violet 151",

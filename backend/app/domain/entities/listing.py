@@ -48,10 +48,11 @@ class Listing:
         seller_name: str,
         description: str = "",
         custom_image_url: str | None = None,
+        listing_id: str | None = None,
     ) -> "Listing":
         """Factory creating a validated active listing."""
         return cls(
-            id=str(uuid.uuid4()),
+            id=listing_id or str(uuid.uuid4()),
             card_id=card_id,
             card_name=card_name,
             set_name=set_name,

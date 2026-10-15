@@ -33,8 +33,6 @@ class SeedCatalogUseCase:
         for listing in initial_listings:
             await self.listing_repo.save(listing)
             await self.search_repo.index_listing(listing)
-            await self.cache_repo.increment_counter("stats:active_listings", 1)
-            await self.cache_repo.push_recent_item("listings:recent_ids", listing.id)
             listings_count += 1
 
         # Clear listing caches
