@@ -116,10 +116,10 @@ export default function App() {
           const next = new Set(prev);
           if (data.is_favorite) {
             next.add(cardId);
-            showToast(`❤️ Ajouté aux favoris dans Redis (Set SADD) !`);
+            showToast(`❤️ Ajouté à vos favoris`);
           } else {
             next.delete(cardId);
-            showToast(`💔 Retiré des favoris dans Redis (Set SREM) !`);
+            showToast(`💔 Retiré de vos favoris`);
           }
           return next;
         });
@@ -190,8 +190,10 @@ export default function App() {
     showToast(`🛒 Bravo ! Achat confirmé de "${order.card_name}" pour ${order.price} € !`);
   };
 
+  const favoriteListingsCount = listings.filter((l) => favorites.has(l.card_id) || favorites.has(l.id)).length;
+
   const displayedListings = showOnlyFavorites
-    ? listings.filter((l) => favorites.has(l.card_id))
+    ? listings.filter((l) => favorites.has(l.card_id) || favorites.has(l.id))
     : listings;
 
   return (
@@ -375,14 +377,14 @@ export default function App() {
                 <option value="PLAYED">⚡ PLAYED</option>
               </select>
 
-              {/* Favorites filter (Redis Set) */}
+              {/* Favorites filter */}
               <button
                 onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
                 className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '8px 14px', fontSize: '0.85rem' }}
               >
                 <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} />
-                Mes Favoris ({favorites.size})
+                Mes Favoris ({favoriteListingsCount})
               </button>
             </div>
 
@@ -463,9 +465,15 @@ export default function App() {
                   ? "Cliquez sur le cœur d'une carte pour la sauvegarder dans vos favoris !"
                   : "Soyez le premier dresseur à publier une annonce avec le formulaire !"}
               </p>
-              <button onClick={() => { setShowOnlyFavorites(false); setIsSellModalOpen(true); }} className="btn btn-gold">
-                <PlusCircle size={18} /> Vendre une carte maintenant
-              </button>
+              {showOnlyFavorites ? (
+                <button onClick={() => setShowOnlyFavorites(false)} className="btn btn-primary" style={{ padding: '12px 24px' }}>
+                  Voir toutes les annonces
+                </button>
+              ) : (
+                <button onClick={() => { setShowOnlyFavorites(false); setIsSellModalOpen(true); }} className="btn btn-gold">
+                  <PlusCircle size={18} /> Vendre une carte maintenant
+                </button>
+              )}
             </div>
           ) : (
             <div className="cards-grid">

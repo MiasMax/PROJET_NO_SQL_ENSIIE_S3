@@ -211,8 +211,8 @@ class InMemoryCacheRepository(CacheRepository):
             "sv3pt5-151": 63,
         }
         self.favorites: dict[str, set[str]] = {
-            "sacha": {"sv3pt5-006", "sv3pt5-151"},
-            "ondine": {"sv3pt5-003"},
+            "sacha": {"sv3pt5-151"},
+            "ondine": {"sv3pt5-025"},
         }
         self.sessions: dict[str, dict[str, Any]] = {}
 
