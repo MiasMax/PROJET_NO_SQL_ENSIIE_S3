@@ -133,11 +133,11 @@ Pour constater en direct la persistance multi-systèmes lors de la saisie d'un f
 
 ### Étape 2 : Vérification dans les terminaux
 
-Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes (les identifiants par défaut sont automatiquement renseignés) :
+Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes (utilisez les mots de passe définis dans votre `.env`, ou copiez-les directement en un clic depuis l'onglet **Admin Dashboard** du site) :
 
 #### Terminal 1 — Constat de persistance dans **MongoDB**
 ```bash
-docker exec -it pokevinted-mongodb mongosh -u admin_pokevinted -p P0k3V1nt3d_S3cur3_M0ng0_P@ssw0rd! --authenticationDatabase admin pokevinted --eval "db.listings.find({seller_name: 'Professeur_NoSQL'}).pretty()"
+docker exec -it pokevinted-mongodb mongosh -u admin_pokevinted -p ChangeMe_P0k3V1nt3d_M0ng0_P@ssw0rd! --authenticationDatabase admin pokevinted --eval "db.listings.find({seller_name: 'Professeur_NoSQL'}).pretty()"
 ```
 > 👉 *L'annonce complète apparaît sous forme de document JSON BSON structuré.*
 
@@ -145,7 +145,7 @@ docker exec -it pokevinted-mongodb mongosh -u admin_pokevinted -p P0k3V1nt3d_S3c
 ```bash
 curl -s "http://localhost:9200/pokevinted_listings/_search?q=Professeur_NoSQL" | jq '.hits.hits[]._source | {id, card_name, price, seller_name, status}'
 ```
-*(ou via l'hôte si jq n'est pas installé)* :
+*(ou directement depuis le conteneur backend)* :
 ```bash
 docker exec -it pokevinted-backend curl -s "http://elasticsearch:9200/pokevinted_listings/_search?q=Professeur_NoSQL"
 ```
@@ -153,11 +153,11 @@ docker exec -it pokevinted-backend curl -s "http://elasticsearch:9200/pokevinted
 
 #### Terminal 3 — Constat des compteurs dans **Redis**
 ```bash
-docker exec -it pokevinted-redis redis-cli -a P0k3V1nt3d_S3cur3_R3d1s_T0k3n_2026! MGET stats:active_listings stats:total_listings_created
+docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! MGET stats:active_listings stats:total_listings_created
 ```
 ```bash
 # Vérifier l'ajout dans la liste des nouveautés
-docker exec -it pokevinted-redis redis-cli -a P0k3V1nt3d_S3cur3_R3d1s_T0k3n_2026! LRANGE listings:recent_ids 0 2
+docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! LRANGE listings:recent_ids 0 2
 ```
 > 👉 *Les compteurs atomiques ont été incrémentés et l'ID de l'annonce est en tête de file.*
 
