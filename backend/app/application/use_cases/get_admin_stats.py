@@ -69,21 +69,30 @@ class GetAdminStatsUseCase:
         }
 
         # --- 5. GUIDE D'INSPECTION TERMINAL (Pour la soutenance) ---
+        from app.config import settings
+
+        mongo_auth_flag = (
+            f"-u {settings.MONGO_ROOT_USER} -p {settings.MONGO_ROOT_PASSWORD} --authenticationDatabase admin "
+            if settings.MONGO_ROOT_USER
+            else ""
+        )
+        redis_auth_flag = f"-a {settings.REDIS_PASSWORD} " if settings.REDIS_PASSWORD else ""
+
         terminal_commands = [
             {
                 "system": "MongoDB",
-                "command": "docker exec -it pokevinted-mongodb mongosh pokevinted --eval 'db.listings.find({}, {card_name:1, price:1, status:1}).pretty()'",
-                "description": "Inspecte les annonces persistées en base documentaire",
+                "command": f"docker exec -it pokevinted-mongodb mongosh {mongo_auth_flag}{settings.MONGO_DB} --eval 'db.listings.find({{}}, {{card_name:1, price:1, status:1}}).pretty()'",
+                "description": "Inspecte les annonces persistées en base documentaire (accès sécurisé)",
             },
             {
                 "system": "Elasticsearch",
                 "command": "curl -s http://localhost:9200/pokevinted_listings/_search | jq '.hits.hits[]._source | {card_name, price, status}'",
-                "description": "Vérifie l'indexation de recherche plein-texte",
+                "description": "Vérifie l'indexation de recherche plein-texte (port 127.0.0.1 isolé)",
             },
             {
                 "system": "Redis",
-                "command": "docker exec -it pokevinted-redis redis-cli MGET stats:active_listings stats:total_sales_count stats:total_sales_volume",
-                "description": "Lit les compteurs atomiques temps réel",
+                "command": f"docker exec -it pokevinted-redis redis-cli {redis_auth_flag}MGET stats:active_listings stats:total_sales_count stats:total_sales_volume",
+                "description": "Lit les compteurs atomiques temps réel (accès sécurisé)",
             },
         ]
 

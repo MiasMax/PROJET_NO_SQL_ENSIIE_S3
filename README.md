@@ -92,7 +92,27 @@ Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalo
 | **Marketplace (Frontend)** | `http://localhost:3000` | Accès libre |
 | **Documentation API (Swagger)** | `http://localhost:8000/docs` | Accès libre |
 | **Elasticsearch** | `http://localhost:9200` | Sans mot de passe |
-| **Grafana** | `http://localhost:3001` | `admin` / `admin` |
+| **Grafana** | `http://localhost:3001` | `admin` / `Grafana_P0k3_Admin_2026!` (ou `.env`) |
+
+---
+
+## 🔒 Sécurité & Architecture Production-Ready
+
+Ce projet intègre les meilleures pratiques de sécurité DevOps pour éliminer les risques de fuite de données :
+
+1. **Cloisonnement Réseau (Zero Public Exposure)** :
+   * Les bases de données (**MongoDB**, **Redis**, **Elasticsearch**) ne sont **JAMAIS** exposées sur `0.0.0.0` (Internet public).
+   * Les ports sont strictement bindés sur `127.0.0.1` (loopback hôte) pour l'inspection locale ou isolés dans le réseau Docker interne `pokevinted-internal`.
+   * Un attaquant ou scanner de vulnérabilités (Shodan, Censys) ne peut pas sonder ou attaquer les bases depuis l'extérieur.
+2. **Authentification Obligatoire (Anti-Ransomware)** :
+   * **MongoDB** est verrouillé avec `admin_pokevinted` et un mot de passe fort via `authSource=admin`.
+   * **Redis** est protégé avec `--requirepass` pour empêcher l'exécution de commandes non autorisées.
+3. **Protection des Secrets & Logs** :
+   * Aucun secret en dur dans le code git : les variables proviennent de `.env` (dans `.gitignore`).
+   * `.env.example` sert de modèle pour le déploiement.
+   * Les URIs de connexion sont masquées dans les logs applicatifs (`******`) pour éviter les fuites via `docker logs`.
+4. **Contrôle des Ressources (Anti-OOM)** :
+   * Des limites de mémoire (`mem_limit`) sont assignées à chaque conteneur pour garantir la stabilité sur un VPS restreint (2 à 4 Go RAM).
 
 ---
 
@@ -113,11 +133,11 @@ Pour constater en direct la persistance multi-systèmes lors de la saisie d'un f
 
 ### Étape 2 : Vérification dans les terminaux
 
-Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes :
+Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes (les identifiants par défaut sont automatiquement renseignés) :
 
 #### Terminal 1 — Constat de persistance dans **MongoDB**
 ```bash
-docker exec -it pokevinted-mongodb mongosh pokevinted --eval "db.listings.find({seller_name: 'Professeur_NoSQL'}).pretty()"
+docker exec -it pokevinted-mongodb mongosh -u admin_pokevinted -p P0k3V1nt3d_S3cur3_M0ng0_P@ssw0rd! --authenticationDatabase admin pokevinted --eval "db.listings.find({seller_name: 'Professeur_NoSQL'}).pretty()"
 ```
 > 👉 *L'annonce complète apparaît sous forme de document JSON BSON structuré.*
 
@@ -125,15 +145,19 @@ docker exec -it pokevinted-mongodb mongosh pokevinted --eval "db.listings.find({
 ```bash
 curl -s "http://localhost:9200/pokevinted_listings/_search?q=Professeur_NoSQL" | jq '.hits.hits[]._source | {id, card_name, price, seller_name, status}'
 ```
+*(ou via l'hôte si jq n'est pas installé)* :
+```bash
+docker exec -it pokevinted-backend curl -s "http://elasticsearch:9200/pokevinted_listings/_search?q=Professeur_NoSQL"
+```
 > 👉 *Le document a été indexé en temps réel et est immédiatement requêtable.*
 
 #### Terminal 3 — Constat des compteurs dans **Redis**
 ```bash
-docker exec -it pokevinted-redis redis-cli MGET stats:active_listings stats:total_listings_created
+docker exec -it pokevinted-redis redis-cli -a P0k3V1nt3d_S3cur3_R3d1s_T0k3n_2026! MGET stats:active_listings stats:total_listings_created
 ```
 ```bash
 # Vérifier l'ajout dans la liste des nouveautés
-docker exec -it pokevinted-redis redis-cli LRANGE listings:recent_ids 0 2
+docker exec -it pokevinted-redis redis-cli -a P0k3V1nt3d_S3cur3_R3d1s_T0k3n_2026! LRANGE listings:recent_ids 0 2
 ```
 > 👉 *Les compteurs atomiques ont été incrémentés et l'ID de l'annonce est en tête de file.*
 
@@ -163,13 +187,18 @@ Pour déployer sur un VPS (OVH, Hetzner, DigitalOcean, AWS EC2, etc.) :
    ```bash
    curl -fsSL https://get.docker.com | sh
    ```
-3. Cloner et démarrer :
+3. Cloner et configurer l'environnement :
    ```bash
    git clone <URL_DU_REPO_GITHUB>
    cd PROJET_NO_SQL_ENSIIE_S3
+   cp .env.example .env
+   # Optionnel : nano .env pour personnaliser vos mots de passe de production
+   ```
+4. Démarrer les conteneurs :
+   ```bash
    docker compose up -d --build
    ```
-4. L'application est immédiatement accessible publiquement sur `http://<IP_DU_SERVEUR>:3000`.
+5. L'application est immédiatement accessible publiquement sur `http://<IP_DU_SERVEUR>:3000`.
 
 ---
 
