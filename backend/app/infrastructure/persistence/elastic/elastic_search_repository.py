@@ -1,6 +1,6 @@
 """
-Implémentation Elasticsearch de SearchRepository.
-Effectue des recherches multi-champs floues (fuzzy search), filtres et tri.
+Elasticsearch implementation of SearchRepository.
+Executes fuzzy multi-match queries, multi-criteria filters, and aggregations.
 """
 
 from typing import Any
@@ -21,7 +21,7 @@ class ElasticSearchRepository(SearchRepository):
 
     async def index_listing(self, listing: Listing) -> None:
         doc = listing.to_dict()
-        # Indexation avec refresh='wait_for' pour visibilité immédiate dans les tests/terminaux
+        # Refresh wait_for ensures instant visibility in read-after-write operations
         await self.client.index(
             index=self.index_name,
             id=listing.id,
@@ -48,12 +48,12 @@ class ElasticSearchRepository(SearchRepository):
         must_clauses: list[dict[str, Any]] = []
         filter_clauses: list[dict[str, Any]] = []
 
-        # 1. Filtre statut
+        # 1. Status filter
         if status:
             val = status.value if isinstance(status, ListingStatus) else status
             filter_clauses.append({"term": {"status": val}})
 
-        # 2. Recherche textuelle floue sur nom, extension, vendeur ou description
+        # 2. Fuzzy text search across card name, set, seller, and description
         if query and query.strip():
             must_clauses.append(
                 {
@@ -71,16 +71,16 @@ class ElasticSearchRepository(SearchRepository):
                 }
             )
 
-        # 3. Filtre par extension (exact match)
+        # 3. Set name exact term filter
         if set_name and set_name.strip():
             filter_clauses.append({"term": {"set_name.keyword": set_name.strip()}})
 
-        # 4. Filtre par état de carte
+        # 4. Condition filter
         if condition:
             cond_val = condition.value if isinstance(condition, CardCondition) else condition
             filter_clauses.append({"term": {"condition": cond_val}})
 
-        # 5. Filtre par tranche de prix
+        # 5. Price range filter
         if min_price is not None or max_price is not None:
             range_clause = {}
             if min_price is not None:
@@ -98,7 +98,7 @@ class ElasticSearchRepository(SearchRepository):
         if filter_clauses:
             bool_query["filter"] = filter_clauses
 
-        # Définition du tri
+        # Sort order configuration
         sort_field = "created_at"
         if sort_by == "price":
             sort_field = "price"
@@ -130,7 +130,7 @@ class ElasticSearchRepository(SearchRepository):
         return res["count"]
 
     async def get_aggregations(self) -> dict[str, Any]:
-        """Agrégations analytiques Elasticsearch exploitant la structure JSON des annonces."""
+        """Aggregate listing metrics across status, condition, set, and price."""
         aggs_query = {
             "by_status": {"terms": {"field": "status"}},
             "by_condition": {"terms": {"field": "condition"}},

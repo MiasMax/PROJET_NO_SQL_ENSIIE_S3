@@ -75,7 +75,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
 
   return (
     <div className="container">
-      {/* En-tête Bilan */}
+      {/* Overview header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -118,7 +118,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         </div>
       )}
 
-      {/* Cartes KPI Financières & Métier */}
+      {/* Financial and business KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -165,7 +165,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         </div>
       </div>
 
-      {/* Cartes d'État des 3 Moteurs NoSQL */}
+      {/* Detailed system health and metrics */}
       <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '16px' }}>
         État Détaillé des 3 Systèmes de Persistance
       </h2>
@@ -267,7 +267,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         </div>
       </div>
 
-      {/* SECTION VÉRIFICATION TERMINAL PROFESSEUR */}
+      {/* Terminal inspection commands */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: 'var(--radius-lg)', padding: '28px', marginBottom: '40px', boxShadow: 'var(--shadow-glow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
           <Terminal size={26} color="var(--accent-primary)" />
@@ -313,7 +313,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         </div>
       </div>
 
-      {/* SECTION GRAFANA & ELASTICSEARCH JSON ANALYTICS */}
+      {/* Grafana integration and Elasticsearch analytics */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-lg)', padding: '28px', marginBottom: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
@@ -347,7 +347,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
           </div>
         </div>
 
-        {/* JSON Explorer si activé */}
+        {/* Raw JSON viewer */}
         {showRawJson && aggregations && (
           <div style={{ marginBottom: '24px', background: '#04070d', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -359,10 +359,10 @@ export default function AdminDashboard({ onBackToMarketplace }) {
           </div>
         )}
 
-        {/* Visualisation des agrégations analytiques Elasticsearch */}
+        {/* Elasticsearch aggregation charts */}
         {aggregations && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-            {/* Par Série */}
+            {/* By set */}
             <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '12px' }}>
                 Prix Moyen par Extension (JSON Terms Agg)
@@ -379,7 +379,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
               </div>
             </div>
 
-            {/* Par État */}
+            {/* By condition */}
             <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-secondary)', marginBottom: '12px' }}>
                 Distribution par État (JSON Terms Agg)
@@ -396,7 +396,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
               </div>
             </div>
 
-            {/* Par Statut */}
+            {/* By status */}
             <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: '12px' }}>
                 Statut du Marché (ACTIVE vs SOLD)
@@ -416,7 +416,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         )}
       </div>
 
-      {/* Historique des Commandes Récentes */}
+      {/* Recent orders audit log */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
         <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '16px' }}>
           Historique des 10 Dernières Ventes Réalisées

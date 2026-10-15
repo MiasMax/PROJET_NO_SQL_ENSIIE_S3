@@ -1,5 +1,5 @@
 """
-Port abstrait du repository Commandes / Transactions (Audit des ventes).
+Order and purchase audit repository interface.
 """
 
 from abc import ABC, abstractmethod
@@ -10,20 +10,20 @@ from app.domain.entities.order import Order
 class OrderRepository(ABC):
     @abstractmethod
     async def save(self, order: Order) -> None:
-        """Enregistre une nouvelle commande."""
+        """Persist a new purchase transaction."""
         pass
 
     @abstractmethod
     async def get_by_id(self, order_id: str) -> Order | None:
-        """Récupère une commande par son ID."""
+        """Fetch order by unique identifier."""
         pass
 
     @abstractmethod
     async def list_orders(self, limit: int = 50, skip: int = 0) -> list[Order]:
-        """Liste les commandes triées par date décroissante."""
+        """List orders ordered by timestamp descending."""
         pass
 
     @abstractmethod
     async def count(self) -> int:
-        """Nombre total de transactions."""
+        """Return total number of completed orders."""
         pass

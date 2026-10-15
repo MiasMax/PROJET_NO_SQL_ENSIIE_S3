@@ -20,7 +20,7 @@ export default function TrendingBar({ onSelectCard }) {
 
   useEffect(() => {
     fetchTrending();
-    // Rafraîchissement périodique toutes les 15 secondes pour montrer le temps réel Redis
+    // Poll every 15s to illustrate real-time Redis Sorted Set updates
     const interval = setInterval(fetchTrending, 15000);
     return () => clearInterval(interval);
   }, []);

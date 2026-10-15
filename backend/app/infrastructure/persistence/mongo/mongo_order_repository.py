@@ -1,6 +1,6 @@
 """
-Implémentation MongoDB de OrderRepository.
-Enregistre les transactions dans la collection 'orders'.
+MongoDB implementation of OrderRepository.
+Persists order audit records in the 'orders' collection.
 """
 
 from motor.motor_asyncio import AsyncIOMotorDatabase

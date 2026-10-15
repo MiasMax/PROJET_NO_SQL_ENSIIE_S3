@@ -1,5 +1,5 @@
 """
-Client et gestionnaire de connexion MongoDB (Motor async).
+MongoDB async client manager (Motor).
 """
 
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _mask_mongo_uri(uri: str) -> str:
-    """Masque le mot de passe dans les logs de connexion."""
+    """Mask credentials in connection log entries."""
     return re.sub(r"://([^:]+):([^@]+)@", r"://\1:******@", uri)
 
 
@@ -22,7 +22,7 @@ class MongoClientManager:
     @classmethod
     def connect(cls, uri: str, db_name: str = "pokevinted") -> AsyncIOMotorDatabase:
         if cls.client is None:
-            logger.info("Connexion à MongoDB sur : %s", _mask_mongo_uri(uri))
+            logger.info("Connecting to MongoDB at: %s", _mask_mongo_uri(uri))
             cls.client = AsyncIOMotorClient(uri)
             cls.db = cls.client[db_name]
         return cls.db
@@ -33,4 +33,4 @@ class MongoClientManager:
             cls.client.close()
             cls.client = None
             cls.db = None
-            logger.info("Connexion MongoDB fermée.")
+            logger.info("MongoDB connection closed.")

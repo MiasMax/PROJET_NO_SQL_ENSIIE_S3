@@ -1,12 +1,12 @@
 """
-Schémas DTO pour les commandes et transactions d'achat.
+Data transfer objects for orders and purchases.
 """
 
 from pydantic import BaseModel, Field
 
 
 class PurchaseListingRequest(BaseModel):
-    buyer_name: str = Field(..., min_length=2, max_length=50, description="Nom / Pseudo de l'acheteur")
+    buyer_name: str = Field(..., min_length=2, max_length=50, description="Buyer name or handle")
 
 
 class OrderResponse(BaseModel):

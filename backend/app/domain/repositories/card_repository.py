@@ -1,5 +1,6 @@
 """
-Port abstrait du repository Catalogue de Cartes.
+Card catalog repository interface.
+Defines storage contracts for reference cards.
 """
 
 from abc import ABC, abstractmethod
@@ -10,25 +11,25 @@ from app.domain.entities.card import Card
 class CardRepository(ABC):
     @abstractmethod
     async def get_by_id(self, card_id: str) -> Card | None:
-        """Récupère une carte par son identifiant unique."""
+        """Fetch a catalog card by unique identifier."""
         pass
 
     @abstractmethod
     async def list_cards(self, limit: int = 50, skip: int = 0, search: str | None = None) -> list[Card]:
-        """Liste les cartes du catalogue avec pagination et recherche optionnelle."""
+        """List catalog cards with pagination and optional search."""
         pass
 
     @abstractmethod
     async def save(self, card: Card) -> None:
-        """Enregistre ou met à jour une carte."""
+        """Persist or update a card record."""
         pass
 
     @abstractmethod
     async def bulk_save(self, cards: list[Card]) -> int:
-        """Enregistre un lot de cartes (utilisé pour le seed)."""
+        """Persist multiple cards in bulk."""
         pass
 
     @abstractmethod
     async def count(self) -> int:
-        """Compte total de cartes dans le catalogue."""
+        """Return total number of cards in catalog."""
         pass

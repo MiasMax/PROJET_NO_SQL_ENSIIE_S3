@@ -12,7 +12,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Initialisation du premier Pokémon du catalogue par défaut
+  // Default to first catalog card on mount
   useEffect(() => {
     if (catalogCards.length > 0 && !selectedCardId) {
       setSelectedCardId(catalogCards[0].id);

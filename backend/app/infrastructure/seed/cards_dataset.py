@@ -1,6 +1,5 @@
 """
-Catalogue initial de cartes Pokémon officielles avec images officielles HD.
-Permet d'avoir une application vivante immédiatement au démarrage sans dépendance réseau externe.
+Official Pokémon reference cards dataset and seed catalog.
 """
 
 from typing import Any
@@ -269,7 +268,7 @@ RAW_CARDS: list[dict[str, Any]] = [
 
 
 def get_default_catalog_cards() -> list[Card]:
-    """Retourne la liste des entités Card du catalogue."""
+    """Return all catalog reference card entities."""
     return [
         Card(
             id=str(c["id"]),
@@ -293,7 +292,7 @@ def get_default_catalog_cards() -> list[Card]:
 
 
 def get_initial_marketplace_listings() -> list[Listing]:
-    """Génère quelques annonces initiales pour peupler le marketplace."""
+    """Generate initial marketplace listings for local demo."""
     return [
         Listing.create(
             card_id="sv3pt5-199",

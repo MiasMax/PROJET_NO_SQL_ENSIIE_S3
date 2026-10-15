@@ -1,50 +1,50 @@
 """
-Exceptions du domaine métier PokéVinted.
-Toutes les règles métier non respectées lèvent une exception explicite.
+PokéVinted domain exceptions.
+Explicit domain-level error types representing business invariant violations.
 """
 
 
 class DomainException(Exception):
-    """Exception de base pour les erreurs du domaine métier."""
+    """Base exception for all domain logic violations."""
 
     pass
 
 
 class CardNotFoundError(DomainException):
-    """Levée lorsqu'une carte de référence Pokémon n'existe pas dans le catalogue."""
+    """Raised when a Pokémon reference card does not exist in the catalog."""
 
     def __init__(self, card_id: str):
-        super().__init__(f"Carte Pokémon introuvable avec l'ID : '{card_id}'")
+        super().__init__(f"Card not found with ID: '{card_id}'")
         self.card_id = card_id
 
 
 class ListingNotFoundError(DomainException):
-    """Levée lorsqu'une annonce n'existe pas sur le marketplace."""
+    """Raised when a marketplace listing does not exist."""
 
     def __init__(self, listing_id: str):
-        super().__init__(f"Annonce introuvable avec l'ID : '{listing_id}'")
+        super().__init__(f"Listing not found with ID: '{listing_id}'")
         self.listing_id = listing_id
 
 
 class ListingAlreadySoldError(DomainException):
-    """Levée lorsqu'un acheteur tente d'acheter une carte déjà vendue."""
+    """Raised when an operation attempts to purchase an already sold listing."""
 
     def __init__(self, listing_id: str):
-        super().__init__(f"L'annonce '{listing_id}' a déjà été vendue")
+        super().__init__(f"Listing '{listing_id}' has already been sold")
         self.listing_id = listing_id
 
 
 class InvalidPriceError(DomainException):
-    """Levée lorsque le prix d'une annonce est négatif ou nul."""
+    """Raised when a listing price is zero or negative."""
 
     def __init__(self, price: float):
-        super().__init__(f"Le prix de vente doit être strictement positif (reçu : {price} €)")
+        super().__init__(f"Listing price must be strictly positive (received: {price} EUR)")
         self.price = price
 
 
 class InvalidConditionError(DomainException):
-    """Levée si l'état de la carte n'est pas reconnu."""
+    """Raised when a card condition string is not recognized."""
 
     def __init__(self, condition: str):
-        super().__init__(f"État de carte invalide : '{condition}'")
+        super().__init__(f"Invalid card condition: '{condition}'")
         self.condition = condition

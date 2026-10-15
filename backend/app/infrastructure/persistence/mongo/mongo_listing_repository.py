@@ -1,6 +1,6 @@
 """
-Implémentation MongoDB du ListingRepository.
-Gère la persistance des annonces dans la collection 'listings'.
+MongoDB implementation of ListingRepository.
+Persists marketplace listings in the 'listings' collection.
 """
 
 from motor.motor_asyncio import AsyncIOMotorDatabase

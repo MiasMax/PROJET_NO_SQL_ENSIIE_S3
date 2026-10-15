@@ -1,6 +1,6 @@
 """
-Tests d'intégration des routes API FastAPI avec injection de dépendances.
-Simule le cycle complet : Catalogue -> Publication d'annonce -> Recherche -> Achat -> Bilan Admin.
+Integration tests for FastAPI endpoints with dependency injection overrides.
+Exercises the full lifecycle: Catalog -> Listing Publication -> Search -> Purchase -> Admin Stats.
 """
 
 import pytest
@@ -26,7 +26,7 @@ from tests.unit.test_use_cases import (
 
 @pytest.fixture
 def test_env():
-    # Catalogue de départ
+    # Initial reference catalog
     cards = get_default_catalog_cards()
     card_repo = MockCardRepository(cards)
     listing_repo = MockListingRepository()
@@ -34,7 +34,7 @@ def test_env():
     cache_repo = MockCacheRepository()
     order_repo = MockOrderRepository()
 
-    # Remplacement des dépendances de l'app par les mocks
+    # Override application dependencies with in-memory test doubles
     app.dependency_overrides[get_card_repository] = lambda: card_repo
     app.dependency_overrides[get_listing_repository] = lambda: listing_repo
     app.dependency_overrides[get_search_repository] = lambda: search_repo
@@ -76,7 +76,7 @@ def test_complete_marketplace_flow(test_env):
     search_repo = test_env["search_repo"]
     cache_repo = test_env["cache_repo"]
 
-    # 1. Étape Formulaire : Création d'une annonce (Consigne principale NoSQL)
+    # 1. Step 1: Listing creation via form payload
     create_payload = {
         "card_id": "sv3pt5-006",
         "price": 48.50,
@@ -89,21 +89,21 @@ def test_complete_marketplace_flow(test_env):
     listing_data = create_res.json()
     listing_id = listing_data["id"]
 
-    # Vérification multi-systèmes directe :
-    # a) Présent dans MongoDB mock
+    # Direct multi-system persistence checks:
+    # a) Stored in MongoDB mock
     assert listing_id in listing_repo.listings
-    # b) Présent dans Elasticsearch mock
+    # b) Indexed in Elasticsearch mock
     assert listing_id in search_repo.indexed
-    # c) Compteurs incrémentés dans Redis mock
+    # c) Atomic counters incremented in Redis mock
     assert cache_repo.counters["stats:active_listings"] == 1
 
-    # 2. Étape Consultation & Recherche
+    # 2. Step 2: Search and query execution
     search_res = client.get("/api/listings?q=Dracaufeu")
     assert search_res.status_code == 200
     search_items = search_res.json()["items"]
     assert any(i["id"] == listing_id for i in search_items)
 
-    # 3. Étape Achat
+    # 3. Step 3: Purchase execution
     buy_payload = {"buyer_name": "Regis"}
     buy_res = client.post(f"/api/listings/{listing_id}/purchase", json=buy_payload)
     assert buy_res.status_code == 200
@@ -111,12 +111,12 @@ def test_complete_marketplace_flow(test_env):
     assert order_data["price"] == 48.50
     assert order_data["buyer_name"] == "Regis"
 
-    # Vérification que l'annonce est bien marquée vendue
+    # Confirm the listing transitioned to SOLD
     assert listing_repo.listings[listing_id].status == "SOLD"
     assert cache_repo.counters["stats:active_listings"] == 0
     assert cache_repo.counters["stats:total_sales_count"] == 1
 
-    # 4. Étape Bilan Admin NoSQL
+    # 4. Step 4: Admin NoSQL telemetry overview
     admin_res = client.get("/api/admin/stats")
     assert admin_res.status_code == 200
     admin_data = admin_res.json()
@@ -129,26 +129,26 @@ def test_redis_sessions_and_favorites(test_env):
     client = test_env["client"]
     cache_repo = test_env["cache_repo"]
 
-    # Session par défaut
+    # Default session check
     me_res = client.get("/api/users/me")
     assert me_res.status_code == 200
     user = me_res.json()
     assert user["id"] == "sacha"
 
-    # Changement de session vers Ondine
+    # Switch session to Ondine
     switch_res = client.post("/api/users/switch", json={"user_id": "ondine"})
     assert switch_res.status_code == 200
     ondine = switch_res.json()
     assert ondine["id"] == "ondine"
     assert ondine["balance"] == 480.0
 
-    # Ajout d'une carte en favori dans Redis (SADD)
+    # Add card to favorites set in Redis (SADD)
     fav_res = client.post("/api/users/favorites/sv3pt5-006?user_id=ondine")
     assert fav_res.status_code == 200
     assert fav_res.json()["is_favorite"] is True
     assert "sv3pt5-006" in cache_repo.favorites.get("ondine", set())
 
-    # Consultation des favoris (SMEMBERS)
+    # Retrieve favorites (SMEMBERS)
     get_favs = client.get("/api/users/favorites?user_id=ondine")
     assert get_favs.status_code == 200
     assert "sv3pt5-006" in get_favs.json()
@@ -157,11 +157,11 @@ def test_redis_sessions_and_favorites(test_env):
 def test_redis_trending_views(test_env):
     client = test_env["client"]
 
-    # Incrémentation de vue dans Redis Sorted Set (ZINCRBY)
+    # Increment view score in Redis Sorted Set (ZINCRBY)
     view_res = client.post("/api/cards/sv3pt5-006/view")
     assert view_res.status_code == 200
 
-    # Consultation du classement Top Trending (ZREVRANGE)
+    # Fetch top trending ranking (ZREVRANGE)
     top_res = client.get("/api/cards/trending/top")
     assert top_res.status_code == 200
     trending_cards = top_res.json()

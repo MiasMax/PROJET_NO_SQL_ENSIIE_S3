@@ -1,6 +1,6 @@
 """
-Implémentation Redis de CacheRepository.
-Gère les compteurs atomiques, listes récentes (LPUSH/LTRIM) et popularité (ZINCRBY).
+Redis implementation of CacheRepository.
+Handles atomic counters, recent feeds (LPUSH/LTRIM), and view rankings (ZINCRBY).
 """
 
 import json

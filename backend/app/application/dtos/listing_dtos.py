@@ -1,5 +1,5 @@
 """
-Schémas DTO pour les annonces du marketplace (Pydantic V2).
+Data transfer objects for marketplace listings.
 """
 
 from pydantic import BaseModel, Field
@@ -8,12 +8,12 @@ from app.domain.value_objects.card_condition import CardCondition
 
 
 class CreateListingRequest(BaseModel):
-    card_id: str = Field(..., description="ID de la carte Pokémon dans le catalogue")
-    price: float = Field(..., gt=0, description="Prix de vente en euros (doit être > 0)")
-    condition: CardCondition = Field(..., description="État d'usure de la carte")
-    seller_name: str = Field(..., min_length=2, max_length=50, description="Pseudo du vendeur")
-    description: str = Field(default="", max_length=1000, description="Description de l'annonce")
-    custom_image_url: str | None = Field(default=None, description="URL d'une photo personnalisée")
+    card_id: str = Field(..., description="Card catalog identifier")
+    price: float = Field(..., gt=0, description="Sale price in EUR (must be positive)")
+    condition: CardCondition = Field(..., description="Card physical condition")
+    seller_name: str = Field(..., min_length=2, max_length=50, description="Seller nickname")
+    description: str = Field(default="", max_length=1000, description="Listing description")
+    custom_image_url: str | None = Field(default=None, description="Optional custom image URL")
 
 
 class ListingResponse(BaseModel):

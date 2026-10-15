@@ -12,26 +12,26 @@ export default function App() {
   const [catalogCards, setCatalogCards] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Métriques de Cache Redis
+  // Redis cache metrics
   const [cacheMetrics, setCacheMetrics] = useState({ hit: false, timeMs: 0, source: 'elasticsearch' });
 
-  // Session Utilisateur Redis
+  // Redis user session
   const [currentUser, setCurrentUser] = useState({ id: 'sacha', name: 'Sacha du Bourg-Palette', role: 'Dresseur Kanto', balance: 250 });
   const [favorites, setFavorites] = useState(new Set());
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
-  // Filtres de recherche
+  // Search filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSet, setSelectedSet] = useState('');
   const [selectedCondition, setSelectedCondition] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 
-  // Modales
+  // Modals
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [selectedListingForBuy, setSelectedListingForBuy] = useState(null);
 
-  // Toast Notification
+  // Toast notification
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (msg) => {
@@ -39,7 +39,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Chargement de l'utilisateur actif et des favoris depuis Redis
+  // Load active user session and favorites from Redis
   const loadUserAndFavorites = async (userId = 'sacha') => {
     try {
       const [resUser, resFavs] = await Promise.all([
@@ -99,7 +99,7 @@ export default function App() {
     }
   };
 
-  // Chargement du catalogue et des annonces
+  // Fetch marketplace listings and reference catalog
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -127,7 +127,7 @@ export default function App() {
         setCatalogCards(cards || []);
       }
     } catch (e) {
-      console.error('Erreur chargement PokéVinted :', e);
+      console.error('Failed to load PokéVinted data:', e);
     } finally {
       setLoading(false);
     }
@@ -142,7 +142,7 @@ export default function App() {
   }, [searchQuery, selectedSet, selectedCondition, sortBy, sortOrder]);
 
   const handleCardSelected = (item) => {
-    // Tracking de popularité en temps réel dans Redis (ZINCRBY)
+    // Real-time popularity tracking in Redis (ZINCRBY)
     fetch(`/api/cards/${item.card_id}/view`, { method: 'POST' }).catch(() => {});
     setSelectedListingForBuy(item);
   };

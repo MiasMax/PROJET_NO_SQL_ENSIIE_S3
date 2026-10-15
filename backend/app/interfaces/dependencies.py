@@ -1,6 +1,6 @@
 """
-Conteneur d'injection de dépendances pour FastAPI.
-Assure l'instanciation des adaptateurs et la transmission aux Use Cases DDD.
+FastAPI dependency injection wiring.
+Instantiates database adapters and passes them to domain use cases.
 """
 
 from fastapi import Depends

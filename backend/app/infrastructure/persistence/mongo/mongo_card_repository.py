@@ -1,6 +1,6 @@
 """
-Implémentation MongoDB du CardRepository.
-Stocke le catalogue officiel des cartes Pokémon dans la collection 'cards'.
+MongoDB implementation of CardRepository.
+Stores official reference card documents in the 'cards' collection.
 """
 
 from motor.motor_asyncio import AsyncIOMotorDatabase

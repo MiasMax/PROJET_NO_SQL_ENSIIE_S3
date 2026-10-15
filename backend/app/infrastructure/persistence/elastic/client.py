@@ -1,5 +1,5 @@
 """
-Client et initialisation des schémas d'index Elasticsearch.
+Elasticsearch async client and index mapping configuration.
 """
 
 import logging
@@ -50,23 +50,23 @@ class ElasticClientManager:
     @classmethod
     def connect(cls, host: str = "http://localhost:9200") -> AsyncElasticsearch:
         if cls.client is None:
-            logger.info("Connexion à Elasticsearch sur : %s", host)
+            logger.info("Connecting to Elasticsearch at: %s", host)
             cls.client = AsyncElasticsearch(hosts=[host], request_timeout=10)
         return cls.client
 
     @classmethod
     async def init_indices(cls) -> None:
-        """Initialise l'index des annonces avec mapping si inexistant."""
+        """Create the listings index mapping when missing."""
         if cls.client is None:
             return
         exists = await cls.client.indices.exists(index=LISTINGS_INDEX)
         if not exists:
             await cls.client.indices.create(index=LISTINGS_INDEX, body=LISTINGS_MAPPING)
-            logger.info("Index Elasticsearch '%s' créé avec succès.", LISTINGS_INDEX)
+            logger.info("Elasticsearch index '%s' initialized.", LISTINGS_INDEX)
 
     @classmethod
     async def close(cls) -> None:
         if cls.client:
             await cls.client.close()
             cls.client = None
-            logger.info("Connexion Elasticsearch fermée.")
+            logger.info("Elasticsearch connection closed.")

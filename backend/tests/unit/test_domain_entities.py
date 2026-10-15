@@ -1,6 +1,6 @@
 """
-Tests unitaires des entités du domaine métier (TDD).
-Vérifie les invariants métier stricts sans dépendance aux bases de données.
+Unit tests for domain entities and value objects.
+Validates business invariants without external dependencies.
 """
 
 import pytest
@@ -112,7 +112,7 @@ def test_listing_mark_as_sold_lifecycle():
     assert listing.buyer_name == "Regis"
     assert listing.sold_at is not None
 
-    # Tenter de revendre une annonce déjà vendue doit échouer
+    # Attempting to resell an already sold listing must fail
     with pytest.raises(ListingAlreadySoldError):
         listing.mark_as_sold("Pierre")
 

@@ -26,7 +26,7 @@
   --accent-primary: #6366f1;       /* Indigo */
   --accent-primary-hover: #4f46e5;
   --accent-secondary: #06b6d4;     /* Cyan */
-  --accent-gold: #f59e0b;          /* Rareté / Prix */
+  --accent-gold: #f59e0b;          /* Rarity / Price */
   --accent-crimson: #ef4444;       /* Pokéball red */
   --accent-emerald: #10b981;       /* Mint condition / Success */
 
@@ -363,7 +363,7 @@ h1, h2, h3, h4, .font-display {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
-/* Barre de filtres */
+/* Filters bar */
 .filters-bar {
   display: flex;
   flex-wrap: wrap;
@@ -376,7 +376,7 @@ h1, h2, h3, h4, .font-display {
   align-items: center;
 }
 
-/* Tableaux Admin */
+/* Admin Tables */
 .admin-table {
   width: 100%;
   border-collapse: collapse;

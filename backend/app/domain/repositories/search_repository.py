@@ -1,5 +1,5 @@
 """
-Port abstrait du moteur de recherche textuelle et filtrage avancé (e.g. Elasticsearch).
+Search and faceted query repository interface (e.g. Elasticsearch).
 """
 
 from abc import ABC, abstractmethod
@@ -13,12 +13,12 @@ from app.domain.value_objects.listing_status import ListingStatus
 class SearchRepository(ABC):
     @abstractmethod
     async def index_listing(self, listing: Listing) -> None:
-        """Indexe ou met à jour une annonce dans le moteur de recherche."""
+        """Index or update listing in search engine."""
         pass
 
     @abstractmethod
     async def delete_listing(self, listing_id: str) -> None:
-        """Supprime une annonce de l'index de recherche."""
+        """Delete listing from search index."""
         pass
 
     @abstractmethod
@@ -36,22 +36,22 @@ class SearchRepository(ABC):
         skip: int = 0,
     ) -> dict[str, Any]:
         """
-        Recherche multicritères et floue avec aggregations.
-        Retourne un dictionnaire {'total': int, 'items': List[Listing], 'aggregations': dict}.
+        Execute multi-criteria fuzzy search with aggregations.
+        Returns a dict matching: {'total': int, 'items': List[Listing], 'aggregations': dict}.
         """
         pass
 
     @abstractmethod
     async def get_indexed_count(self) -> int:
-        """Nombre total de documents indexés."""
+        """Return total number of indexed documents."""
         pass
 
     @abstractmethod
     async def get_aggregations(self) -> dict[str, Any]:
         """
-        Calcule les agrégations analytiques via Elasticsearch :
-        - Répartition par statut (ACTIVE vs SOLD)
-        - Prix moyen et volumétrie par extension (set_name)
-        - Distribution par état d'usure et rareté
+        Compute analytical aggregations:
+        - Distribution by status (ACTIVE vs SOLD)
+        - Average price and volume by expansion set
+        - Breakdown by condition grade and rarity
         """
         pass

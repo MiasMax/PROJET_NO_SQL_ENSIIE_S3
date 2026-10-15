@@ -56,7 +56,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
         transition: 'transform 0.15s ease-out',
       }}
     >
-      {/* Reflet Holographique Speculaire */}
+      {/* Holographic specular glare */}
       <div
         style={{
           position: 'absolute',
@@ -71,7 +71,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
         }}
       />
 
-      {/* Ruban Vendu */}
+      {/* Sold ribbon banner */}
       {isSold && (
         <div style={{
           position: 'absolute',
@@ -87,11 +87,11 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
           zIndex: 20,
           boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
         }}>
-          VENDU
+          SOLD
         </div>
       )}
 
-      {/* Image de la carte */}
+      {/* Card image container */}
       <div className="card-image-wrap">
         {onToggleFavorite && (
           <button
@@ -99,7 +99,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
               e.stopPropagation();
               onToggleFavorite(listing.card_id);
             }}
-            title={isFavorite ? "Retirer des favoris (Redis Set)" : "Ajouter aux favoris (Redis Set)"}
+            title={isFavorite ? "Remove from favorites (Redis Set)" : "Add to favorites (Redis Set)"}
             style={{
               position: 'absolute',
               top: '12px',
@@ -130,7 +130,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
         />
       </div>
 
-      {/* Informations de l'annonce */}
+      {/* Listing details */}
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className={`condition-badge ${getConditionBadgeClass(listing.condition)}`}>
@@ -156,7 +156,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
           </span>
         </div>
 
-        {/* Boutons d'action */}
+        {/* Action buttons */}
         <div style={{ display: 'grid', gridTemplateColumns: isSold ? '1fr' : '1fr 1fr', gap: '8px', marginTop: '12px' }}>
           <button
             onClick={() => onSelect(listing)}

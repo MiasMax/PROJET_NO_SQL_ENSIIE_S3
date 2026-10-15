@@ -1,5 +1,5 @@
 """
-Schémas DTO pour le bilan Admin et les métriques NoSQL.
+Data transfer objects for admin metrics and status checks.
 """
 
 from typing import Any

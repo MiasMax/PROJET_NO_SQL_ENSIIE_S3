@@ -1,13 +1,13 @@
 """
-Objets-valeurs pour l'état d'usure des cartes (standard international TCG / Cardmarket).
+Value objects for card condition (TCG / Cardmarket grading standard).
 """
 
 from enum import StrEnum
 
 
 class CardCondition(StrEnum):
-    MINT = "MINT"  # Parfait état, sortie de booster sous sleeve
-    NEAR_MINT = "NEAR_MINT"  # Quasi neuf, infimes micro-défauts
-    EXCELLENT = "EXCELLENT"  # Très bon état, légers blanchiments aux bords
-    GOOD = "GOOD"  # Bon état, quelques rayures ou marques d'usage
-    PLAYED = "PLAYED"  # Jouée, plis ou usure visible
+    MINT = "MINT"  # Pack-fresh, sleeved immediately
+    NEAR_MINT = "NEAR_MINT"  # Minimal edge whitening or micro-flaws
+    EXCELLENT = "EXCELLENT"  # Light play, minor border wear
+    GOOD = "GOOD"  # Noticeable wear, minor scratches or scuffs
+    PLAYED = "PLAYED"  # Heavy play, visible bends or edge wear

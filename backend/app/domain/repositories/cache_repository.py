@@ -1,5 +1,5 @@
 """
-Port abstrait pour le cache, compteurs temps-réel et structures ordonnées (e.g. Redis).
+Cache, real-time counters, and session repository interface (e.g. Redis).
 """
 
 from abc import ABC, abstractmethod
@@ -9,80 +9,80 @@ from typing import Any
 class CacheRepository(ABC):
     @abstractmethod
     async def increment_counter(self, key: str, amount: int = 1) -> int:
-        """Incrémente atomiquement un compteur numérique."""
+        """Atomically increment an integer counter."""
         pass
 
     @abstractmethod
     async def increment_float_counter(self, key: str, amount: float) -> float:
-        """Incrémente atomiquement un compteur décimal (ex: volume des ventes)."""
+        """Atomically increment a floating-point counter (e.g. sales volume)."""
         pass
 
     @abstractmethod
     async def get_counter(self, key: str) -> float:
-        """Lit la valeur d'un compteur."""
+        """Read current counter value."""
         pass
 
     @abstractmethod
     async def push_recent_item(self, list_key: str, item_id: str, max_items: int = 20) -> None:
-        """Ajoute un élément dans une liste FIFO bornée."""
+        """Push an item to a bounded FIFO list."""
         pass
 
     @abstractmethod
     async def get_recent_items(self, list_key: str, limit: int = 10) -> list[str]:
-        """Récupère les derniers éléments d'une liste."""
+        """Fetch latest items from a bounded list."""
         pass
 
     @abstractmethod
     async def track_card_view(self, card_id: str) -> None:
-        """Incrémente la popularité d'une carte dans un Sorted Set (trending)."""
+        """Increment popularity of a card in a Sorted Set (trending)."""
         pass
 
     @abstractmethod
     async def get_trending_card_ids(self, limit: int = 5) -> list[dict[str, Any]]:
-        """Récupère les cartes les plus consultées avec leur score."""
+        """Fetch most viewed card IDs with their view count."""
         pass
 
     @abstractmethod
     async def add_favorite(self, user_id: str, card_id: str) -> None:
-        """Ajoute une carte aux favoris de l'utilisateur (Redis SADD)."""
+        """Add a card to user favorites Set (Redis SADD)."""
         pass
 
     @abstractmethod
     async def remove_favorite(self, user_id: str, card_id: str) -> None:
-        """Retire une carte des favoris (Redis SREM)."""
+        """Remove a card from user favorites Set (Redis SREM)."""
         pass
 
     @abstractmethod
     async def get_favorites(self, user_id: str) -> list[str]:
-        """Récupère la liste des favoris (Redis SMEMBERS)."""
+        """Retrieve user favorite card IDs (Redis SMEMBERS)."""
         pass
 
     @abstractmethod
     async def set_user_session(self, token: str, user_data: dict[str, Any], ttl_seconds: int = 86400) -> None:
-        """Enregistre une session utilisateur avec expiration TTL dans Redis."""
+        """Store user session with expiration TTL."""
         pass
 
     @abstractmethod
     async def get_user_session(self, token: str) -> dict[str, Any] | None:
-        """Récupère la session utilisateur active depuis Redis."""
+        """Retrieve active user session by token."""
         pass
 
     @abstractmethod
     async def get_json(self, key: str) -> Any | None:
-        """Récupère une valeur mise en cache JSON."""
+        """Retrieve a cached JSON value."""
         pass
 
     @abstractmethod
     async def set_json(self, key: str, value: Any, ttl_seconds: int = 300) -> None:
-        """Stocke une valeur en cache JSON avec une durée de vie (TTL)."""
+        """Cache a JSON value with expiration TTL."""
         pass
 
     @abstractmethod
     async def delete(self, key: str) -> None:
-        """Supprime une clé du cache."""
+        """Invalidate a cache key."""
         pass
 
     @abstractmethod
     async def get_stats(self) -> dict[str, Any]:
-        """Récupère des métriques Redis (mémoire, connexions, uptime)."""
+        """Fetch server runtime stats (memory, connections, uptime)."""
         pass

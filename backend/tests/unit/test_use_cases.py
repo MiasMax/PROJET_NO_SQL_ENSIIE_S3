@@ -1,6 +1,6 @@
 """
-Tests unitaires des Use Cases (TDD).
-Valide que chaque action métier orchestre scrupuleusement la persistance multi-NoSQL.
+Unit tests for domain use cases.
+Validates multi-store persistence orchestration across MongoDB, Elasticsearch, and Redis.
 """
 
 from typing import Any
@@ -21,7 +21,7 @@ from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.search_repository import SearchRepository
 from app.domain.value_objects.listing_status import ListingStatus
 
-# --- REPOSITORIES MOCKS POUR TEST PUR ---
+# --- In-memory repository mocks for fast unit test execution ---
 
 
 class MockCardRepository(CardRepository):
@@ -224,21 +224,21 @@ async def test_create_listing_orchestrates_multi_system_persistence(fake_card):
         description="Carte neuve sortie de booster",
     )
 
-    # Exécution
+    # Execution
     created_listing = await use_case.execute(command)
 
-    # 1. Vérification MongoDB (Listing persistant)
+    # 1. MongoDB verification (persisted listing entity)
     assert created_listing.id in listing_repo.listings
     saved_in_mongo = listing_repo.listings[created_listing.id]
     assert saved_in_mongo.price == 55.0
     assert saved_in_mongo.card_name == "Dracaufeu ex"
 
-    # 2. Vérification Elasticsearch (Document indexé)
+    # 2. Elasticsearch verification (indexed searchable document)
     assert created_listing.id in search_repo.indexed
     indexed_in_elastic = search_repo.indexed[created_listing.id]
     assert indexed_in_elastic.seller_name == "Sacha"
 
-    # 3. Vérification Redis (Compteurs et recent feed)
+    # 3. Redis verification (atomic counters and recent feed)
     assert cache_repo.counters["stats:active_listings"] == 1
     assert cache_repo.counters["stats:total_listings_created"] == 1
     assert created_listing.id in cache_repo.lists["listings:recent_ids"]
@@ -265,14 +265,14 @@ async def test_create_listing_fails_if_card_not_in_catalog():
 
 @pytest.mark.asyncio
 async def test_purchase_listing_updates_all_stores(fake_card):
-    # Setup initial avec 1 carte et 1 annonce active
+    # Initial setup with 1 reference card and 1 active listing
     card_repo = MockCardRepository([fake_card])
     listing_repo = MockListingRepository()
     search_repo = MockSearchRepository()
     cache_repo = MockCacheRepository()
     order_repo = MockOrderRepository()
 
-    # Création initiale
+    # Initial listing creation
     create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
     listing = await create_uc.execute(
         CreateListingCommand(
@@ -283,20 +283,20 @@ async def test_purchase_listing_updates_all_stores(fake_card):
         )
     )
 
-    # Achat par un acheteur
+    # Purchase execution
     purchase_uc = PurchaseListingUseCase(listing_repo, order_repo, search_repo, cache_repo)
     order = await purchase_uc.execute(PurchaseListingCommand(listing_id=listing.id, buyer_name="Regis"))
 
-    # 1. Vérification MongoDB
+    # 1. MongoDB verification (marked as SOLD)
     updated_listing = listing_repo.listings[listing.id]
     assert updated_listing.status == ListingStatus.SOLD
     assert updated_listing.buyer_name == "Regis"
     assert order.id in order_repo.orders
 
-    # 2. Vérification Elasticsearch
+    # 2. Elasticsearch verification (updated index document)
     assert search_repo.indexed[listing.id].status == ListingStatus.SOLD
 
-    # 3. Vérification Redis
+    # 3. Redis verification (decremented active count and incremented volume)
     assert cache_repo.counters["stats:active_listings"] == 0
     assert cache_repo.counters["stats:total_sales_count"] == 1
     assert cache_repo.counters["stats:total_sales_volume"] == 60.0

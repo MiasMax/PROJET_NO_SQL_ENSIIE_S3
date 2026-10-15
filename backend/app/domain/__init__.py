@@ -1,1 +1,1 @@
-# Package Domaine Métier Pur (Clean Architecture / DDD)
+# Pure domain layer package (Clean Architecture / DDD)
