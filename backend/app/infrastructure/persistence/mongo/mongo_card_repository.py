@@ -3,6 +3,8 @@ MongoDB implementation of CardRepository.
 Stores official reference card documents in the 'cards' collection.
 """
 
+import re
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.domain.entities.card import Card
@@ -21,8 +23,9 @@ class MongoCardRepository(CardRepository):
 
     async def list_cards(self, limit: int = 50, skip: int = 0, search: str | None = None) -> list[Card]:
         query = {}
-        if search:
-            query = {"name": {"$regex": search, "$options": "i"}}
+        if search and search.strip():
+            safe_search = re.escape(search.strip())
+            query = {"name": {"$regex": safe_search, "$options": "i"}}
         cursor = self.collection.find(query).skip(skip).limit(limit)
         docs = await cursor.to_list(length=limit)
         return [self._to_entity(d) for d in docs]

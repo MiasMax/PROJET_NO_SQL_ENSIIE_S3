@@ -178,3 +178,21 @@ def test_elasticsearch_aggregations(test_env):
     assert data["status"] == "success"
     assert "by_status" in data["aggregations"]
     assert "by_set" in data["aggregations"]
+
+
+def test_http_security_headers(test_env):
+    client = test_env["client"]
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["x-frame-options"] == "DENY"
+    assert res.headers["x-xss-protection"] == "1; mode=block"
+    assert res.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+
+
+def test_special_regex_characters_search_handled_safely(test_env):
+    client = test_env["client"]
+    # Unclosed parentheses, braces, or glob stars must not trigger server 500 errors
+    res = client.get("/api/cards?search=(([[*+?^$")
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)

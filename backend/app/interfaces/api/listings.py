@@ -53,8 +53,8 @@ async def search_listings(
     status: str | None = Query("ACTIVE", description="Listing status filter"),
     sort_by: str = Query("created_at", description="Sort field: created_at, price, name"),
     sort_order: str = Query("desc", description="Sort direction: asc, desc"),
-    limit: int = Query(20, ge=1, le=100),
-    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100, description="Page size limit"),
+    skip: int = Query(0, ge=0, le=10000, description="Pagination offset"),
     search_uc: SearchListingsUseCase = Depends(get_search_listings_use_case),
     cache_repo=Depends(get_cache_repository),
 ):

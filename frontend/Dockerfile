@@ -1,4 +1,4 @@
-# Étape 1 : Build de l'application React avec Node
+# Stage 1: Build React application with Node
 FROM node:20-alpine AS build
 
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN npm install
 COPY . ./
 RUN npm run build
 
-# Étape 2 : Serveur de production Nginx léger
+# Stage 2: Production Nginx web server
 FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html

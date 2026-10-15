@@ -14,9 +14,9 @@ router = APIRouter(prefix="/api/cards", tags=["Cards Catalog"])
 
 @router.get("", response_model=list[dict])
 async def list_cards(
-    limit: int = Query(50, ge=1, le=100),
-    skip: int = Query(0, ge=0),
-    search: str | None = Query(None, description="Filter by Pokémon card name"),
+    limit: int = Query(50, ge=1, le=100, description="Page size limit"),
+    skip: int = Query(0, ge=0, le=5000, description="Pagination offset"),
+    search: str | None = Query(None, max_length=100, description="Filter by Pokémon card name"),
     card_repo: MongoCardRepository = Depends(get_card_repository),
 ):
     """List catalog cards with optional name filtering."""
