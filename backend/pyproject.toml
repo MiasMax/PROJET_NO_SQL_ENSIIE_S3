@@ -39,6 +39,7 @@ asyncio_mode = "strict"
 filterwarnings = [
     "ignore::DeprecationWarning:starlette.testclient.*",
     "ignore::DeprecationWarning:anyio.abc.*",
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated.*:Warning",
 ]
 
 # --- CONFIGURATION RUFF (Linter & Formatter haute performance) ---

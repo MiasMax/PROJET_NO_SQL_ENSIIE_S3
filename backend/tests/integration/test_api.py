@@ -4,7 +4,7 @@ Exercises the full lifecycle: Catalog -> Listing Publication -> Search -> Purcha
 """
 
 import pytest
-from starlette.testclient import TestClient
+from fastapi.testclient import TestClient
 
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards
 from app.interfaces.dependencies import (
