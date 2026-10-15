@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, ShieldCheck, ShoppingBag, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, ShieldCheck, ShoppingBag, AlertCircle, Wallet, UserCheck } from 'lucide-react';
 
-export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete }) {
-  const [buyerName, setBuyerName] = useState('');
+export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurchaseComplete }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successOrder, setSuccessOrder] = useState(null);
 
   if (!isOpen || !listing) return null;
 
+  const buyerName = currentUser?.name || currentUser?.username || 'Acheteur';
+  const buyerId = currentUser?.id || 'sacha';
+  const currentBalance = Number(currentUser?.balance ?? 0);
+  const price = Number(listing.price);
+  const hasSufficientFunds = currentBalance >= price;
+  const remainingBalance = Math.max(0, currentBalance - price);
+
   const handlePurchase = async (e) => {
     e.preventDefault();
-    if (!buyerName.trim()) return;
+    if (!hasSufficientFunds) {
+      setError(`Solde insuffisant : vous disposez de ${currentBalance.toFixed(2)} € pour un montant requis de ${price.toFixed(2)} €.`);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -20,7 +29,10 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
       const response = await fetch(`/api/listings/${listing.id}/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyer_name: buyerName.trim() }),
+        body: JSON.stringify({
+          buyer_name: buyerName,
+          buyer_id: buyerId,
+        }),
       });
 
       if (!response.ok) {
@@ -38,12 +50,18 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
     }
   };
 
+  const handleClose = () => {
+    setSuccessOrder(null);
+    setError(null);
+    onClose();
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" style={{ maxWidth: '650px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Acheter cette carte Pokémon</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button onClick={handleClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
             <X size={22} />
           </button>
         </div>
@@ -56,26 +74,32 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
               Votre commande est confirmée. Le vendeur a été notifié pour expédier votre carte protégée sous sleeve et toploader.
             </p>
 
-            <div style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: 'var(--radius-md)', textAlign: 'left', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: 'var(--radius-md)', textAlign: 'left', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Identifiant Commande :</span>
                 <span style={{ fontFamily: 'monospace' }}>{successOrder.id.slice(0, 13)}...</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Carte :</span>
                 <strong>{successOrder.card_name}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Montant :</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Montant débité :</span>
                 <strong style={{ color: 'var(--accent-gold)' }}>{successOrder.price.toFixed(2)} €</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Acheteur :</span>
-                <span>{successOrder.buyer_name}</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{successOrder.buyer_name || buyerName}</strong>
               </div>
+              {successOrder.buyer_balance !== undefined && successOrder.buyer_balance !== null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px', marginTop: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Nouveau solde disponible :</span>
+                  <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.05rem' }}>{successOrder.buyer_balance.toFixed(2)} €</strong>
+                </div>
+              )}
             </div>
 
-            <button onClick={onClose} className="btn btn-primary" style={{ padding: '12px 32px' }}>
+            <button onClick={handleClose} className="btn btn-primary" style={{ padding: '12px 32px' }}>
               Retour au Marketplace
             </button>
           </div>
@@ -119,32 +143,54 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
               </div>
             </div>
 
-            <form onSubmit={handlePurchase}>
-              <div className="form-group">
-                <label className="form-label">Votre Nom / Pseudo d'Acheteur :</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ex: Ondine_Bleue"
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
-                  className="form-input"
-                  autoFocus
-                />
+            {/* Payment & Account balance summary */}
+            <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  <UserCheck size={16} color="var(--accent-primary)" /> Compte débité :
+                </span>
+                <strong>{buyerName}</strong>
               </div>
 
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  <Wallet size={16} color="var(--accent-gold)" /> Solde actuel disponible :
+                </span>
+                <span style={{ fontWeight: 700, color: hasSufficientFunds ? 'var(--text-primary)' : 'var(--accent-crimson)' }}>
+                  {currentBalance.toFixed(2)} €
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-subtle)', paddingTop: '10px', marginTop: '10px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nouveau solde après achat :</span>
+                <strong style={{ color: hasSufficientFunds ? 'var(--accent-emerald)' : 'var(--accent-crimson)', fontSize: '1.05rem' }}>
+                  {hasSufficientFunds ? `${remainingBalance.toFixed(2)} €` : 'Fonds insuffisants'}
+                </strong>
+              </div>
+            </div>
+
+            <form onSubmit={handlePurchase} style={{ marginTop: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
                 <ShieldCheck size={18} color="var(--accent-emerald)" />
-                Protection Acheteur PokéVinted incluse & paiement 100% sécurisé.
+                Protection Acheteur PokéVinted incluse • Débit immédiat et sécurisé de votre solde.
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={onClose} className="btn btn-secondary">
+                <button type="button" onClick={handleClose} className="btn btn-secondary">
                   Annuler
                 </button>
-                <button type="submit" disabled={loading} className="btn btn-gold" style={{ padding: '12px 28px' }}>
+                <button
+                  type="submit"
+                  disabled={loading || !hasSufficientFunds}
+                  className="btn btn-gold"
+                  style={{ padding: '12px 28px', opacity: hasSufficientFunds ? 1 : 0.6, cursor: hasSufficientFunds ? 'pointer' : 'not-allowed' }}
+                >
                   <ShoppingBag size={18} />
-                  {loading ? 'Paiement...' : `Payer ${listing.price.toFixed(2)} €`}
+                  {loading
+                    ? 'Traitement...'
+                    : hasSufficientFunds
+                    ? `Confirmer l'achat (${price.toFixed(2)} €)`
+                    : 'Solde insuffisant'}
                 </button>
               </div>
             </form>

@@ -126,11 +126,43 @@ async def purchase_listing(
     listing_id: str,
     payload: PurchaseListingRequest,
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
 ):
     """
     Execute a card purchase.
-    Transitions listing to SOLD across datastores and records immutable order.
+    Transitions listing to SOLD across datastores, records immutable order,
+    and atomically debits the buyer's account balance.
     """
-    command = PurchaseListingCommand(listing_id=listing_id, buyer_name=payload.buyer_name)
-    order = await purchase_uc.execute(command)
-    return order.to_dict()
+    from app.interfaces.api.users import credit_user_balance, debit_user_balance
+
+    # Pre-check listing existence and status
+    listing = await listing_repo.get_by_id(listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+
+    current_status = listing.status.value if hasattr(listing.status, "value") else str(listing.status)
+    if current_status == "SOLD":
+        raise HTTPException(status_code=400, detail="Cette annonce a déjà été vendue.")
+
+    # Identify buyer and atomically debit balance
+    buyer_identifier = payload.buyer_id or payload.buyer_name
+    matched_user, new_balance = debit_user_balance(buyer_identifier, listing.price)
+    resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
+
+    # Credit seller if registered in marketplace
+    credit_user_balance(listing.seller_name, listing.price)
+
+    try:
+        command = PurchaseListingCommand(listing_id=listing_id, buyer_name=resolved_buyer_name)
+        order = await purchase_uc.execute(command)
+    except Exception:
+        # Rollback debit on transaction failure
+        if matched_user:
+            credit_user_balance(matched_user["id"], listing.price)
+        raise
+
+    order_dict = order.to_dict()
+    order_dict["buyer_balance"] = new_balance
+    order_dict["buyer_name"] = resolved_buyer_name
+    return order_dict
+

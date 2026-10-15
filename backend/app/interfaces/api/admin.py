@@ -46,6 +46,9 @@ async def trigger_seed(
     seed_uc: SeedCatalogUseCase = Depends(get_seed_catalog_use_case),
 ):
     """Populate or re-initialize catalog cards and initial marketplace listings."""
+    from app.interfaces.api.users import reset_seed_users
+
+    reset_seed_users()
     cards = get_default_catalog_cards()
     listings = get_initial_marketplace_listings()
     result = await seed_uc.execute(cards, listings)
@@ -54,3 +57,4 @@ async def trigger_seed(
         "message": "Catalog and marketplace successfully seeded",
         "details": result,
     }
+

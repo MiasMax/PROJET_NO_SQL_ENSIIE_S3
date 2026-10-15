@@ -198,6 +198,12 @@ export default function App() {
     setListings((prev) =>
       prev.map((item) => (item.id === listingId ? { ...item, status: 'SOLD', buyer_name: order.buyer_name } : item))
     );
+    if (order.buyer_balance !== undefined && order.buyer_balance !== null) {
+      setCurrentUser((prev) => ({
+        ...prev,
+        balance: order.buyer_balance,
+      }));
+    }
     showToast(`🛒 Bravo ! Achat confirmé de "${order.card_name}" pour ${order.price} € !`);
   };
 
@@ -535,6 +541,7 @@ export default function App() {
         isOpen={!!selectedListingForBuy}
         onClose={() => setSelectedListingForBuy(null)}
         listing={selectedListingForBuy}
+        currentUser={currentUser}
         onPurchaseComplete={handlePurchaseComplete}
       />
 

@@ -327,7 +327,7 @@ def get_initial_marketplace_listings() -> list[Listing]:
             image_url="https://images.pokemontcg.io/sv3/223_hires.png",
             price=89.00,
             condition=CardCondition.NEAR_MINT,
-            seller_name="Professeur_Chen",
+            seller_name="Peter_Kanto",
             description="Superbe Dracaufeu doré, brillant holographique splendide.",
         ),
         Listing.create(

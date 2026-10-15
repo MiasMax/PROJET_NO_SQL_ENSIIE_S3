@@ -46,6 +46,61 @@ USERS_STORE: dict[str, dict[str, Any]] = {
 ACTIVE_USER_ID: str = "sacha"
 
 
+def find_user(identifier: str | None) -> dict[str, Any] | None:
+    """Find registered user by identifier, username, or display name."""
+    if not identifier:
+        return None
+    clean = identifier.lower().strip()
+    if clean in USERS_STORE:
+        return USERS_STORE[clean]
+    for u in USERS_STORE.values():
+        if u["username"].lower() == clean or u["name"].lower() == clean:
+            return u
+    for u in USERS_STORE.values():
+        if u["id"] in clean or clean in u["id"]:
+            return u
+    return None
+
+
+def debit_user_balance(identifier: str | None, amount: float) -> tuple[dict[str, Any] | None, float | None]:
+    """
+    Atomically debits the user's account balance.
+    Returns (updated_user_dict, new_balance).
+    Raises HTTPException(400) if balance is insufficient.
+    """
+    user = find_user(identifier)
+    if not user:
+        return None, None
+
+    if user["balance"] < amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant pour finaliser cet achat. Solde actuel : {user['balance']:.2f} €, montant requis : {amount:.2f} €.",
+        )
+
+    user["balance"] = round(user["balance"] - amount, 2)
+    return user, user["balance"]
+
+
+def reset_seed_users() -> None:
+    """Reset default seed user balances."""
+    if "sacha" in USERS_STORE:
+        USERS_STORE["sacha"]["balance"] = 250.0
+    if "ondine" in USERS_STORE:
+        USERS_STORE["ondine"]["balance"] = 480.0
+    if "chen" in USERS_STORE:
+        USERS_STORE["chen"]["balance"] = 1500.0
+
+
+def credit_user_balance(identifier: str | None, amount: float) -> None:
+    """Atomically credits seller account balance if registered."""
+    user = find_user(identifier)
+    if user:
+        user["balance"] = round(user["balance"] + amount, 2)
+
+
+
+
 class SwitchUserRequest(BaseModel):
     user_id: str
 
@@ -110,6 +165,9 @@ async def get_current_user(
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session:
+            user_id = session.get("id")
+            if user_id in USERS_STORE:
+                session["balance"] = USERS_STORE[user_id]["balance"]
             return session
 
     # Default fallback session: last active user or Sacha
@@ -119,6 +177,7 @@ async def get_current_user(
     session_data = {**default_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
+
 
 
 @router.post("/switch")
