@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Layers, Server, Copy, Check, Store } from 'lucide-react';
+import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Layers, Server, Copy, Check, Store, ExternalLink } from 'lucide-react';
 
 export default function AdminDashboard({ onBackToMarketplace }) {
   const [stats, setStats] = useState(null);
@@ -120,6 +120,54 @@ export default function AdminDashboard({ onBackToMarketplace }) {
           {seedMessage}
         </div>
       )}
+
+      {/* External Observability & Stack Deep-Links */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)',
+        padding: '12px 20px',
+        marginBottom: '28px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+          <Activity size={16} color="var(--accent-primary)" />
+          <strong style={{ color: '#ffffff' }}>Observabilité & Services Externes :</strong>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <a
+            href="http://localhost:3001"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+            style={{ padding: '6px 14px', fontSize: '0.8rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            📊 Grafana Dashboards (:3001) <ExternalLink size={13} />
+          </a>
+          <a
+            href="http://localhost:9200/pokevinted_listings/_search?pretty"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+            style={{ padding: '6px 14px', fontSize: '0.8rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            🔍 Elasticsearch Cluster API (:9200) <ExternalLink size={13} />
+          </a>
+          <a
+            href="http://localhost:8000/docs"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+            style={{ padding: '6px 14px', fontSize: '0.8rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            📖 Swagger API Docs (:8000) <ExternalLink size={13} />
+          </a>
+        </div>
+      </div>
 
       {/* Financial and business KPI cards */}
       <div className="admin-kpi-grid">
