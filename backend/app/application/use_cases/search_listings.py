@@ -1,7 +1,7 @@
 """
-Use Case : Recherche et consultation d'annonces.
-Interroge Elasticsearch pour les filtres et la recherche plein-texte,
-avec un fallback résilient vers MongoDB en cas de problème réseau.
+Search Listings Use Case.
+Queries Elasticsearch for faceted filters and full-text search,
+falling back to MongoDB when Elasticsearch is unavailable.
 """
 
 import logging
@@ -57,7 +57,7 @@ class SearchListingsUseCase:
             except ValueError:
                 pass
 
-        # 1. Tentative de recherche via Elasticsearch
+        # 1. Primary path: Elasticsearch full-text query
         try:
             results = await self.search_repo.search_listings(
                 query=query_params.query,
@@ -73,9 +73,9 @@ class SearchListingsUseCase:
             )
             return results
         except Exception as exc:
-            logger.warning("Elasticsearch indisponible ou erreur d'indexation, bascule vers MongoDB: %s", exc)
+            logger.warning("Elasticsearch unavailable, falling back to MongoDB: %s", exc)
 
-        # 2. Fallback résilient MongoDB
+        # 2. Resilient fallback: MongoDB query
         listings = await self.listing_repo.list_listings(
             status=status_enum,
             limit=query_params.limit,

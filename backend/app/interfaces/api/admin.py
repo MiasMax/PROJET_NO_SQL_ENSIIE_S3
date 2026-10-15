@@ -1,6 +1,6 @@
 """
-Routes API pour la vue Admin (Bilan d'activité et Supervision NoSQL).
-Fournit les métriques combinées Mongo + Elastic + Redis et les commandes d'inspection terminal.
+Admin and Supervision API Router.
+Provides aggregated NoSQL metrics, Elasticsearch aggregations, and catalog re-seeding.
 """
 
 from fastapi import APIRouter, Depends
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/admin", tags=["Admin & Supervision"])
 async def get_admin_stats(
     stats_uc: GetAdminStatsUseCase = Depends(get_admin_stats_use_case),
 ):
-    """Bilan complet des métriques financières et de l'état des 3 bases NoSQL."""
+    """Real-time financial summaries, datastore health metrics, and CLI check commands."""
     return await stats_uc.execute()
 
 
@@ -31,9 +31,8 @@ async def get_elasticsearch_aggregations(
     search_repo=Depends(get_search_repository),
 ):
     """
-    Agrégations analytiques directes depuis Elasticsearch.
-    Démontre la puissance du format JSON partagé entre MongoDB et Elasticsearch
-    pour alimenter des tableaux de bord analytiques complexes et Grafana.
+    Direct analytical aggregations from Elasticsearch.
+    Demonstrates shared JSON document structures driving analytics in Grafana and API views.
     """
     try:
         aggs = await search_repo.get_aggregations()
@@ -46,12 +45,12 @@ async def get_elasticsearch_aggregations(
 async def trigger_seed(
     seed_uc: SeedCatalogUseCase = Depends(get_seed_catalog_use_case),
 ):
-    """Ré-initialise ou peuple le catalogue avec les cartes officielles et annonces de démo."""
+    """Populate or re-initialize catalog cards and initial marketplace listings."""
     cards = get_default_catalog_cards()
     listings = get_initial_marketplace_listings()
     result = await seed_uc.execute(cards, listings)
     return {
         "status": "success",
-        "message": "Peuplement du catalogue et du marketplace effectué avec succès",
+        "message": "Catalog and marketplace successfully seeded",
         "details": result,
     }

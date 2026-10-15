@@ -1,5 +1,6 @@
 """
-Routes API pour l'historique des commandes / transactions.
+Orders and Transactions API Router.
+Provides immutable purchase audit trails from MongoDB.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -17,6 +18,6 @@ async def list_orders(
     skip: int = Query(0, ge=0),
     order_repo: MongoOrderRepository = Depends(get_order_repository),
 ):
-    """Liste les transactions réalisées sur la plateforme (audit des achats)."""
+    """List completed purchase orders stored in MongoDB."""
     orders = await order_repo.list_orders(limit=limit, skip=skip)
     return [o.to_dict() for o in orders]

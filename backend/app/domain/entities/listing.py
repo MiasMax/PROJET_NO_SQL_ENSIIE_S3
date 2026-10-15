@@ -1,6 +1,6 @@
 """
-Entité Annonce Marketplace (Listing).
-Représente la mise en vente d'un exemplaire physique par un utilisateur (style Vinted).
+Marketplace Listing Entity.
+Represents an item put up for sale by a user.
 """
 
 import uuid
@@ -15,26 +15,25 @@ from app.domain.value_objects.listing_status import ListingStatus
 @dataclass
 class Listing:
     id: str
-    card_id: str  # Référence vers la carte du catalogue
-    card_name: str  # Nom dénormalisé pour requêtes rapides
-    set_name: str  # Nom de l'extension dénormalisé
-    rarity: str  # Rareté dénormalisée
-    image_url: str  # Image affichée (photo vendeur ou image HD catalogue)
-    price: float  # Prix demandé par le vendeur en €
-    condition: CardCondition  # État d'usure
-    seller_name: str  # Pseudo du vendeur (ex: 'Sacha_du_Bourg_Palette')
-    description: str  # Description textuelle personnalisée
+    card_id: str  # Catalog card reference
+    card_name: str  # Denormalized for fast reads
+    set_name: str  # Denormalized expansion set
+    rarity: str  # Denormalized rarity
+    image_url: str  # Display image (seller photo or HD catalog artwork)
+    price: float  # Asking price in EUR
+    condition: CardCondition  # Wear condition
+    seller_name: str  # Seller handle
+    description: str  # Custom listing notes
     status: ListingStatus = ListingStatus.ACTIVE
     buyer_name: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     sold_at: str | None = None
 
     def __post_init__(self):
-        # Invariant métier : le prix doit être strictement positif
         if self.price <= 0:
             raise InvalidPriceError(self.price)
         if not self.seller_name or not self.seller_name.strip():
-            raise ValueError("Le nom du vendeur est obligatoire.")
+            raise ValueError("Seller name is required.")
 
     @classmethod
     def create(
@@ -50,7 +49,7 @@ class Listing:
         description: str = "",
         custom_image_url: str | None = None,
     ) -> "Listing":
-        """Factory pour initialiser une nouvelle annonce valide."""
+        """Factory creating a validated active listing."""
         return cls(
             id=str(uuid.uuid4()),
             card_id=card_id,
@@ -66,11 +65,11 @@ class Listing:
         )
 
     def mark_as_sold(self, buyer_name: str) -> None:
-        """Marque l'annonce comme vendue à un acheteur spécifique."""
+        """Mark listing as sold to a buyer."""
         if self.status == ListingStatus.SOLD:
             raise ListingAlreadySoldError(self.id)
         if not buyer_name or not buyer_name.strip():
-            raise ValueError("Le nom de l'acheteur est obligatoire pour valider la vente.")
+            raise ValueError("Buyer name is required.")
 
         self.status = ListingStatus.SOLD
         self.buyer_name = buyer_name.strip()

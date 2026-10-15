@@ -1,6 +1,6 @@
 """
-Point d'entrée principal de l'API FastAPI PokéVinted.
-Initialise les connexions NoSQL au démarrage et gère le cycle de vie de l'application.
+PokéVinted FastAPI application entrypoint.
+Initializes NoSQL datastores on startup and manages application lifecycle.
 """
 
 import logging
@@ -39,24 +39,24 @@ logger = logging.getLogger("pokevinted")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Démarrage : Initialisation des connexions
-    logger.info("Démarrage de PokéVinted API...")
+    # Startup: initialize datastore connections
+    logger.info("Starting PokéVinted API...")
     try:
         mongo_db = MongoClientManager.connect(settings.MONGO_URI, settings.MONGO_DB)
         redis_client = RedisClientManager.connect(settings.REDIS_URL)
         elastic_client = ElasticClientManager.connect(settings.ELASTICSEARCH_HOST)
 
-        # Initialisation de l'index Elasticsearch si disponible
+        # Initialize Elasticsearch schema if available
         try:
             await ElasticClientManager.init_indices()
         except Exception as e:
-            logger.warning("Elasticsearch non disponible à l'initialisation : %s", e)
+            logger.warning("Elasticsearch unavailable during schema init: %s", e)
 
-        # Peuplement automatique au premier lancement si catalogue vide
+        # Auto-seed reference catalog on first start when empty
         card_repo = MongoCardRepository(mongo_db)
         existing_cards_count = await card_repo.count()
         if existing_cards_count == 0:
-            logger.info("Catalogue vide : amorçage automatique (seed) des cartes et annonces...")
+            logger.info("Empty catalog detected: auto-seeding cards and marketplace listings...")
             listing_repo = MongoListingRepository(mongo_db)
             search_repo = ElasticSearchRepository(elastic_client)
             cache_repo = RedisCacheRepository(redis_client)
@@ -66,33 +66,33 @@ async def lifespan(app: FastAPI):
             listings = get_initial_marketplace_listings()
             try:
                 await seed_uc.execute(cards, listings)
-                logger.info("Catalogue et annonces initialisés avec succès !")
+                logger.info("Catalog and initial listings seeded successfully.")
             except Exception as e:
-                logger.warning("Erreur lors du seed automatique : %s", e)
+                logger.warning("Failed to auto-seed catalog: %s", e)
 
     except Exception as exc:
-        logger.error("Erreur d'initialisation des bases : %s", exc)
+        logger.error("Failed to initialize database connections: %s", exc)
 
     yield
 
-    # Arrêt propre des connexions
-    logger.info("Fermeture des connexions NoSQL...")
+    # Shutdown: cleanly close connections
+    logger.info("Closing NoSQL connections...")
     try:
         await ElasticClientManager.close()
         await RedisClientManager.close()
         MongoClientManager.close()
     except Exception as exc:
-        logger.warning("Erreur lors de la fermeture des connexions : %s", exc)
+        logger.warning("Error during connection teardown: %s", exc)
 
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Marketplace de cartes Pokémon - Projet NoSQL ENSIIE (FastAPI + MongoDB + Elasticsearch + Redis)",
+    description="Pokémon Card Marketplace - NoSQL Project (FastAPI, MongoDB, Elasticsearch, Redis)",
     lifespan=lifespan,
 )
 
-# Configuration CORS pour autoriser le frontend React
+# CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -102,7 +102,7 @@ app.add_middleware(
 )
 
 
-# Handlers d'exceptions métier
+# Domain exception handlers
 @app.exception_handler(CardNotFoundError)
 async def card_not_found_handler(request: Request, exc: CardNotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc), "code": "CARD_NOT_FOUND"})
@@ -128,7 +128,7 @@ async def invalid_condition_handler(request: Request, exc: InvalidConditionError
     return JSONResponse(status_code=422, content={"detail": str(exc), "code": "INVALID_CONDITION"})
 
 
-# Montage des routes
+# Register API routers
 app.include_router(cards_router)
 app.include_router(listings_router)
 app.include_router(orders_router)
@@ -138,5 +138,5 @@ app.include_router(users_router)
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():
-    """Vérification de santé de l'API."""
+    """Health check endpoint."""
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}

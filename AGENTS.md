@@ -33,3 +33,7 @@ Chaque moteur a un rôle précis et justifié :
 * **Zero Public Exposure** : Aucune base de données ne doit exposer de port sur `0.0.0.0`. Les ports sont strictement réservés à `127.0.0.1` ou cloisonnés dans le réseau Docker interne `pokevinted-internal`.
 * **Authentification** : Toujours utiliser des identifiants sécurisés sur MongoDB (`authSource=admin`) et Redis (`--requirepass`).
 * **Secrets** : Tous les mots de passe et clés doivent provenir de `.env` (gitignoré). Ne jamais hardcoder de mot de passe dans le code commité.
+
+## 5. Style de Code & Commentaires (Humanizer & Anglais)
+* **Commentaires et docstrings en anglais** : Tout le code (commentaires inline, docstrings Python, types, logs et messages de commit) doit être rédigé en anglais technique clair et concis.
+* **Skill Humanizer** : Bannir le jargon artificiel ou bavard propre aux IA (pas de "let's dive into", "in this section we will...", ni de fioritures ou répétitions creuses). Écrire comme un développeur humain senior : sobre, direct, factuel.

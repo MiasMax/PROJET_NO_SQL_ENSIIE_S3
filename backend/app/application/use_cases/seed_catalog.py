@@ -1,6 +1,6 @@
 """
-Use Case : Peuplement initial du catalogue et du marketplace (Seed).
-Injecte des cartes réelles avec images HD officielles et crée les premières annonces.
+Catalog and Marketplace Seeding Use Case.
+Loads authentic reference cards with official artwork and creates initial listings.
 """
 
 from app.domain.entities.card import Card
@@ -25,10 +25,10 @@ class SeedCatalogUseCase:
         self.cache_repo = cache_repo
 
     async def execute(self, cards: list[Card], initial_listings: list[Listing]) -> dict:
-        # 1. Sauvegarde des cartes de référence dans MongoDB
+        # Save reference cards to MongoDB catalog
         saved_cards_count = await self.card_repo.bulk_save(cards)
 
-        # 2. Création et synchronisation des premières annonces
+        # Seed and index initial listings
         listings_count = 0
         for listing in initial_listings:
             await self.listing_repo.save(listing)
@@ -37,7 +37,7 @@ class SeedCatalogUseCase:
             await self.cache_repo.push_recent_item("listings:recent_ids", listing.id)
             listings_count += 1
 
-        # Invalidation cache
+        # Clear listing caches
         await self.cache_repo.delete("cache:marketplace:recent")
 
         return {

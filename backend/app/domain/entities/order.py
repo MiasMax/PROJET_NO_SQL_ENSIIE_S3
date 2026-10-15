@@ -1,6 +1,6 @@
 """
-Entité Transaction / Commande (Order).
-Enregistre immuablement un acte d'achat effectué sur la plateforme.
+Order Entity.
+Represents an immutable transaction record for a card purchase.
 """
 
 import uuid

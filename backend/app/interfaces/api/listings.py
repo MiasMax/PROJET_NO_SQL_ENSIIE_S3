@@ -1,5 +1,6 @@
 """
-Routes API pour les annonces du Marketplace (Création, Recherche, Achat).
+Marketplace Listings API Router.
+Handles listing creation, faceted search, and card purchasing.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -27,8 +28,8 @@ async def create_listing(
     create_uc: CreateListingUseCase = Depends(get_create_listing_use_case),
 ):
     """
-    Formulaire de mise en vente (Point névralgique de la soutenance NoSQL) :
-    Persiste simultanément les données dans MongoDB, Elasticsearch et Redis.
+    Publish a new card listing.
+    Persists simultaneously into MongoDB, Elasticsearch, and Redis.
     """
     command = CreateListingCommand(
         card_id=payload.card_id,
@@ -44,28 +45,28 @@ async def create_listing(
 
 @router.get("", response_model=SearchListingsResponse)
 async def search_listings(
-    q: str | None = Query(None, description="Recherche textuelle floue sur nom, série ou vendeur"),
-    set_name: str | None = Query(None, description="Filtre par extension"),
-    condition: str | None = Query(None, description="Filtre par état (MINT, NEAR_MINT, etc.)"),
-    min_price: float | None = Query(None, ge=0, description="Prix minimum"),
-    max_price: float | None = Query(None, ge=0, description="Prix maximum"),
-    status: str | None = Query("ACTIVE", description="Statut de l'annonce"),
-    sort_by: str = Query("created_at", description="Tri : created_at, price, name"),
-    sort_order: str = Query("desc", description="Ordre de tri : asc, desc"),
+    q: str | None = Query(None, description="Fuzzy text query on card name, set, or seller"),
+    set_name: str | None = Query(None, description="Filter by card expansion set"),
+    condition: str | None = Query(None, description="Filter by card condition (e.g. MINT, NEAR_MINT)"),
+    min_price: float | None = Query(None, ge=0, description="Minimum price filter"),
+    max_price: float | None = Query(None, ge=0, description="Maximum price filter"),
+    status: str | None = Query("ACTIVE", description="Listing status filter"),
+    sort_by: str = Query("created_at", description="Sort field: created_at, price, name"),
+    sort_order: str = Query("desc", description="Sort direction: asc, desc"),
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     search_uc: SearchListingsUseCase = Depends(get_search_listings_use_case),
     cache_repo=Depends(get_cache_repository),
 ):
     """
-    Recherche plein-texte avec Elasticsearch, fallback MongoDB et mise en cache Redis.
-    Met en évidence la différence de latence entre Redis Cache HIT (<1ms) et Elasticsearch/Mongo.
+    Search listings using Elasticsearch with MongoDB fallback and Redis caching.
+    Demonstrates the latency contrast between Redis cache hits and database queries.
     """
     import time
 
     start_time = time.perf_counter()
 
-    # Clé de cache normalisée
+    # Normalized cache key
     cache_key = f"cache:listings:{q}:{set_name}:{condition}:{min_price}:{max_price}:{status}:{sort_by}:{sort_order}:{limit}:{skip}"
     cached = await cache_repo.get_json(cache_key)
 
@@ -79,7 +80,7 @@ async def search_listings(
             "response_time_ms": elapsed_ms,
         }
 
-    # Requête métier (Elasticsearch / Mongo)
+    # Query search service (Elasticsearch with Mongo fallback)
     query = SearchListingsQuery(
         query=q,
         set_name=set_name,
@@ -95,7 +96,7 @@ async def search_listings(
     results = await search_uc.execute(query)
     items_dict = [item.to_dict() for item in results["items"]]
 
-    # Mise en cache Redis pour 45 secondes
+    # Cache response in Redis with 45s TTL
     await cache_repo.set_json(cache_key, {"total": results["total"], "items": items_dict}, ttl_seconds=45)
 
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -113,10 +114,10 @@ async def get_listing_detail(
     listing_id: str,
     listing_repo: ListingRepository = Depends(get_listing_repository),
 ):
-    """Consulte la fiche d'une annonce spécifique depuis MongoDB."""
+    """Fetch individual listing from MongoDB document store."""
     listing = await listing_repo.get_by_id(listing_id)
     if not listing:
-        raise HTTPException(status_code=404, detail="Annonce introuvable.")
+        raise HTTPException(status_code=404, detail="Listing not found.")
     return listing.to_dict()
 
 
@@ -127,8 +128,8 @@ async def purchase_listing(
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
 ):
     """
-    Achat d'une carte (Style Vinted) :
-    Bascule l'annonce à SOLD dans Mongo et Elastic, crée la commande et met à jour les stats Redis.
+    Execute a card purchase.
+    Transitions listing to SOLD across datastores and records immutable order.
     """
     command = PurchaseListingCommand(listing_id=listing_id, buyer_name=payload.buyer_name)
     order = await purchase_uc.execute(command)

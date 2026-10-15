@@ -1,5 +1,6 @@
 """
-Routes API pour le catalogue de cartes de référence.
+Cards Catalog API Router.
+Handles reference card browsing, view tracking, and trending rankings.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,10 +16,10 @@ router = APIRouter(prefix="/api/cards", tags=["Cards Catalog"])
 async def list_cards(
     limit: int = Query(50, ge=1, le=100),
     skip: int = Query(0, ge=0),
-    search: str | None = Query(None, description="Filtrer par nom de Pokémon"),
+    search: str | None = Query(None, description="Filter by Pokémon card name"),
     card_repo: MongoCardRepository = Depends(get_card_repository),
 ):
-    """Retourne la liste des cartes officielles disponibles dans le catalogue."""
+    """List catalog cards with optional name filtering."""
     cards = await card_repo.list_cards(limit=limit, skip=skip, search=search)
     return [c.to_dict() for c in cards]
 
@@ -28,10 +29,10 @@ async def get_card_detail(
     card_id: str,
     card_repo: MongoCardRepository = Depends(get_card_repository),
 ):
-    """Détail d'une carte du catalogue."""
+    """Retrieve detailed metadata for a catalog card."""
     card = await card_repo.get_by_id(card_id)
     if not card:
-        raise HTTPException(status_code=404, detail="Carte Pokémon non trouvée.")
+        raise HTTPException(status_code=404, detail="Card not found.")
     return card.to_dict()
 
 
@@ -41,8 +42,8 @@ async def track_card_view(
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """
-    Incrémente le score de popularité en temps réel dans Redis (Sorted Set : ZINCRBY).
-    Permet un classement instantané sans saturer la base documentaire.
+    Increment real-time card view counter in Redis Sorted Set (ZINCRBY).
+    Maintains instantaneous trending ranks without stressing the document database.
     """
     await cache_repo.track_card_view(card_id)
     return {"status": "tracked", "card_id": card_id}
@@ -55,8 +56,8 @@ async def get_trending_cards(
     card_repo: MongoCardRepository = Depends(get_card_repository),
 ):
     """
-    Récupère le Top des cartes les plus consultées calculé en direct par Redis (ZREVRANGE).
-    Jointure rapide avec MongoDB pour récupérer les visuels HD.
+    Retrieve top trending cards computed via Redis Sorted Set (ZREVRANGE).
+    Enriches IDs with MongoDB catalog details and artwork.
     """
     trending_scores = await cache_repo.get_trending_card_ids(limit=limit)
     enriched = []

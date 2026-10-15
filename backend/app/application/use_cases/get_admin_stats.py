@@ -1,7 +1,7 @@
 """
-Use Case : Bilan Admin & Supervision NoSQL en temps réel.
-Agrège les métriques des 3 moteurs de persistance (Mongo, Elastic, Redis)
-et fournit les commandes exactes pour vérification en terminal par le professeur.
+Admin and Supervision Use Case.
+Aggregates real-time health metrics across MongoDB, Elasticsearch, and Redis,
+and provides authenticated CLI verification commands for evaluation.
 """
 
 from typing import Any
@@ -30,14 +30,14 @@ class GetAdminStatsUseCase:
         self.cache_repo = cache_repo
 
     async def execute(self) -> dict[str, Any]:
-        # --- 1. MÉTRIQUES MONGODB ---
+        # 1. MongoDB metrics
         mongo_cards_count = await self.card_repo.count()
         mongo_total_listings = await self.listing_repo.count_by_status(None)
         mongo_active_listings = await self.listing_repo.count_by_status(ListingStatus.ACTIVE)
         mongo_sold_listings = await self.listing_repo.count_by_status(ListingStatus.SOLD)
         mongo_orders_count = await self.order_repo.count()
 
-        # --- 2. MÉTRIQUES ELASTICSEARCH ---
+        # 2. Elasticsearch metrics
         try:
             elastic_indexed_docs = await self.search_repo.get_indexed_count()
             elastic_status = "HEALTHY"
@@ -45,7 +45,7 @@ class GetAdminStatsUseCase:
             elastic_indexed_docs = 0
             elastic_status = "UNAVAILABLE"
 
-        # --- 3. MÉTRIQUES REDIS ---
+        # 3. Redis metrics
         try:
             redis_active_counter = await self.cache_repo.get_counter("stats:active_listings")
             redis_sales_count = await self.cache_repo.get_counter("stats:total_sales_count")
@@ -61,14 +61,14 @@ class GetAdminStatsUseCase:
             redis_stats = {}
             redis_status = "UNAVAILABLE"
 
-        # --- 4. RÉCONCILIATION & COHÉRENCE MULTI-SYSTÈMES ---
+        # 4. Multi-system reconciliation check
         consistency_check = {
             "is_in_sync": (mongo_total_listings == elastic_indexed_docs),
             "mongo_total_listings": mongo_total_listings,
             "elastic_indexed_docs": elastic_indexed_docs,
         }
 
-        # --- 5. GUIDE D'INSPECTION TERMINAL (Pour la soutenance) ---
+        # 5. Terminal commands for live inspection
         from app.config import settings
 
         mongo_auth_flag = (
@@ -82,17 +82,17 @@ class GetAdminStatsUseCase:
             {
                 "system": "MongoDB",
                 "command": f"docker exec -it pokevinted-mongodb mongosh {mongo_auth_flag}{settings.MONGO_DB} --eval 'db.listings.find({{}}, {{card_name:1, price:1, status:1}}).pretty()'",
-                "description": "Inspecte les annonces persistées en base documentaire (accès sécurisé)",
+                "description": "Inspect persisted listings in document store (authenticated)",
             },
             {
                 "system": "Elasticsearch",
                 "command": "curl -s http://localhost:9200/pokevinted_listings/_search | jq '.hits.hits[]._source | {card_name, price, status}'",
-                "description": "Vérifie l'indexation de recherche plein-texte (port 127.0.0.1 isolé)",
+                "description": "Inspect full-text search index (loopback port)",
             },
             {
                 "system": "Redis",
                 "command": f"docker exec -it pokevinted-redis redis-cli {redis_auth_flag}MGET stats:active_listings stats:total_sales_count stats:total_sales_volume",
-                "description": "Lit les compteurs atomiques temps réel (accès sécurisé)",
+                "description": "Read atomic real-time counters (authenticated)",
             },
         ]
 

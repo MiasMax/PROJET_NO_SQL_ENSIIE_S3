@@ -1,9 +1,9 @@
 """
-Use Case : Achat d'une carte sur le marketplace (Purchase / Order).
-Garantit la cohérence entre les 3 systèmes NoSQL :
-1. MongoDB : Mise à jour de l'état de l'annonce (ACTIVE -> SOLD) et création de la Commande
-2. Elasticsearch : Mise à jour du statut dans l'index de recherche
-3. Redis : Décrémentation du compteur d'annonces actives, incrémentation du volume des ventes
+Purchase Listing Use Case.
+Updates state across all three NoSQL datastores:
+1. MongoDB: Transition listing to SOLD and create immutable Order record.
+2. Elasticsearch: Update listing status in search index.
+3. Redis: Decrement active listing counter, increment sales metrics.
 """
 
 from dataclasses import dataclass
@@ -36,15 +36,13 @@ class PurchaseListingUseCase:
         self.cache_repo = cache_repo
 
     async def execute(self, command: PurchaseListingCommand) -> Order:
-        # 1. Vérification de l'annonce
         listing = await self.listing_repo.get_by_id(command.listing_id)
         if not listing:
             raise ListingNotFoundError(command.listing_id)
 
-        # 2. Transition d'état métier (lève ListingAlreadySoldError si déjà vendue)
+        # Domain transition: raises ListingAlreadySoldError if already sold
         listing.mark_as_sold(command.buyer_name)
 
-        # 3. Création de l'entité commande d'achat
         order = Order.create(
             listing_id=listing.id,
             card_id=listing.card_id,
@@ -54,16 +52,15 @@ class PurchaseListingUseCase:
             buyer_name=command.buyer_name,
         )
 
-        # --- PERSISTANCE MULTI-SYSTÈMES NOSQL ---
-
-        # 1. MongoDB : Mise à jour annonce + insertion commande
+        # Multi-system persistence
+        # 1. MongoDB: Persist updated listing state and record immutable order
         await self.listing_repo.save(listing)
         await self.order_repo.save(order)
 
-        # 2. Elasticsearch : Ré-indexation avec statut SOLD
+        # 2. Elasticsearch: Update index entry with SOLD status
         await self.search_repo.index_listing(listing)
 
-        # 3. Redis : Métriques d'activité et audit
+        # 3. Redis: Update live metrics and invalidate caches
         await self.cache_repo.increment_counter("stats:active_listings", -1)
         await self.cache_repo.increment_counter("stats:total_sales_count", 1)
         await self.cache_repo.increment_float_counter("stats:total_sales_volume", listing.price)
