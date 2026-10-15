@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, UploadCloud, CheckCircle2, AlertCircle, Database } from 'lucide-react';
+import { X, Sparkles, UploadCloud, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function SellCardModal({ isOpen, onClose, onListingCreated, catalogCards = [] }) {
   const [selectedCardId, setSelectedCardId] = useState('');
@@ -79,7 +79,7 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Vendre une Carte Pokémon</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Publiez votre annonce en quelques secondes (synchronisation NoSQL automatique).
+              Publiez votre annonce en quelques secondes auprès des collectionneurs certifiés.
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -87,11 +87,11 @@ export default function SellCardModal({ isOpen, onClose, onListingCreated, catal
           </button>
         </div>
 
-        {/* Multi-store persistence banner */}
-        <div style={{ padding: '12px 24px', background: 'rgba(99, 102, 241, 0.08)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Database size={18} color="var(--accent-primary)" />
+        {/* Consumer seller guarantee banner */}
+        <div style={{ padding: '12px 24px', background: 'rgba(99, 102, 241, 0.08)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <ShieldCheck size={18} color="var(--accent-emerald)" />
           <span style={{ fontSize: '0.85rem', color: '#c7d2fe' }}>
-            Persistance active : <strong>MongoDB</strong> (document) + <strong>Elasticsearch</strong> (recherche) + <strong>Redis</strong> (statistiques).
+            Vente directe sans commission • Visibilité instantanée dans les résultats de recherche.
           </span>
         </div>
 

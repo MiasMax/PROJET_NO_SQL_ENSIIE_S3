@@ -99,7 +99,7 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorit
               e.stopPropagation();
               onToggleFavorite(listing.card_id);
             }}
-            title={isFavorite ? "Remove from favorites (Redis Set)" : "Add to favorites (Redis Set)"}
+            title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
             style={{
               position: 'absolute',
               top: '12px',

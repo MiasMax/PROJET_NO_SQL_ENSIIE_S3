@@ -386,27 +386,43 @@ export default function App() {
               </button>
             </div>
 
-            {/* Redis cache and Elasticsearch response time indicator */}
+            {/* Listings count for regular users, performance indicator for admin */}
             <div className="filters-stats">
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '999px',
-                background: cacheMetrics.hit ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                border: `1px solid ${cacheMetrics.hit ? '#06b6d4' : '#6366f1'}`,
-                color: cacheMetrics.hit ? '#22d3ee' : '#a5b4fc',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-              }}
-              title={cacheMetrics.hit ? "Résultat servi en mémoire vive par Redis" : "Requête exécutée par Elasticsearch & MongoDB"}
-              >
-                <Zap size={14} color={cacheMetrics.hit ? "#06b6d4" : "#818cf8"} />
-                {cacheMetrics.hit
-                  ? `⚡ Cache Redis HIT (${cacheMetrics.timeMs} ms)`
-                  : `🔍 Elasticsearch Query (${cacheMetrics.timeMs} ms)`}
-              </div>
+              {currentUser.is_admin ? (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  background: cacheMetrics.hit ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                  border: `1px solid ${cacheMetrics.hit ? '#06b6d4' : '#6366f1'}`,
+                  color: cacheMetrics.hit ? '#22d3ee' : '#a5b4fc',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                }}
+                title={cacheMetrics.hit ? "Résultat servi en mémoire vive par Redis" : "Requête exécutée par Elasticsearch & MongoDB"}
+                >
+                  <Zap size={14} color={cacheMetrics.hit ? "#06b6d4" : "#818cf8"} />
+                  {cacheMetrics.hit
+                    ? `⚡ Cache HIT (${cacheMetrics.timeMs} ms)`
+                    : `🔍 Recherche (${cacheMetrics.timeMs} ms)`}
+                </div>
+              ) : (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                }}>
+                  {displayedListings.length} annonce{displayedListings.length > 1 ? 's' : ''} en vente
+                </div>
+              )}
 
               {/* Sort selector */}
               <select
@@ -434,7 +450,7 @@ export default function App() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <RefreshCw className="animate-spin" size={32} color="var(--accent-primary)" style={{ margin: '0 auto 16px' }} />
-              <p style={{ color: 'var(--text-secondary)' }}>Interrogation d'Elasticsearch & MongoDB...</p>
+              <p style={{ color: 'var(--text-secondary)' }}>Chargement des cartes en cours...</p>
             </div>
           ) : displayedListings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)' }}>
@@ -444,7 +460,7 @@ export default function App() {
               </h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
                 {showOnlyFavorites
-                  ? "Cliquez sur le cœur d'une carte pour l'enregistrer instantanément dans votre Set Redis !"
+                  ? "Cliquez sur le cœur d'une carte pour la sauvegarder dans vos favoris !"
                   : "Soyez le premier dresseur à publier une annonce avec le formulaire !"}
               </p>
               <button onClick={() => { setShowOnlyFavorites(false); setIsSellModalOpen(true); }} className="btn btn-gold">

@@ -53,7 +53,7 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
             <CheckCircle size={64} color="var(--accent-emerald)" style={{ margin: '0 auto 16px' }} />
             <h3 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '8px' }}>Félicitations pour votre achat !</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-              La transaction a été validée et enregistrée dans <strong>MongoDB</strong>, le statut mis à jour dans <strong>Elasticsearch</strong> et les ventes comptabilisées dans <strong>Redis</strong>.
+              Votre commande est confirmée. Le vendeur a été notifié pour expédier votre carte protégée sous sleeve et toploader.
             </p>
 
             <div style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: 'var(--radius-md)', textAlign: 'left', marginBottom: '24px' }}>
@@ -135,7 +135,7 @@ export default function BuyModal({ isOpen, onClose, listing, onPurchaseComplete 
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
                 <ShieldCheck size={18} color="var(--accent-emerald)" />
-                Protection Acheteur PokéVinted incluse & simulation de transaction sécurisée.
+                Protection Acheteur PokéVinted incluse & paiement 100% sécurisé.
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
