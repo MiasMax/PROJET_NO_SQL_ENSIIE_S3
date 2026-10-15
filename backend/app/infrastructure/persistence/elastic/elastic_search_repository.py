@@ -124,6 +124,27 @@ class ElasticSearchRepository(SearchRepository):
         res = await self.client.count(index=self.index_name)
         return res["count"]
 
+    async def get_aggregations(self) -> Dict[str, Any]:
+        """Agrégations analytiques Elasticsearch exploitant la structure JSON des annonces."""
+        aggs_query = {
+            "by_status": {"terms": {"field": "status"}},
+            "by_condition": {"terms": {"field": "condition"}},
+            "by_rarity": {"terms": {"field": "rarity"}},
+            "by_set": {
+                "terms": {"field": "set_name.keyword", "size": 10},
+                "aggs": {
+                    "avg_price": {"avg": {"field": "price"}},
+                },
+            },
+            "price_stats": {"stats": {"field": "price"}},
+        }
+        res = await self.client.search(
+            index=self.index_name,
+            size=0,
+            aggs=aggs_query,
+        )
+        return res.get("aggregations", {})
+
     def _to_entity(self, source: dict) -> Listing:
         return Listing(
             id=source["id"],

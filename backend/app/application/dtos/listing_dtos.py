@@ -37,3 +37,5 @@ class SearchListingsResponse(BaseModel):
     total: int
     items: List[ListingResponse]
     source: Optional[str] = None
+    cache_hit: Optional[bool] = False
+    response_time_ms: Optional[float] = 0.0

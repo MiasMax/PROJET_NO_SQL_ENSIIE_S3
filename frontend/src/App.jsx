@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Search, SlidersHorizontal, BarChart3, Store, Sparkles, Filter, RefreshCw } from 'lucide-react';
+import { PlusCircle, Search, BarChart3, Store, Sparkles, Filter, RefreshCw, User, Zap, Heart, Database, ShieldCheck } from 'lucide-react';
 import PokemonCard3D from './components/PokemonCard3D';
+import TrendingBar from './components/TrendingBar';
 import SellCardModal from './components/SellCardModal';
 import BuyModal from './components/BuyModal';
 import AdminDashboard from './components/AdminDashboard';
@@ -10,6 +11,14 @@ export default function App() {
   const [listings, setListings] = useState([]);
   const [catalogCards, setCatalogCards] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Métriques de Cache Redis
+  const [cacheMetrics, setCacheMetrics] = useState({ hit: false, timeMs: 0, source: 'elasticsearch' });
+
+  // Session Utilisateur Redis
+  const [currentUser, setCurrentUser] = useState({ id: 'sacha', name: 'Sacha du Bourg-Palette', role: 'Dresseur Kanto', balance: 250 });
+  const [favorites, setFavorites] = useState(new Set());
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
   // Filtres de recherche
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +31,7 @@ export default function App() {
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [selectedListingForBuy, setSelectedListingForBuy] = useState(null);
 
-  // Notification Toast
+  // Toast Notification
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (msg) => {
@@ -30,11 +39,70 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Chargement de l'utilisateur actif et des favoris depuis Redis
+  const loadUserAndFavorites = async (userId = 'sacha') => {
+    try {
+      const [resUser, resFavs] = await Promise.all([
+        fetch('/api/users/me'),
+        fetch(`/api/users/favorites?user_id=${userId}`),
+      ]);
+      if (resUser.ok) {
+        const u = await resUser.json();
+        setCurrentUser(u);
+      }
+      if (resFavs.ok) {
+        const favList = await resFavs.json();
+        setFavorites(new Set(favList));
+      }
+    } catch (e) {
+      console.error("Erreur chargement session Redis :", e);
+    }
+  };
+
+  const handleSwitchUser = async (userId) => {
+    try {
+      const res = await fetch('/api/users/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (res.ok) {
+        const user = await res.json();
+        setCurrentUser(user);
+        loadUserAndFavorites(user.id);
+        showToast(`👤 Session Redis basculée sur : ${user.name} (TTL 24h)`);
+      }
+    } catch (e) {
+      console.error("Erreur switch session :", e);
+    }
+  };
+
+  const handleToggleFavorite = async (cardId) => {
+    try {
+      const res = await fetch(`/api/users/favorites/${cardId}?user_id=${currentUser.id}`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setFavorites((prev) => {
+          const next = new Set(prev);
+          if (data.is_favorite) {
+            next.add(cardId);
+            showToast(`❤️ Ajouté aux favoris dans Redis (Set SADD) !`);
+          } else {
+            next.delete(cardId);
+            showToast(`💔 Retiré des favoris dans Redis (Set SREM) !`);
+          }
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error("Erreur toggle favori :", e);
+    }
+  };
+
   // Chargement du catalogue et des annonces
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Annonces avec filtres
       let url = `/api/listings?sort_by=${sortBy}&sort_order=${sortOrder}`;
       if (searchQuery) url += `&q=${encodeURIComponent(searchQuery)}`;
       if (selectedSet) url += `&set_name=${encodeURIComponent(selectedSet)}`;
@@ -48,6 +116,11 @@ export default function App() {
       if (resListings.ok) {
         const data = await resListings.json();
         setListings(data.items || []);
+        setCacheMetrics({
+          hit: data.cache_hit || false,
+          timeMs: data.response_time_ms || 1.2,
+          source: data.source || 'elasticsearch',
+        });
       }
       if (resCards.ok) {
         const cards = await resCards.json();
@@ -61,8 +134,18 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadUserAndFavorites();
+  }, []);
+
+  useEffect(() => {
     fetchData();
   }, [searchQuery, selectedSet, selectedCondition, sortBy, sortOrder]);
+
+  const handleCardSelected = (item) => {
+    // Tracking de popularité en temps réel dans Redis (ZINCRBY)
+    fetch(`/api/cards/${item.card_id}/view`, { method: 'POST' }).catch(() => {});
+    setSelectedListingForBuy(item);
+  };
 
   const handleListingCreated = (newListing) => {
     setListings((prev) => [newListing, ...prev]);
@@ -75,6 +158,10 @@ export default function App() {
     );
     showToast(`🛒 Bravo ! Achat confirmé de "${order.card_name}" pour ${order.price} € !`);
   };
+
+  const displayedListings = showOnlyFavorites
+    ? listings.filter((l) => favorites.has(l.card_id))
+    : listings;
 
   return (
     <div>
@@ -117,9 +204,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Barre de recherche rapide */}
+        {/* Barre de recherche */}
         {currentView === 'marketplace' && (
-          <div style={{ position: 'relative', width: '360px', display: 'none', md: 'block' }}>
+          <div style={{ position: 'relative', width: '340px' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -132,8 +219,42 @@ export default function App() {
           </div>
         )}
 
-        {/* Actions de navigation */}
+        {/* Sélecteur de profil Dresseur (Session Redis) & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Badge Profil & Switcher Session Redis */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-full)',
+            padding: '4px 12px',
+          }}>
+            <User size={16} color="var(--accent-secondary)" />
+            <select
+              value={currentUser.id}
+              onChange={(e) => handleSwitchUser(e.target.value)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              title="Changer de session dresseur (Session stockée avec TTL dans Redis)"
+            >
+              <option value="sacha" style={{ background: '#121826' }}>🧢 Sacha (250€)</option>
+              <option value="ondine" style={{ background: '#121826' }}>🌊 Ondine (480€)</option>
+              <option value="chen" style={{ background: '#121826' }}>🧪 Prof. Chen (1500€)</option>
+            </select>
+            <span style={{ fontSize: '0.7rem', color: '#38bdf8', background: 'rgba(6,182,212,0.15)', padding: '1px 6px', borderRadius: '4px' }}>
+              Redis Session
+            </span>
+          </div>
+
           <button
             onClick={() => setCurrentView(currentView === 'marketplace' ? 'admin' : 'marketplace')}
             className={`btn ${currentView === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
@@ -147,14 +268,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* Contenu principal selon la vue */}
+      {/* Contenu principal */}
       {currentView === 'admin' ? (
         <AdminDashboard onBackToMarketplace={() => setCurrentView('marketplace')} />
       ) : (
         <main className="container">
           {/* Bannière Hero */}
           <section className="hero-banner">
-            <div style={{ maxWidth: '680px', position: 'relative', zIndex: 1 }}>
+            <div style={{ maxWidth: '720px', position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '999px', fontSize: '0.85rem', color: '#a5b4fc', marginBottom: '16px' }}>
                 <Sparkles size={14} color="var(--accent-gold)" />
                 Cartes Pokémon officielles • Extensions récentes
@@ -163,27 +284,30 @@ export default function App() {
                 Achetez & Vendez vos cartes <span>Pokémon</span> au juste prix.
               </h1>
               <p className="hero-subtitle">
-                Le marketplace Pokémon style Vinted haute performance propulsé par <strong>MongoDB</strong> (source de vérité), <strong>Elasticsearch</strong> (recherche plein-texte) et <strong>Redis</strong> (cache & temps réel).
+                Marketplace Pokémon style Vinted haute performance combinant <strong>MongoDB</strong> (source de vérité documents JSON), <strong>Elasticsearch</strong> (recherche floue & analytics Grafana) et <strong>Redis</strong> (sessions, favoris, cache et top cartes en direct).
               </p>
               <div style={{ display: 'flex', gap: '16px' }}>
                 <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold" style={{ padding: '12px 28px' }}>
                   <PlusCircle size={18} /> Mettre une carte en vente
                 </button>
                 <button onClick={() => setCurrentView('admin')} className="btn btn-secondary" style={{ padding: '12px 24px' }}>
-                  <BarChart3 size={18} /> Consulter le Bilan Admin
+                  <BarChart3 size={18} /> Consulter le Bilan Admin NoSQL
                 </button>
               </div>
             </div>
           </section>
 
-          {/* Barre de Filtres Avancés */}
+          {/* TOP 5 TENDANCES EN DIRECT (Redis ZSET) */}
+          <TrendingBar onSelectCard={(card) => setSearchQuery(card.name)} />
+
+          {/* Barre de Filtres Avancés & Benchmark Latence Cache */}
           <div className="filters-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', marginRight: '8px' }}>
               <Filter size={18} />
               <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filtres :</span>
             </div>
 
-            {/* Sélecteur Série / Extension */}
+            {/* Sélecteur Série */}
             <select
               value={selectedSet}
               onChange={(e) => setSelectedSet(e.target.value)}
@@ -203,19 +327,49 @@ export default function App() {
               value={selectedCondition}
               onChange={(e) => setSelectedCondition(e.target.value)}
               className="form-select"
-              style={{ width: 'auto', minWidth: '160px' }}
+              style={{ width: 'auto', minWidth: '150px' }}
             >
               <option value="">Tous les états</option>
-              <option value="MINT">💎 MINT (Parfait)</option>
+              <option value="MINT">💎 MINT</option>
               <option value="NEAR_MINT">✨ NEAR MINT</option>
               <option value="EXCELLENT">👍 EXCELLENT</option>
               <option value="GOOD">👌 GOOD</option>
               <option value="PLAYED">⚡ PLAYED</option>
             </select>
 
-            {/* Tri */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Trier par :</span>
+            {/* Filtre Mes Favoris (Redis Set) */}
+            <button
+              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+              className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 14px', fontSize: '0.85rem' }}
+            >
+              <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} />
+              Mes Favoris ({favorites.size})
+            </button>
+
+            {/* INDICATEUR DE LATENCE CACHE REDIS / ELASTICSEARCH */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '999px',
+                background: cacheMetrics.hit ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                border: `1px solid ${cacheMetrics.hit ? '#06b6d4' : '#6366f1'}`,
+                color: cacheMetrics.hit ? '#22d3ee' : '#a5b4fc',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+              }}
+              title={cacheMetrics.hit ? "Résultat servi en mémoire vive par Redis" : "Requête exécutée par Elasticsearch & MongoDB"}
+              >
+                <Zap size={14} color={cacheMetrics.hit ? "#06b6d4" : "#818cf8"} />
+                {cacheMetrics.hit
+                  ? `⚡ Cache Redis HIT (${cacheMetrics.timeMs} ms)`
+                  : `🔍 Elasticsearch Query (${cacheMetrics.timeMs} ms)`}
+              </div>
+
+              {/* Tri */}
               <select
                 value={`${sortBy}:${sortOrder}`}
                 onChange={(e) => {
@@ -237,31 +391,37 @@ export default function App() {
             </div>
           </div>
 
-          {/* Grille des cartes en vente */}
+          {/* Grille des annonces */}
           {loading ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <RefreshCw className="animate-spin" size={32} color="var(--accent-primary)" style={{ margin: '0 auto 16px' }} />
               <p style={{ color: 'var(--text-secondary)' }}>Interrogation d'Elasticsearch & MongoDB...</p>
             </div>
-          ) : listings.length === 0 ? (
+          ) : displayedListings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)' }}>
               <Sparkles size={40} color="var(--accent-gold)" style={{ margin: '0 auto 16px' }} />
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '8px' }}>Aucune annonce trouvée</h3>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '8px' }}>
+                {showOnlyFavorites ? "Vous n'avez pas encore de cartes en favoris" : "Aucune annonce trouvée"}
+              </h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                Soyez le premier dresseur à publier une annonce avec le formulaire !
+                {showOnlyFavorites
+                  ? "Cliquez sur le cœur d'une carte pour l'enregistrer instantanément dans votre Set Redis !"
+                  : "Soyez le premier dresseur à publier une annonce avec le formulaire !"}
               </p>
-              <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold">
+              <button onClick={() => { setShowOnlyFavorites(false); setIsSellModalOpen(true); }} className="btn btn-gold">
                 <PlusCircle size={18} /> Vendre une carte maintenant
               </button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '24px' }}>
-              {listings.map((item) => (
+              {displayedListings.map((item) => (
                 <PokemonCard3D
                   key={item.id}
                   listing={item}
-                  onSelect={(l) => setSelectedListingForBuy(l)}
-                  onQuickBuy={(l) => setSelectedListingForBuy(l)}
+                  isFavorite={favorites.has(item.card_id)}
+                  onToggleFavorite={handleToggleFavorite}
+                  onSelect={handleCardSelected}
+                  onQuickBuy={handleCardSelected}
                 />
               ))}
             </div>

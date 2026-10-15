@@ -125,3 +125,58 @@ def test_complete_marketplace_flow(test_env):
     assert admin_data["summary"]["total_orders_completed"] == 1
     assert admin_data["summary"]["total_sales_volume_eur"] == 48.50
     assert len(admin_data["terminal_commands"]) == 3
+
+
+def test_redis_sessions_and_favorites(test_env):
+    client = test_env["client"]
+    cache_repo = test_env["cache_repo"]
+
+    # Session par défaut
+    me_res = client.get("/api/users/me")
+    assert me_res.status_code == 200
+    user = me_res.json()
+    assert user["id"] == "sacha"
+
+    # Changement de session vers Ondine
+    switch_res = client.post("/api/users/switch", json={"user_id": "ondine"})
+    assert switch_res.status_code == 200
+    ondine = switch_res.json()
+    assert ondine["id"] == "ondine"
+    assert ondine["balance"] == 480.0
+
+    # Ajout d'une carte en favori dans Redis (SADD)
+    fav_res = client.post("/api/users/favorites/sv3pt5-006?user_id=ondine")
+    assert fav_res.status_code == 200
+    assert fav_res.json()["is_favorite"] is True
+    assert "sv3pt5-006" in cache_repo.favorites.get("ondine", set())
+
+    # Consultation des favoris (SMEMBERS)
+    get_favs = client.get("/api/users/favorites?user_id=ondine")
+    assert get_favs.status_code == 200
+    assert "sv3pt5-006" in get_favs.json()
+
+
+def test_redis_trending_views(test_env):
+    client = test_env["client"]
+
+    # Incrémentation de vue dans Redis Sorted Set (ZINCRBY)
+    view_res = client.post("/api/cards/sv3pt5-006/view")
+    assert view_res.status_code == 200
+
+    # Consultation du classement Top Trending (ZREVRANGE)
+    top_res = client.get("/api/cards/trending/top")
+    assert top_res.status_code == 200
+    trending_cards = top_res.json()
+    assert len(trending_cards) > 0
+    assert trending_cards[0]["id"] == "sv3pt5-006"
+    assert trending_cards[0]["views"] >= 1
+
+
+def test_elasticsearch_aggregations(test_env):
+    client = test_env["client"]
+    res = client.get("/api/admin/aggregations")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "by_status" in data["aggregations"]
+    assert "by_set" in data["aggregations"]

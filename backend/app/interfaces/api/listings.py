@@ -15,6 +15,7 @@ from app.interfaces.dependencies import (
     get_purchase_listing_use_case,
     get_search_listings_use_case,
     get_listing_repository,
+    get_cache_repository,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
@@ -54,8 +55,30 @@ async def search_listings(
     limit: int = Query(20, ge=1, le=100),
     skip: int = Query(0, ge=0),
     search_uc: SearchListingsUseCase = Depends(get_search_listings_use_case),
+    cache_repo=Depends(get_cache_repository),
 ):
-    """Recherche plein-texte avec Elasticsearch et fallback sur MongoDB."""
+    """
+    Recherche plein-texte avec Elasticsearch, fallback MongoDB et mise en cache Redis.
+    Met en évidence la différence de latence entre Redis Cache HIT (<1ms) et Elasticsearch/Mongo.
+    """
+    import time
+    start_time = time.perf_counter()
+
+    # Clé de cache normalisée
+    cache_key = f"cache:listings:{q}:{set_name}:{condition}:{min_price}:{max_price}:{status}:{sort_by}:{sort_order}:{limit}:{skip}"
+    cached = await cache_repo.get_json(cache_key)
+
+    if cached:
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        return {
+            "total": cached["total"],
+            "items": cached["items"],
+            "source": "redis_cache",
+            "cache_hit": True,
+            "response_time_ms": elapsed_ms,
+        }
+
+    # Requête métier (Elasticsearch / Mongo)
     query = SearchListingsQuery(
         query=q,
         set_name=set_name,
@@ -69,10 +92,18 @@ async def search_listings(
         skip=skip,
     )
     results = await search_uc.execute(query)
+    items_dict = [item.to_dict() for item in results["items"]]
+
+    # Mise en cache Redis pour 45 secondes
+    await cache_repo.set_json(cache_key, {"total": results["total"], "items": items_dict}, ttl_seconds=45)
+
+    elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
     return {
         "total": results["total"],
-        "items": [item.to_dict() for item in results["items"]],
-        "source": results.get("source"),
+        "items": items_dict,
+        "source": results.get("source", "elasticsearch"),
+        "cache_hit": False,
+        "response_time_ms": elapsed_ms,
     }
 
 

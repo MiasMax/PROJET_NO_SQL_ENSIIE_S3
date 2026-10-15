@@ -42,6 +42,31 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
+    async def add_favorite(self, user_id: str, card_id: str) -> None:
+        """Ajoute une carte aux favoris de l'utilisateur (Redis SADD)."""
+        pass
+
+    @abstractmethod
+    async def remove_favorite(self, user_id: str, card_id: str) -> None:
+        """Retire une carte des favoris (Redis SREM)."""
+        pass
+
+    @abstractmethod
+    async def get_favorites(self, user_id: str) -> List[str]:
+        """Récupère la liste des favoris (Redis SMEMBERS)."""
+        pass
+
+    @abstractmethod
+    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+        """Enregistre une session utilisateur avec expiration TTL dans Redis."""
+        pass
+
+    @abstractmethod
+    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+        """Récupère la session utilisateur active depuis Redis."""
+        pass
+
+    @abstractmethod
     async def get_json(self, key: str) -> Optional[Any]:
         """Récupère une valeur mise en cache JSON."""
         pass

@@ -86,6 +86,13 @@ class MockSearchRepository(SearchRepository):
     async def get_indexed_count(self) -> int:
         return len(self.indexed)
 
+    async def get_aggregations(self) -> Dict[str, Any]:
+        return {
+            "by_status": {"buckets": [{"key": "ACTIVE", "doc_count": len(self.indexed)}]},
+            "by_condition": {"buckets": [{"key": "NEAR_MINT", "doc_count": len(self.indexed)}]},
+            "by_set": {"buckets": [{"key": "151", "doc_count": len(self.indexed), "avg_price": {"value": 45.0}}]},
+        }
+
 
 class MockCacheRepository(CacheRepository):
     def __init__(self):
@@ -93,6 +100,8 @@ class MockCacheRepository(CacheRepository):
         self.lists = {}
         self.cache = {}
         self.trending = {}
+        self.favorites = {}
+        self.sessions = {}
 
     async def increment_counter(self, key: str, amount: int = 1) -> int:
         self.counters[key] = self.counters.get(key, 0) + amount
@@ -120,6 +129,24 @@ class MockCacheRepository(CacheRepository):
     async def get_trending_card_ids(self, limit: int = 5) -> List[Dict[str, Any]]:
         sorted_items = sorted(self.trending.items(), key=lambda x: x[1], reverse=True)[:limit]
         return [{"card_id": k, "views": v} for k, v in sorted_items]
+
+    async def add_favorite(self, user_id: str, card_id: str) -> None:
+        if user_id not in self.favorites:
+            self.favorites[user_id] = set()
+        self.favorites[user_id].add(card_id)
+
+    async def remove_favorite(self, user_id: str, card_id: str) -> None:
+        if user_id in self.favorites:
+            self.favorites[user_id].discard(card_id)
+
+    async def get_favorites(self, user_id: str) -> List[str]:
+        return list(self.favorites.get(user_id, set()))
+
+    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+        self.sessions[token] = user_data
+
+    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+        return self.sessions.get(token)
 
     async def get_json(self, key: str) -> Optional[Any]:
         return self.cache.get(key)

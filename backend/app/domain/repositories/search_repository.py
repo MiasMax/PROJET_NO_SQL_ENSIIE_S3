@@ -43,3 +43,13 @@ class SearchRepository(ABC):
     async def get_indexed_count(self) -> int:
         """Nombre total de documents indexés."""
         pass
+
+    @abstractmethod
+    async def get_aggregations(self) -> Dict[str, Any]:
+        """
+        Calcule les agrégations analytiques via Elasticsearch :
+        - Répartition par statut (ACTIVE vs SOLD)
+        - Prix moyen et volumétrie par extension (set_name)
+        - Distribution par état d'usure et rareté
+        """
+        pass

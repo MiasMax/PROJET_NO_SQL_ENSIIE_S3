@@ -30,6 +30,7 @@ from app.interfaces.api.cards import router as cards_router
 from app.interfaces.api.listings import router as listings_router
 from app.interfaces.api.orders import router as orders_router
 from app.interfaces.api.admin import router as admin_router
+from app.interfaces.api.users import router as users_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -133,6 +134,7 @@ app.include_router(cards_router)
 app.include_router(listings_router)
 app.include_router(orders_router)
 app.include_router(admin_router)
+app.include_router(users_router)
 
 
 @app.get("/api/health", tags=["Health"])

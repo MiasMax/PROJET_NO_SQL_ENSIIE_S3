@@ -11,21 +11,24 @@
 1. **Marketplace Moderne & Réactif (Style Vinted)** :
    * Consultation du catalogue officiel avec **images officielles HD** (*151, Flammes Obsidiennes, Écarlate et Violet, Faille Paradoxe*).
    * **Effet 3D Holographique interactif** au survol des cartes (inclinaison tilt et reflet spéculaire dynamique).
+   * **Top 5 Tendances en Direct (Redis ZSET)** : classement temps réel des cartes les plus vues mis à jour instantanément à chaque clic (`ZINCRBY` / `ZREVRANGE`).
+   * **Gestion de Sessions & Favoris (Redis)** :
+     * Bascule instantanée de compte dresseur (Sacha, Ondine, Prof. Chen) avec session persistée en cache Redis (`TTL 24h`).
+     * Liste de favoris gérée en mémoire vive via des ensembles Redis Sets (`SADD` / `SREM` / `SMEMBERS`).
+   * **Indicateur de Benchmark de Latence** : affichage en direct du gain de performance (`⚡ Cache Redis HIT : 0.4 ms` vs `🔍 Elasticsearch : 12 ms`).
    * Recherche instantanée tolérante aux fautes de frappe (*fuzzy search*) avec filtres par série, état d'usure et tri par prix.
-   * Achat express simulé avec protection acheteur et archivage immuable des commandes.
 
 2. **Formulaire de Vente & Double Persistance (Consigne Enseignant)** :
    * Formulaire complet de publication d'annonce (choix de carte, état, prix, description, pseudo vendeur).
    * Lors de la soumission, la donnée est persistée instantanément dans :
-     * 🟢 **MongoDB** : Source de vérité principale (Document Store).
-     * 🔵 **Elasticsearch** : Indexation immédiate pour recherche plein-texte.
-     * 🔴 **Redis** : Compteurs atomiques, flux FIFO des nouveautés et purge du cache.
+     * 🟢 **MongoDB** : Source de vérité principale (Document Store JSON).
+     * 🔵 **Elasticsearch** : Indexation immédiate pour recherche plein-texte et agrégations.
+     * 🔴 **Redis** : Compteurs atomiques, flux FIFO des nouveautés et invalidation du cache.
 
-3. **Bilan Admin & Supervision Temps-Réel** :
-   * Métriques financières (volume total en €, commandes passées, annonces actives).
-   * **Vérificateur de cohérence** (audit de synchronisation entre MongoDB et Elasticsearch).
-   * **Boîte à outils Soutenance** : boutons pour copier les commandes exactes à jouer dans les terminaux.
-   * Dashboard **Grafana** préconfiguré sur le port `3001`.
+3. **Synergie JSON MongoDB + Elasticsearch & Dashboards Grafana** :
+   * **Pipeline Document JSON fluide** : le schéma JSON flexible de MongoDB est directement indexé par Elasticsearch sans transformation complexe ni jointure SQL lourde.
+   * **Agrégations analytiques natives** : Elasticsearch calcule à la volée le prix moyen par extension, la distribution par état et les ratios actifs/vendus.
+   * **Supervision Grafana (Port 3001)** : tableau de bord préconfiguré auto-provisionné interrogeant directement Elasticsearch comme Data Source.
 
 ---
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Sparkles, ShoppingBag, Eye, Tag } from 'lucide-react';
+import { Sparkles, ShoppingBag, Eye, Tag, Heart } from 'lucide-react';
 
-export default function PokemonCard3D({ listing, onSelect, onQuickBuy }) {
+export default function PokemonCard3D({ listing, onSelect, onQuickBuy, isFavorite = false, onToggleFavorite }) {
   const cardRef = useRef(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
@@ -93,6 +93,35 @@ export default function PokemonCard3D({ listing, onSelect, onQuickBuy }) {
 
       {/* Image de la carte */}
       <div className="card-image-wrap">
+        {onToggleFavorite && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(listing.card_id);
+            }}
+            title={isFavorite ? "Retirer des favoris (Redis Set)" : "Ajouter aux favoris (Redis Set)"}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              zIndex: 25,
+              background: 'rgba(15, 23, 42, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '999px',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: isFavorite ? '#ef4444' : '#94a3b8',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Heart size={16} fill={isFavorite ? '#ef4444' : 'none'} />
+          </button>
+        )}
         <img
           src={listing.image_url}
           alt={listing.card_name}

@@ -4,17 +4,20 @@ import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Laye
 export default function AdminDashboard({ onBackToMarketplace }) {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [aggregations, setAggregations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedMessage, setSeedMessage] = useState(null);
+  const [showRawJson, setShowRawJson] = useState(false);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [resStats, resOrders] = await Promise.all([
+      const [resStats, resOrders, resAggs] = await Promise.all([
         fetch('/api/admin/stats'),
-        fetch('/api/orders?limit=10')
+        fetch('/api/orders?limit=10'),
+        fetch('/api/admin/aggregations')
       ]);
 
       if (resStats.ok) {
@@ -22,6 +25,10 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       }
       if (resOrders.ok) {
         setOrders(await resOrders.json());
+      }
+      if (resAggs.ok) {
+        const aggsData = await resAggs.json();
+        setAggregations(aggsData.aggregations || null);
       }
     } catch (e) {
       console.error("Erreur de récupération des stats :", e);
@@ -304,6 +311,109 @@ export default function AdminDashboard({ onBackToMarketplace }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* SECTION GRAFANA & ELASTICSEARCH JSON ANALYTICS */}
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-lg)', padding: '28px', marginBottom: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Tableaux de Bord Grafana (Datasource Elasticsearch)</h2>
+              <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '999px', background: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                Port 3001
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px' }}>
+              Grafana interroge directement l'index Elasticsearch <code>pokevinted_listings</code> grâce au format JSON unifié.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => setShowRawJson(!showRawJson)}
+              className="btn btn-secondary"
+            >
+              {showRawJson ? 'Masquer le JSON' : '{ } Voir JSON Elasticsearch'}
+            </button>
+            <a
+              href="http://localhost:3001"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-gold"
+              style={{ textDecoration: 'none' }}
+            >
+              🚀 Ouvrir Grafana (:3001)
+            </a>
+          </div>
+        </div>
+
+        {/* JSON Explorer si activé */}
+        {showRawJson && aggregations && (
+          <div style={{ marginBottom: '24px', background: '#04070d', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 700 }}>FLUX JSON BRUT ELASTICSEARCH AGGREGATIONS</span>
+            </div>
+            <pre style={{ margin: 0, maxHeight: '250px', overflowY: 'auto', fontSize: '0.8rem', color: '#a5b4fc', fontFamily: 'monospace' }}>
+              {JSON.stringify(aggregations, null, 2)}
+            </pre>
+          </div>
+        )}
+
+        {/* Visualisation des agrégations analytiques Elasticsearch */}
+        {aggregations && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            {/* Par Série */}
+            <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '12px' }}>
+                Prix Moyen par Extension (JSON Terms Agg)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {aggregations.by_set?.buckets?.map((b) => (
+                  <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{b.key} ({b.doc_count})</span>
+                    <strong style={{ color: 'var(--accent-gold)' }}>
+                      {b.avg_price?.value ? `${b.avg_price.value.toFixed(2)} €` : 'N/A'}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Par État */}
+            <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-secondary)', marginBottom: '12px' }}>
+                Distribution par État (JSON Terms Agg)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {aggregations.by_condition?.buckets?.map((b) => (
+                  <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{b.key}</span>
+                    <span style={{ padding: '2px 8px', background: 'rgba(6, 182, 212, 0.15)', color: '#22d3ee', borderRadius: '4px', fontWeight: 700 }}>
+                      {b.doc_count} carte{b.doc_count > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Par Statut */}
+            <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: '12px' }}>
+                Statut du Marché (ACTIVE vs SOLD)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {aggregations.by_status?.buckets?.map((b) => (
+                  <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{b.key}</span>
+                    <strong style={{ color: b.key === 'ACTIVE' ? 'var(--accent-emerald)' : '#f87171' }}>
+                      {b.doc_count}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Historique des Commandes Récentes */}

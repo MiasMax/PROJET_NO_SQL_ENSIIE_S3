@@ -43,6 +43,22 @@ class RedisCacheRepository(CacheRepository):
         results = await self.client.zrevrange("cards:trending_views", 0, limit - 1, withscores=True)
         return [{"card_id": card_id, "views": int(score)} for card_id, score in results]
 
+    async def add_favorite(self, user_id: str, card_id: str) -> None:
+        await self.client.sadd(f"user:{user_id}:favorites", card_id)
+
+    async def remove_favorite(self, user_id: str, card_id: str) -> None:
+        await self.client.srem(f"user:{user_id}:favorites", card_id)
+
+    async def get_favorites(self, user_id: str) -> List[str]:
+        members = await self.client.smembers(f"user:{user_id}:favorites")
+        return list(members)
+
+    async def set_user_session(self, token: str, user_data: Dict[str, Any], ttl_seconds: int = 86400) -> None:
+        await self.set_json(f"session:{token}", user_data, ttl_seconds=ttl_seconds)
+
+    async def get_user_session(self, token: str) -> Optional[Dict[str, Any]]:
+        return await self.get_json(f"session:{token}")
+
     async def get_json(self, key: str) -> Optional[Any]:
         val = await self.client.get(key)
         if not val:
