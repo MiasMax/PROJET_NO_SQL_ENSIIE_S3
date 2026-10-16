@@ -3,7 +3,10 @@ MongoDB implementation of ListingRepository.
 Persists marketplace listings in the 'listings' collection.
 """
 
+from datetime import UTC, datetime
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo import ReturnDocument
 
 from app.domain.entities.listing import Listing
 from app.domain.repositories.listing_repository import ListingRepository
@@ -45,6 +48,18 @@ class MongoListingRepository(ListingRepository):
 
     async def get_recent(self, limit: int = 10) -> list[Listing]:
         return await self.list_listings(status=ListingStatus.ACTIVE, limit=limit, skip=0)
+
+    async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
+        """Atomically transition listing from ACTIVE to SOLD. Guaranteed idempotency under high concurrency."""
+        now = datetime.now(UTC)
+        doc = await self.collection.find_one_and_update(
+            {"_id": listing_id, "status": ListingStatus.ACTIVE.value},
+            {"$set": {"status": ListingStatus.SOLD.value, "buyer_name": buyer_name, "sold_at": now}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not doc:
+            return None
+        return self._to_entity(doc)
 
     def _to_entity(self, doc: dict) -> Listing:
         return Listing(

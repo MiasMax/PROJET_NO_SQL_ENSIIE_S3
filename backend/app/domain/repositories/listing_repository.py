@@ -36,3 +36,8 @@ class ListingRepository(ABC):
     async def get_recent(self, limit: int = 10) -> list[Listing]:
         """Fetch recently created listings."""
         pass
+
+    @abstractmethod
+    async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
+        """Atomically transition listing from ACTIVE to SOLD. Returns updated listing or None if already sold."""
+        pass

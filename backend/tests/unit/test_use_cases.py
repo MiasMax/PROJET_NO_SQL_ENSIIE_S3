@@ -13,12 +13,14 @@ from app.application.use_cases.purchase_listing import PurchaseListingCommand, P
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
+from app.domain.entities.user import User
 from app.domain.exceptions import CardNotFoundError
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.search_repository import SearchRepository
+from app.domain.repositories.user_repository import UserRepository
 from app.domain.value_objects.listing_status import ListingStatus
 
 # --- In-memory repository mocks for fast unit test execution ---
@@ -71,6 +73,13 @@ class MockListingRepository(ListingRepository):
 
     async def get_recent(self, limit: int = 10) -> list[Listing]:
         return list(self.listings.values())[-limit:]
+
+    async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
+        item = self.listings.get(listing_id)
+        if not item or item.status == ListingStatus.SOLD:
+            return None
+        item.mark_as_sold(buyer_name)
+        return item
 
 
 class MockSearchRepository(SearchRepository):
@@ -153,6 +162,9 @@ class MockCacheRepository(CacheRepository):
     async def get_user_session(self, token: str) -> dict[str, Any] | None:
         return self.sessions.get(token)
 
+    async def delete_user_session(self, token: str) -> None:
+        self.sessions.pop(token, None)
+
     async def get_json(self, key: str) -> Any | None:
         return self.cache.get(key)
 
@@ -164,6 +176,37 @@ class MockCacheRepository(CacheRepository):
 
     async def get_stats(self) -> dict[str, Any]:
         return {"used_memory_human": "1.2M", "connected_clients": 1}
+
+
+class MockUserRepository(UserRepository):
+    def __init__(self, users: list[User] | None = None):
+        self.users = {u.id: u for u in (users or [])}
+
+    async def save(self, user: User) -> None:
+        self.users[user.id] = user
+
+    async def get_by_id(self, user_id: str) -> User | None:
+        return self.users.get(user_id)
+
+    async def get_by_username(self, username: str) -> User | None:
+        clean = username.lower().strip()
+        for u in self.users.values():
+            if u.username.lower() == clean:
+                return u
+        return None
+
+    async def get_by_email(self, email: str) -> User | None:
+        clean = email.lower().strip()
+        for u in self.users.values():
+            if u.email.lower() == clean:
+                return u
+        return None
+
+    async def list_users(self, limit: int = 50, skip: int = 0) -> list[User]:
+        return list(self.users.values())[skip : skip + limit]
+
+    async def count(self) -> int:
+        return len(self.users)
 
 
 class MockOrderRepository(OrderRepository):

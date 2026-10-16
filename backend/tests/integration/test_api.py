@@ -13,6 +13,7 @@ from app.interfaces.dependencies import (
     get_listing_repository,
     get_order_repository,
     get_search_repository,
+    get_user_repository,
 )
 from app.main import app
 from tests.unit.test_use_cases import (
@@ -21,6 +22,7 @@ from tests.unit.test_use_cases import (
     MockListingRepository,
     MockOrderRepository,
     MockSearchRepository,
+    MockUserRepository,
 )
 
 
@@ -33,6 +35,7 @@ def test_env():
     search_repo = MockSearchRepository()
     cache_repo = MockCacheRepository()
     order_repo = MockOrderRepository()
+    user_repo = MockUserRepository()
 
     # Override application dependencies with in-memory test doubles
     app.dependency_overrides[get_card_repository] = lambda: card_repo
@@ -40,6 +43,7 @@ def test_env():
     app.dependency_overrides[get_search_repository] = lambda: search_repo
     app.dependency_overrides[get_cache_repository] = lambda: cache_repo
     app.dependency_overrides[get_order_repository] = lambda: order_repo
+    app.dependency_overrides[get_user_repository] = lambda: user_repo
 
     client = TestClient(app)
     yield {
@@ -196,3 +200,88 @@ def test_special_regex_characters_search_handled_safely(test_env):
     res = client.get("/api/cards?search=(([[*+?^$")
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+def test_user_registration_login_and_wallet_flow(test_env):
+    client = test_env["client"]
+
+    # 1. Register new member
+    reg_res = client.post(
+        "/api/users/register",
+        json={
+            "username": "red_pallet",
+            "name": "Red du Mont Argenté",
+            "email": "red@pallet.com",
+            "password": "secret_password_123",
+            "role": "Maître Pokémon",
+            "balance": 200.0,
+            "is_admin": False,
+        },
+    )
+    assert reg_res.status_code == 200
+    reg_data = reg_res.json()
+    assert reg_data["username"] == "red_pallet"
+    assert reg_data["balance"] == 200.0
+    token = reg_data["token"]
+    assert token.startswith("sess_")
+
+    # 2. Get profile with session token
+    me_res = client.get("/api/users/me", headers={"x-session-token": token})
+    assert me_res.status_code == 200
+    assert me_res.json()["name"] == "Red du Mont Argenté"
+
+    # 3. Recharge wallet
+    recharge_res = client.post(
+        "/api/users/wallet/recharge",
+        headers={"x-session-token": token},
+        json={"amount": 50.0},
+    )
+    assert recharge_res.status_code == 200
+    assert recharge_res.json()["new_balance"] == 250.0
+
+    # 4. Login with credentials
+    login_res = client.post(
+        "/api/users/login",
+        json={"username": "red_pallet", "password": "secret_password_123"},
+    )
+    assert login_res.status_code == 200
+    assert login_res.json()["token"] is not None
+
+    # 5. Logout
+    logout_res = client.post("/api/users/logout", headers={"x-session-token": token})
+    assert logout_res.status_code == 200
+    assert logout_res.json()["status"] == "success"
+
+
+def test_duplicate_purchase_prevention(test_env):
+    client = test_env["client"]
+
+    # Create listing
+    create_res = client.post(
+        "/api/listings",
+        json={
+            "card_id": "sv3pt5-006",
+            "price": 40.0,
+            "condition": "MINT",
+            "seller_name": "Sacha",
+            "description": "Carte Dracaufeu sous sleeve",
+        },
+    )
+    assert create_res.status_code == 201
+    listing_id = create_res.json()["id"]
+
+    # First purchase succeeds
+    buy1 = client.post(
+        f"/api/listings/{listing_id}/purchase",
+        json={"buyer_name": "Ondine", "buyer_id": "ondine"},
+    )
+    assert buy1.status_code == 200
+
+    # Second purchase must be rejected with 400 (already sold)
+    buy2 = client.post(
+        f"/api/listings/{listing_id}/purchase",
+        json={"buyer_name": "Pierre", "buyer_id": "pierre"},
+    )
+    assert buy2.status_code == 400
+    assert "déjà été vendue" in buy2.json()["detail"] or "already been sold" in buy2.json()["detail"].lower()
+

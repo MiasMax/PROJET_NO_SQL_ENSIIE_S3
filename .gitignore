@@ -21,6 +21,7 @@ dist-ssr/
 # Docker & Storage volumes
 data/
 *.log
+*.db
 
 # Env
 .env

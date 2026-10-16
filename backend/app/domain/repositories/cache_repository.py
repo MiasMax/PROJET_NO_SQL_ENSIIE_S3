@@ -68,6 +68,11 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
+    async def delete_user_session(self, token: str) -> None:
+        """Remove active user session by token."""
+        pass
+
+    @abstractmethod
     async def get_json(self, key: str) -> Any | None:
         """Retrieve a cached JSON value."""
         pass

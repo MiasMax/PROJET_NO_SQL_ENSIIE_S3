@@ -1,11 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Search, BarChart3, Store, Sparkles, Filter, RefreshCw, User, Zap, Heart, ShieldCheck, UserPlus } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  PlusCircle,
+  Search,
+  Store,
+  Sparkles,
+  Filter,
+  RefreshCw,
+  User,
+  Zap,
+  Heart,
+  ShieldCheck,
+  UserPlus,
+  LogIn,
+  LogOut,
+  Wallet,
+  ChevronDown,
+  ShoppingBag,
+} from 'lucide-react';
 import PokemonCard3D from './components/PokemonCard3D';
 import TrendingBar from './components/TrendingBar';
 import SellCardModal from './components/SellCardModal';
 import BuyModal from './components/BuyModal';
 import AdminDashboard from './components/AdminDashboard';
 import RegisterModal from './components/RegisterModal';
+import LoginModal from './components/LoginModal';
+import UserProfileModal from './components/UserProfileModal';
 
 export default function App() {
   const [currentView, setCurrentView] = useState('marketplace'); // 'marketplace' | 'admin'
@@ -16,11 +35,12 @@ export default function App() {
   // Redis cache metrics
   const [cacheMetrics, setCacheMetrics] = useState({ hit: false, timeMs: 0, source: 'elasticsearch' });
 
-  // User profiles & sessions
-  const [currentUser, setCurrentUser] = useState({ id: 'sacha', name: 'Sacha du Bourg-Palette', role: 'Dresseur Kanto', balance: 250, is_admin: false });
-  const [allUsers, setAllUsers] = useState([]);
+  // Real authentication & user profile state
+  const [currentUser, setCurrentUser] = useState(null); // null when guest, user object when logged in
   const [favorites, setFavorites] = useState(new Set());
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Search filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,6 +52,8 @@ export default function App() {
   // Modals
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedListingForBuy, setSelectedListingForBuy] = useState(null);
 
   // Toast notification
@@ -42,72 +64,116 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const fetchUsersList = async () => {
-    try {
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const users = await res.json();
-        setAllUsers(users);
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsUserDropdownOpen(false);
       }
-    } catch (e) {
-      console.error("Erreur chargement utilisateurs :", e);
-    }
-  };
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // Load active user session and favorites from Redis
-  const loadUserAndFavorites = async (userId = 'sacha') => {
+  // Check active session on initial load
+  const checkActiveSession = async () => {
     try {
-      const [resUser, resFavs] = await Promise.all([
-        fetch('/api/users/me'),
-        fetch(`/api/users/favorites?user_id=${userId}`),
-      ]);
-      if (resUser.ok) {
-        const u = await resUser.json();
-        setCurrentUser(u);
+      const token = localStorage.getItem('pokevinted_token');
+      if (!token) {
+        // Fallback demo session or guest
+        const res = await fetch('/api/users/me');
+        if (res.ok) {
+          const user = await res.json();
+          setCurrentUser(user);
+          if (user.id) {
+            loadUserFavorites(user.id);
+          }
+        }
+        return;
       }
-      if (resFavs.ok) {
-        const favList = await resFavs.json();
-        setFavorites(new Set(favList));
-      }
-    } catch (e) {
-      console.error("Erreur chargement session Redis :", e);
-    }
-  };
 
-  const handleSwitchUser = async (userId) => {
-    try {
-      const res = await fetch('/api/users/switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
+      const res = await fetch('/api/users/me', {
+        headers: { 'x-session-token': token },
       });
+
       if (res.ok) {
         const user = await res.json();
         setCurrentUser(user);
-        const favRes = await fetch(`/api/users/favorites?user_id=${user.id}`);
-        if (favRes.ok) {
-          const favList = await favRes.json();
-          setFavorites(new Set(favList));
+        if (user.id) {
+          loadUserFavorites(user.id);
         }
-        showToast(`👤 Connecté en tant que : ${user.name}`);
+      } else {
+        localStorage.removeItem('pokevinted_token');
+        setCurrentUser(null);
       }
     } catch (e) {
-      console.error("Erreur switch session :", e);
+      console.error("Erreur vérification session :", e);
+      setCurrentUser(null);
     }
+  };
+
+  const loadUserFavorites = async (userId) => {
+    try {
+      const res = await fetch(`/api/users/favorites?user_id=${userId}`);
+      if (res.ok) {
+        const favList = await res.json();
+        setFavorites(new Set(favList));
+      }
+    } catch (e) {
+      console.error("Erreur favoris :", e);
+    }
+  };
+
+  const handleLoginSuccess = async (user) => {
+    setCurrentUser(user);
+    if (user.id) {
+      loadUserFavorites(user.id);
+    }
+    showToast(`👋 Bienvenue ${user.name} ! Connexion réussie.`);
   };
 
   const handleUserRegistered = async (newUser) => {
     setCurrentUser(newUser);
-    fetchUsersList();
-    const favRes = await fetch(`/api/users/favorites?user_id=${newUser.id}`);
-    if (favRes.ok) {
-      const favList = await favRes.json();
-      setFavorites(new Set(favList));
+    if (newUser.id) {
+      loadUserFavorites(newUser.id);
     }
-    showToast(`🎉 Bienvenue ${newUser.name} ! Votre compte est créé.`);
+    showToast(`🎉 Bienvenue ${newUser.name} ! Votre compte dresseur est créé.`);
+  };
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('pokevinted_token');
+      if (token) {
+        await fetch('/api/users/logout', {
+          method: 'POST',
+          headers: { 'x-session-token': token },
+        });
+      }
+    } catch (e) {
+      console.error("Erreur déconnexion :", e);
+    } finally {
+      localStorage.removeItem('pokevinted_token');
+      setCurrentUser(null);
+      setFavorites(new Set());
+      setIsUserDropdownOpen(false);
+      if (currentView === 'admin') {
+        setCurrentView('marketplace');
+      }
+      showToast("👋 Déconnexion réussie. À bientôt sur PokéVinted !");
+    }
+  };
+
+  const handleBalanceUpdated = (newBalance) => {
+    setCurrentUser((prev) => (prev ? { ...prev, balance: newBalance } : prev));
   };
 
   const handleToggleFavorite = async (cardId) => {
+    if (!currentUser) {
+      showToast("🔒 Veuillez vous connecter pour ajouter des cartes en favoris.");
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/users/favorites/${cardId}?user_id=${currentUser.id}`, { method: 'POST' });
       if (res.ok) {
@@ -146,6 +212,7 @@ export default function App() {
       if (resListings.ok) {
         const data = await resListings.json();
         const rawItems = data.items || [];
+        // Deduplicate listings by ID
         const seenIds = new Set();
         const uniqueItems = rawItems.filter((item) => {
           if (!item.id || seenIds.has(item.id)) return false;
@@ -171,8 +238,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchUsersList();
-    loadUserAndFavorites();
+    checkActiveSession();
   }, []);
 
   useEffect(() => {
@@ -182,7 +248,30 @@ export default function App() {
   const handleCardSelected = (item) => {
     // Real-time popularity tracking in Redis (ZINCRBY)
     fetch(`/api/cards/${item.card_id}/view`, { method: 'POST' }).catch(() => {});
+    if (!currentUser) {
+      showToast("🔒 Veuillez vous connecter pour finaliser cet achat.");
+      setIsLoginModalOpen(true);
+      return;
+    }
     setSelectedListingForBuy(item);
+  };
+
+  const handleQuickBuy = (item) => {
+    if (!currentUser) {
+      showToast("🔒 Veuillez vous connecter pour acheter cette carte.");
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setSelectedListingForBuy(item);
+  };
+
+  const handleOpenSell = () => {
+    if (!currentUser) {
+      showToast("🔒 Veuillez vous connecter pour vendre une carte.");
+      setIsLoginModalOpen(true);
+      return;
+    }
+    setIsSellModalOpen(true);
   };
 
   const handleListingCreated = (newListing) => {
@@ -195,14 +284,12 @@ export default function App() {
   };
 
   const handlePurchaseComplete = (order, listingId) => {
+    // Transition listing status to SOLD immediately
     setListings((prev) =>
       prev.map((item) => (item.id === listingId ? { ...item, status: 'SOLD', buyer_name: order.buyer_name } : item))
     );
     if (order.buyer_balance !== undefined && order.buyer_balance !== null) {
-      setCurrentUser((prev) => ({
-        ...prev,
-        balance: order.buyer_balance,
-      }));
+      setCurrentUser((prev) => (prev ? { ...prev, balance: order.buyer_balance } : prev));
     }
     showToast(`🛒 Bravo ! Achat confirmé de "${order.card_name}" pour ${order.price} € !`);
   };
@@ -225,7 +312,7 @@ export default function App() {
 
       {/* Navigation bar */}
       <header className="navbar">
-        <div className="logo-container" onClick={() => setCurrentView('marketplace')}>
+        <div className="logo-container" onClick={() => setCurrentView('marketplace')} style={{ cursor: 'pointer' }}>
           <svg className="logo-icon" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="#ffffff" strokeWidth="2" fill="#1e293b" />
             <path d="M2 12h20" stroke="#ef4444" strokeWidth="2.5" />
@@ -252,69 +339,153 @@ export default function App() {
           </div>
         )}
 
-        {/* Trainer profile selector and actions */}
+        {/* Real User Navigation Actions */}
         <div className="navbar-actions">
-          {/* Profile badge and user switcher */}
-          <div className="navbar-session-badge">
-            <User size={16} color="var(--accent-secondary)" />
-            <select
-              value={currentUser.id}
-              onChange={(e) => handleSwitchUser(e.target.value)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-              title="Changer de profil dresseur"
-            >
-              {allUsers.length > 0 ? (
-                allUsers.map((u) => (
-                  <option key={u.id} value={u.id} style={{ background: '#121826' }}>
-                    {u.is_admin ? '🛡️' : '🧢'} {u.name} ({u.balance}€)
-                  </option>
-                ))
-              ) : (
-                <>
-                  <option value="sacha" style={{ background: '#121826' }}>🧢 Sacha (250€)</option>
-                  <option value="ondine" style={{ background: '#121826' }}>🌊 Ondine (480€)</option>
-                  <option value="chen" style={{ background: '#121826' }}>🛡️ Prof. Chen (Admin)</option>
-                </>
-              )}
-            </select>
-            <span style={{ fontSize: '0.7rem', color: '#38bdf8', background: 'rgba(6,182,212,0.15)', padding: '1px 6px', borderRadius: '4px' }}>
-              {currentUser.is_admin ? 'Admin' : `${currentUser.balance} €`}
-            </span>
-          </div>
+          {currentUser ? (
+            <>
+              {/* Wallet Pill with live balance and recharge action */}
+              <div
+                className="navbar-wallet-pill"
+                onClick={() => setIsProfileModalOpen(true)}
+                title="Cliquez pour gérer votre compte et recharger votre solde"
+              >
+                <Wallet size={15} color="var(--accent-gold)" />
+                <span style={{ fontWeight: 800, color: '#fef08a', fontSize: '0.9rem' }}>
+                  {Number(currentUser.balance ?? 0).toFixed(2)} €
+                </span>
+                <span className="wallet-add-btn">+</span>
+              </div>
 
-          <button
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="btn btn-secondary btn-responsive"
-            title="Créer un nouveau profil dresseur ou administrateur"
-          >
-            <UserPlus size={16} />
-            <span className="btn-label-desktop">S'inscrire</span>
-          </button>
+              {/* Favorites filter shortcut */}
+              <button
+                onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+                className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'} btn-responsive`}
+                title="Filtrer mes cartes favorites"
+                style={{ position: 'relative' }}
+              >
+                <Heart size={16} fill={showOnlyFavorites ? '#ffffff' : favorites.size > 0 ? '#ef4444' : 'none'} color={showOnlyFavorites ? '#ffffff' : favorites.size > 0 ? '#ef4444' : 'currentColor'} />
+                <span className="btn-label-desktop">Favoris</span>
+                {favorites.size > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {favorites.size}
+                  </span>
+                )}
+              </button>
 
-          {currentUser.is_admin && (
-            <button
-              onClick={() => setCurrentView(currentView === 'admin' ? 'marketplace' : 'admin')}
-              className={`btn ${currentView === 'admin' ? 'btn-primary' : 'btn-secondary'} btn-responsive`}
-              title="Accéder au panneau de supervision"
-            >
-              {currentView === 'admin' ? (
-                <><Store size={18} /><span className="btn-label-desktop">Marketplace</span></>
-              ) : (
-                <><ShieldCheck size={18} color="#38bdf8" /><span className="btn-label-desktop">Administration</span><span className="btn-label-mobile">Admin</span></>
-              )}
-            </button>
+              {/* User profile dropdown button */}
+              <div style={{ position: 'relative' }} ref={dropdownRef}>
+                <button
+                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  className="navbar-user-btn"
+                >
+                  <div className="user-avatar-circle">
+                    {(currentUser.name || currentUser.username || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                    {currentUser.name}
+                  </span>
+                  <ChevronDown size={14} style={{ opacity: 0.7 }} />
+                </button>
+
+                {isUserDropdownOpen && (
+                  <div className="user-dropdown-menu">
+                    <div className="user-dropdown-header">
+                      <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
+                        {currentUser.name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        @{currentUser.username} • {currentUser.role || 'Dresseur'}
+                      </div>
+                      <div style={{ marginTop: '6px', fontSize: '0.82rem', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                        Solde : {Number(currentUser.balance ?? 0).toFixed(2)} €
+                      </div>
+                    </div>
+
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setIsUserDropdownOpen(false);
+                        setIsProfileModalOpen(true);
+                      }}
+                    >
+                      <User size={16} /> Mon Compte & Portefeuille
+                    </button>
+
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setIsUserDropdownOpen(false);
+                        setIsProfileModalOpen(true);
+                      }}
+                    >
+                      <ShoppingBag size={16} /> Mes Achats & Commandes
+                    </button>
+
+                    {currentUser.is_admin && (
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setIsUserDropdownOpen(false);
+                          setCurrentView(currentView === 'admin' ? 'marketplace' : 'admin');
+                        }}
+                        style={{ color: '#38bdf8' }}
+                      >
+                        <ShieldCheck size={16} color="#38bdf8" />
+                        {currentView === 'admin' ? 'Retour Marketplace' : 'Espace Administration'}
+                      </button>
+                    )}
+
+                    <div className="dropdown-divider" />
+
+                    <button className="dropdown-item danger" onClick={handleLogout}>
+                      <LogOut size={16} /> Se déconnecter
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Guest navigation: Login & Register buttons */}
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="btn btn-secondary btn-responsive"
+                title="Se connecter avec son compte"
+              >
+                <LogIn size={16} />
+                <span>Connexion</span>
+              </button>
+
+              <button
+                onClick={() => setIsRegisterModalOpen(true)}
+                className="btn btn-primary btn-responsive"
+                title="Créer un compte dresseur gratuit"
+              >
+                <UserPlus size={16} />
+                <span>S'inscrire</span>
+              </button>
+            </>
           )}
 
-          <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold btn-responsive">
-            <PlusCircle size={18} /><span className="btn-label-desktop">Vendre une carte</span><span className="btn-label-mobile">Vendre</span>
+          {/* Sell button */}
+          <button onClick={handleOpenSell} className="btn btn-gold btn-responsive">
+            <PlusCircle size={18} />
+            <span className="btn-label-desktop">Vendre une carte</span>
+            <span className="btn-label-mobile">Vendre</span>
           </button>
         </div>
       </header>
@@ -338,13 +509,19 @@ export default function App() {
                 Trouvez les pépites sous sleeve et toploader, négociez au meilleur prix et complétez vos master sets directement entre dresseurs certifiés.
               </p>
               <div className="hero-actions">
-                <button onClick={() => setIsSellModalOpen(true)} className="btn btn-gold hero-btn" style={{ padding: '12px 28px' }}>
+                <button onClick={handleOpenSell} className="btn btn-gold hero-btn" style={{ padding: '12px 28px' }}>
                   <PlusCircle size={18} /> Vendre une carte
                 </button>
-                <button onClick={() => setIsRegisterModalOpen(true)} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
-                  <UserPlus size={18} /> Créer un compte
-                </button>
-                {currentUser.is_admin && (
+                {!currentUser ? (
+                  <button onClick={() => setIsRegisterModalOpen(true)} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
+                    <UserPlus size={18} /> Créer un compte dresseur
+                  </button>
+                ) : (
+                  <button onClick={() => setIsProfileModalOpen(true)} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
+                    <Wallet size={18} /> Gérer mon solde ({Number(currentUser.balance ?? 0).toFixed(2)} €)
+                  </button>
+                )}
+                {currentUser?.is_admin && (
                   <button onClick={() => setCurrentView('admin')} className="btn btn-secondary hero-btn" style={{ padding: '12px 24px' }}>
                     <ShieldCheck size={18} /> Administration
                   </button>
@@ -353,29 +530,45 @@ export default function App() {
             </div>
           </section>
 
-          {/* Live top 5 trending cards (Redis ZSET) */}
-          <TrendingBar onSelectCard={(card) => setSearchQuery(card.name)} />
+          {/* Real-time Redis Popularity Bar */}
+          <TrendingBar />
 
-          {/* Advanced filters bar and cache latency benchmark */}
-          <div className="filters-bar">
+          {/* Redis Cache Performance Metrics Banner */}
+          <div className="cache-metrics-banner">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Zap size={18} color="var(--accent-gold)" />
+              <span>
+                Recherche NoSQL indexée : <strong>{displayedListings.length} annonces en ligne</strong>
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className={`cache-badge ${cacheMetrics.hit ? 'cache-hit' : 'cache-miss'}`}>
+                {cacheMetrics.hit ? '⚡ REDIS CACHE HIT' : `🔍 ${cacheMetrics.source.toUpperCase()}`}
+              </span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {cacheMetrics.timeMs} ms
+              </span>
+            </div>
+          </div>
+
+          {/* Filters and search options */}
+          <section className="filters-container">
             <div className="filters-main">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-                <Filter size={18} />
-                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Filtres :</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                <Filter size={16} /> Filtres :
               </div>
 
-              {/* Expansion set selector */}
+              {/* Set selector */}
               <select
                 value={selectedSet}
                 onChange={(e) => setSelectedSet(e.target.value)}
                 className="form-select"
-                style={{ width: 'auto', minWidth: '180px' }}
+                style={{ width: 'auto' }}
               >
                 <option value="">Toutes les séries</option>
                 <option value="Écarlate et Violet 151">Écarlate et Violet 151</option>
                 <option value="Flammes Obsidiennes">Flammes Obsidiennes</option>
-                <option value="Écarlate et Violet">Écarlate et Violet</option>
-                <option value="Faille Paradoxe">Faille Paradoxe</option>
+                <option value="Écarlate et Violet">Écarlate et Violet (Base)</option>
                 <option value="Forces Temporelles">Forces Temporelles</option>
               </select>
 
@@ -384,113 +577,78 @@ export default function App() {
                 value={selectedCondition}
                 onChange={(e) => setSelectedCondition(e.target.value)}
                 className="form-select"
-                style={{ width: 'auto', minWidth: '150px' }}
+                style={{ width: 'auto' }}
               >
                 <option value="">Tous les états</option>
-                <option value="MINT">💎 MINT</option>
+                <option value="MINT">💎 MINT (Parfait)</option>
                 <option value="NEAR_MINT">✨ NEAR MINT</option>
                 <option value="EXCELLENT">👍 EXCELLENT</option>
                 <option value="GOOD">👌 GOOD</option>
                 <option value="PLAYED">⚡ PLAYED</option>
               </select>
 
-              {/* Favorites filter */}
+              {/* Favorites toggle */}
               <button
                 onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
                 className={`btn ${showOnlyFavorites ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '8px 14px', fontSize: '0.85rem' }}
               >
-                <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} />
+                <Heart size={15} fill={showOnlyFavorites ? '#ffffff' : 'none'} color={showOnlyFavorites ? '#ffffff' : '#ef4444'} />
                 Mes Favoris ({favoriteListingsCount})
               </button>
             </div>
 
-            {/* Listings count for regular users, performance indicator for admin */}
-            <div className="filters-stats">
-              {currentUser.is_admin ? (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '999px',
-                  background: cacheMetrics.hit ? 'rgba(6, 182, 212, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                  border: `1px solid ${cacheMetrics.hit ? '#06b6d4' : '#6366f1'}`,
-                  color: cacheMetrics.hit ? '#22d3ee' : '#a5b4fc',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                }}
-                title={cacheMetrics.hit ? "Résultat servi en mémoire vive par Redis" : "Requête exécutée par Elasticsearch & MongoDB"}
-                >
-                  <Zap size={14} color={cacheMetrics.hit ? "#06b6d4" : "#818cf8"} />
-                  {cacheMetrics.hit
-                    ? `⚡ Cache HIT (${cacheMetrics.timeMs} ms)`
-                    : `🔍 Recherche (${cacheMetrics.timeMs} ms)`}
-                </div>
-              ) : (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 12px',
-                  borderRadius: '999px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                }}>
-                  {displayedListings.length} annonce{displayedListings.length > 1 ? 's' : ''} en vente
-                </div>
-              )}
-
-              {/* Sort selector */}
+            {/* Sorting controls */}
+            <div className="filters-sort">
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Trier par :</span>
               <select
-                value={`${sortBy}:${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split(':');
-                  setSortBy(field);
-                  setSortOrder(order);
-                }}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
                 className="form-select"
                 style={{ width: 'auto' }}
               >
-                <option value="created_at:desc">Plus récentes</option>
-                <option value="price:asc">Prix : croissant</option>
-                <option value="price:desc">Prix : décroissant</option>
+                <option value="created_at">Plus récentes</option>
+                <option value="price">Prix</option>
               </select>
 
-              <button onClick={fetchData} className="btn btn-secondary" style={{ padding: '10px 14px' }}>
-                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="btn btn-secondary"
+                style={{ padding: '8px 12px' }}
+                title="Inverser l'ordre"
+              >
+                {sortOrder === 'desc' ? '↓ Décroissant' : '↑ Croissant'}
+              </button>
+
+              <button
+                onClick={fetchData}
+                className="btn btn-secondary"
+                style={{ padding: '8px' }}
+                title="Actualiser les résultats"
+              >
+                <RefreshCw size={16} />
               </button>
             </div>
-          </div>
+          </section>
 
-          {/* Listings grid */}
+          {/* Cards catalog grid */}
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <RefreshCw className="animate-spin" size={32} color="var(--accent-primary)" style={{ margin: '0 auto 16px' }} />
-              <p style={{ color: 'var(--text-secondary)' }}>Chargement des cartes en cours...</p>
+            <div style={{ textAlign: 'center', padding: '80px 0' }}>
+              <RefreshCw className="animate-spin" size={40} style={{ margin: '0 auto 16px', color: 'var(--accent-primary)' }} />
+              <p style={{ color: 'var(--text-secondary)' }}>Recherche instantanée dans Elasticsearch...</p>
             </div>
           ) : displayedListings.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)' }}>
-              <Sparkles size={40} color="var(--accent-gold)" style={{ margin: '0 auto 16px' }} />
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '8px' }}>
-                {showOnlyFavorites ? "Vous n'avez pas encore de cartes en favoris" : "Aucune annonce trouvée"}
+            <div style={{ textAlign: 'center', padding: '80px 20px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
+              <Store size={48} style={{ margin: '0 auto 16px', color: 'var(--text-muted)' }} />
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>
+                Aucune carte ne correspond à votre recherche
               </h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                {showOnlyFavorites
-                  ? "Cliquez sur le cœur d'une carte pour la sauvegarder dans vos favoris !"
-                  : "Soyez le premier dresseur à publier une annonce avec le formulaire !"}
+                Essayez d'ajuster vos critères ou soyez le premier à mettre cette carte en vente !
               </p>
-              {showOnlyFavorites ? (
-                <button onClick={() => setShowOnlyFavorites(false)} className="btn btn-primary" style={{ padding: '12px 24px' }}>
-                  Voir toutes les annonces
-                </button>
-              ) : (
-                <button onClick={() => { setShowOnlyFavorites(false); setIsSellModalOpen(true); }} className="btn btn-gold">
-                  <PlusCircle size={18} /> Vendre une carte maintenant
-                </button>
-              )}
+              <button onClick={() => { setSearchQuery(''); setSelectedSet(''); setSelectedCondition(''); setShowOnlyFavorites(false); }} className="btn btn-secondary">
+                Réinitialiser les filtres
+              </button>
             </div>
           ) : (
             <div className="cards-grid">
@@ -501,29 +659,27 @@ export default function App() {
                   isFavorite={favorites.has(item.card_id)}
                   onToggleFavorite={handleToggleFavorite}
                   onSelect={handleCardSelected}
-                  onQuickBuy={handleCardSelected}
+                  onQuickBuy={handleQuickBuy}
                 />
               ))}
             </div>
           )}
+
           {/* Marketplace footer */}
           <footer style={{ marginTop: '60px', padding: '32px 0 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             <div>
-              <strong>PokéVinted</strong> — La marketplace de référence des cartes Pokémon.
+              <strong>PokéVinted</strong> — La marketplace officielle de référence des cartes Pokémon.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <button
-                onClick={() => {
-                  if (!currentUser.is_admin) {
-                    handleSwitchUser('chen');
-                  }
-                  setCurrentView('admin');
-                }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <ShieldCheck size={14} /> Espace Administration
-              </button>
-              <span>© 2026 PokéVinted</span>
+              {currentUser?.is_admin && (
+                <button
+                  onClick={() => setCurrentView('admin')}
+                  style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+                >
+                  <ShieldCheck size={14} /> Espace Administration NoSQL
+                </button>
+              )}
+              <span>© 2026 PokéVinted — ENSIIE S3 NoSQL</span>
             </div>
           </footer>
         </main>
@@ -535,20 +691,39 @@ export default function App() {
         onClose={() => setIsSellModalOpen(false)}
         onListingCreated={handleListingCreated}
         catalogCards={catalogCards}
+        currentUser={currentUser}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       <BuyModal
-        isOpen={!!selectedListingForBuy}
+        isOpen={Boolean(selectedListingForBuy)}
         onClose={() => setSelectedListingForBuy(null)}
         listing={selectedListingForBuy}
         currentUser={currentUser}
         onPurchaseComplete={handlePurchaseComplete}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       <RegisterModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onUserRegistered={handleUserRegistered}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+      />
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+        onOpenRegister={() => setIsRegisterModalOpen(true)}
+      />
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onBalanceUpdated={handleBalanceUpdated}
+        onLogout={handleLogout}
       />
     </div>
   );

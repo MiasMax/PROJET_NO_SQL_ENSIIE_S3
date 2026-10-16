@@ -48,3 +48,37 @@ class InvalidConditionError(DomainException):
     def __init__(self, condition: str):
         super().__init__(f"Invalid card condition: '{condition}'")
         self.condition = condition
+
+
+class UserNotFoundError(DomainException):
+    """Raised when a user account does not exist."""
+
+    def __init__(self, identifier: str):
+        super().__init__(f"User not found: '{identifier}'")
+        self.identifier = identifier
+
+
+class UserAlreadyExistsError(DomainException):
+    """Raised when registering an existing username or email."""
+
+    def __init__(self, username: str):
+        super().__init__(f"User '{username}' already exists")
+        self.username = username
+
+
+class InvalidCredentialsError(DomainException):
+    """Raised on invalid login credentials."""
+
+    def __init__(self):
+        super().__init__("Identifiants incorrects (pseudo ou mot de passe invalide)")
+
+
+class InsufficientFundsError(DomainException):
+    """Raised when buyer balance is lower than purchase amount."""
+
+    def __init__(self, balance: float, required: float):
+        super().__init__(
+            f"Solde insuffisant: solde actuel {balance:.2f} €, montant requis {required:.2f} €"
+        )
+        self.balance = balance
+        self.required = required

@@ -144,22 +144,27 @@ async def purchase_listing(
     if current_status == "SOLD":
         raise HTTPException(status_code=400, detail="Cette annonce a déjà été vendue.")
 
-    # Identify buyer and atomically debit balance
+    # Identify buyer and pre-check balance
     buyer_identifier = payload.buyer_id or payload.buyer_name
-    matched_user, new_balance = debit_user_balance(buyer_identifier, listing.price)
+    from app.interfaces.api.users import find_user
+    matched_user = find_user(buyer_identifier)
+    if matched_user and matched_user["balance"] < listing.price:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant pour finaliser cet achat. Solde actuel : {matched_user['balance']:.2f} €, montant requis : {listing.price:.2f} €.",
+        )
+
     resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
 
-    # Credit seller if registered in marketplace
-    credit_user_balance(listing.seller_name, listing.price)
+    # Execute purchase and atomic transition across datastores
+    command = PurchaseListingCommand(listing_id=listing_id, buyer_name=resolved_buyer_name)
+    order = await purchase_uc.execute(command)
 
-    try:
-        command = PurchaseListingCommand(listing_id=listing_id, buyer_name=resolved_buyer_name)
-        order = await purchase_uc.execute(command)
-    except Exception:
-        # Rollback debit on transaction failure
-        if matched_user:
-            credit_user_balance(matched_user["id"], listing.price)
-        raise
+    # Upon confirmed purchase, atomically debit buyer and credit seller
+    new_balance = None
+    if matched_user:
+        _, new_balance = debit_user_balance(matched_user["id"], listing.price)
+    credit_user_balance(listing.seller_name, listing.price)
 
     order_dict = order.to_dict()
     order_dict["buyer_balance"] = new_balance

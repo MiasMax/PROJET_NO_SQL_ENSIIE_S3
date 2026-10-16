@@ -9,11 +9,12 @@ Updates state across all three NoSQL datastores:
 from dataclasses import dataclass
 
 from app.domain.entities.order import Order
-from app.domain.exceptions import ListingNotFoundError
+from app.domain.exceptions import ListingAlreadySoldError, ListingNotFoundError
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.search_repository import SearchRepository
+from app.domain.value_objects.listing_status import ListingStatus
 
 
 @dataclass
@@ -40,8 +41,15 @@ class PurchaseListingUseCase:
         if not listing:
             raise ListingNotFoundError(command.listing_id)
 
-        # Domain transition: raises ListingAlreadySoldError if already sold
-        listing.mark_as_sold(command.buyer_name)
+        if listing.status == ListingStatus.SOLD:
+            raise ListingAlreadySoldError(command.listing_id)
+
+        # Concurrency-safe atomic state transition in persistence layer
+        updated_listing = await self.listing_repo.mark_as_sold(command.listing_id, command.buyer_name)
+        if not updated_listing:
+            raise ListingAlreadySoldError(command.listing_id)
+
+        listing = updated_listing
 
         order = Order.create(
             listing_id=listing.id,
@@ -53,8 +61,7 @@ class PurchaseListingUseCase:
         )
 
         # Multi-system persistence
-        # 1. MongoDB: Persist updated listing state and record immutable order
-        await self.listing_repo.save(listing)
+        # 1. MongoDB: Persist immutable order
         await self.order_repo.save(order)
 
         # 2. Elasticsearch: Update index entry with SOLD status

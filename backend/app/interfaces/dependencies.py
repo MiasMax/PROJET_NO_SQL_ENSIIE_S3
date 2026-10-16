@@ -17,6 +17,7 @@ from app.infrastructure.persistence.mongo.client import MongoClientManager
 from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
 from app.infrastructure.persistence.mongo.mongo_listing_repository import MongoListingRepository
 from app.infrastructure.persistence.mongo.mongo_order_repository import MongoOrderRepository
+from app.infrastructure.persistence.mongo.mongo_user_repository import MongoUserRepository
 from app.infrastructure.persistence.redis.client import RedisClientManager
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 
@@ -47,6 +48,10 @@ def get_order_repository(db=Depends(get_mongo_db)) -> MongoOrderRepository:
 
 def get_search_repository(elastic=Depends(get_elastic_client)) -> ElasticSearchRepository:
     return ElasticSearchRepository(elastic)
+
+
+def get_user_repository(db=Depends(get_mongo_db)) -> MongoUserRepository:
+    return MongoUserRepository(db)
 
 
 def get_cache_repository(redis_client=Depends(get_redis_client)) -> RedisCacheRepository:

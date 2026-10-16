@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
+from app.domain.entities.user import User
 from app.domain.exceptions import (
     CardNotFoundError,
     InvalidConditionError,
@@ -25,6 +26,7 @@ from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.search_repository import SearchRepository
+from app.domain.repositories.user_repository import UserRepository
 from app.domain.value_objects.card_condition import CardCondition
 from app.domain.value_objects.listing_status import ListingStatus
 from app.infrastructure.seed.cards_dataset import (
@@ -42,6 +44,7 @@ from app.interfaces.dependencies import (
     get_listing_repository,
     get_order_repository,
     get_search_repository,
+    get_user_repository,
 )
 
 
@@ -96,6 +99,13 @@ class InMemoryListingRepository(ListingRepository):
 
     async def get_recent(self, limit: int = 10) -> list[Listing]:
         return list(self.listings.values())[-limit:]
+
+    async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
+        item = self.listings.get(listing_id)
+        if not item or item.status == ListingStatus.SOLD:
+            return None
+        item.mark_as_sold(buyer_name)
+        return item
 
 
 class InMemorySearchRepository(SearchRepository):
@@ -261,6 +271,9 @@ class InMemoryCacheRepository(CacheRepository):
     async def get_user_session(self, token: str) -> dict[str, Any] | None:
         return self.sessions.get(token)
 
+    async def delete_user_session(self, token: str) -> None:
+        self.sessions.pop(token, None)
+
     async def get_json(self, key: str) -> Any | None:
         return self.cache.get(key)
 
@@ -293,6 +306,37 @@ class InMemoryOrderRepository(OrderRepository):
 
     async def count(self) -> int:
         return len(self.orders)
+
+
+class InMemoryUserRepository(UserRepository):
+    def __init__(self, users: list[User] | None = None):
+        self.users: dict[str, User] = {u.id: u for u in (users or [])}
+
+    async def save(self, user: User) -> None:
+        self.users[user.id] = user
+
+    async def get_by_id(self, user_id: str) -> User | None:
+        return self.users.get(user_id)
+
+    async def get_by_username(self, username: str) -> User | None:
+        clean = username.lower().strip()
+        for u in self.users.values():
+            if u.username.lower() == clean:
+                return u
+        return None
+
+    async def get_by_email(self, email: str) -> User | None:
+        clean = email.lower().strip()
+        for u in self.users.values():
+            if u.email.lower() == clean:
+                return u
+        return None
+
+    async def list_users(self, limit: int = 50, skip: int = 0) -> list[User]:
+        return list(self.users.values())[skip : skip + limit]
+
+    async def count(self) -> int:
+        return len(self.users)
 
 
 def create_demo_app() -> FastAPI:
@@ -347,12 +391,14 @@ def create_demo_app() -> FastAPI:
     search_repo = InMemorySearchRepository(listings)
     cache_repo = InMemoryCacheRepository(listings)
     order_repo = InMemoryOrderRepository()
+    user_repo = InMemoryUserRepository()
 
     demo_app.dependency_overrides[get_card_repository] = lambda: card_repo
     demo_app.dependency_overrides[get_listing_repository] = lambda: listing_repo
     demo_app.dependency_overrides[get_search_repository] = lambda: search_repo
     demo_app.dependency_overrides[get_cache_repository] = lambda: cache_repo
     demo_app.dependency_overrides[get_order_repository] = lambda: order_repo
+    demo_app.dependency_overrides[get_user_repository] = lambda: user_repo
 
     demo_app.include_router(cards_router)
     demo_app.include_router(listings_router)

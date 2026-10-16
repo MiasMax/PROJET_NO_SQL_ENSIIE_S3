@@ -1,45 +1,62 @@
 """
-User accounts, sessions, and watchlist router (Redis).
-Manages member profiles, account registration, active sessions, and favorites.
+User accounts, authentication, sessions, and watchlist router (MongoDB + Redis).
+Manages member profiles, registration, login/logout, wallet operations, and favorites.
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.domain.entities.user import User
+from app.domain.repositories.cache_repository import CacheRepository
+from app.domain.repositories.order_repository import OrderRepository
+from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
-from app.interfaces.dependencies import get_cache_repository
+from app.interfaces.dependencies import (
+    get_cache_repository,
+    get_order_repository,
+    get_user_repository,
+)
 
-router = APIRouter(prefix="/api/users", tags=["Users & Sessions (Redis)"])
+router = APIRouter(prefix="/api/users", tags=["Users & Authentication (MongoDB + Redis)"])
 
-# Seed user registry (in-memory persistent state across sessions)
+# In-memory registry fallback for demo & test environments
 USERS_STORE: dict[str, dict[str, Any]] = {
     "sacha": {
         "id": "sacha",
         "username": "sacha",
         "name": "Sacha",
+        "email": "sacha@pokevinted.fr",
+        "password_hash": "",
         "role": "Dresseur Kanto",
         "balance": 250.0,
         "is_admin": False,
+        "created_at": datetime.now(UTC).isoformat(),
     },
     "ondine": {
         "id": "ondine",
         "username": "ondine",
         "name": "Ondine",
+        "email": "ondine@pokevinted.fr",
+        "password_hash": "",
         "role": "Championne Azuria",
         "balance": 480.0,
         "is_admin": False,
+        "created_at": datetime.now(UTC).isoformat(),
     },
     "chen": {
         "id": "chen",
         "username": "chen",
         "name": "Professeur Chen",
+        "email": "admin@pokevinted.fr",
+        "password_hash": "",
         "role": "Administrateur",
         "balance": 1500.0,
         "is_admin": True,
+        "created_at": datetime.now(UTC).isoformat(),
     },
 }
 
@@ -99,8 +116,6 @@ def credit_user_balance(identifier: str | None, amount: float) -> None:
         user["balance"] = round(user["balance"] + amount, 2)
 
 
-
-
 class SwitchUserRequest(BaseModel):
     user_id: str
 
@@ -108,58 +123,139 @@ class SwitchUserRequest(BaseModel):
 class RegisterUserRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     name: str = Field(..., min_length=2, max_length=50)
+    email: str = Field("", max_length=100)
+    password: str = Field("", max_length=100)
     role: str = Field("Dresseur", max_length=40)
-    balance: float = Field(100.0, ge=0.0, le=100000.0)
+    balance: float = Field(150.0, ge=0.0, le=100000.0)
     is_admin: bool = False
+
+
+class LoginUserRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=50)
+    password: str = Field("", max_length=100)
+
+
+class RechargeWalletRequest(BaseModel):
+    amount: float = Field(..., gt=0.0, le=10000.0)
 
 
 @router.get("", response_model=list[dict[str, Any]])
 async def list_users():
     """List all registered members and administrators."""
-    return list(USERS_STORE.values())
+    return [
+        {k: v for k, v in u.items() if k != "password_hash"}
+        for u in USERS_STORE.values()
+    ]
 
 
 @router.post("/register", response_model=dict[str, Any])
 async def register_user(
     payload: RegisterUserRequest,
-    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Register a new marketplace member or administrator and initialize session."""
     global ACTIVE_USER_ID
     user_id = payload.username.lower().strip().replace(" ", "_")
+
+    # Check persistence and store
     if user_id in USERS_STORE:
+        raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
+
+    existing_in_repo = await user_repo.get_by_id(user_id)
+    if existing_in_repo:
         raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
 
     new_user = User.create(
         username=payload.username,
         name=payload.name,
+        email=payload.email or f"{user_id}@pokevinted.fr",
+        password=payload.password,
         role=payload.role,
         balance=payload.balance,
         is_admin=payload.is_admin,
         user_id=user_id,
     )
 
-    user_dict: dict[str, Any] = {
-        "id": new_user.id,
-        "username": new_user.username,
-        "name": new_user.name,
-        "role": new_user.role,
-        "balance": new_user.balance,
-        "is_admin": new_user.is_admin,
-    }
-    USERS_STORE[user_id] = user_dict
+    # Persist in MongoDB
+    try:
+        await user_repo.save(new_user)
+    except Exception:
+        pass  # In-memory demo fallback
+
+    user_dict: dict[str, Any] = new_user.to_dict()
+    user_dict_with_pwd = new_user.to_dict(include_private=True)
+    USERS_STORE[user_id] = user_dict_with_pwd
     ACTIVE_USER_ID = user_id
 
-    token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
+    token = f"sess_{user_id}_{uuid.uuid4().hex[:12]}"
     session_data = {**user_dict, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
 
 
+@router.post("/login", response_model=dict[str, Any])
+async def login_user(
+    payload: LoginUserRequest,
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+):
+    """Authenticate registered member with username and password, returns session token."""
+    global ACTIVE_USER_ID
+    clean_username = payload.username.strip().lower()
+
+    # Find user in store or repository
+    target_user_dict = None
+    if clean_username in USERS_STORE:
+        target_user_dict = USERS_STORE[clean_username]
+    else:
+        for u in USERS_STORE.values():
+            if u["username"].lower() == clean_username or u.get("email", "").lower() == clean_username:
+                target_user_dict = u
+                break
+
+    if not target_user_dict:
+        # Check database
+        user_entity = await user_repo.get_by_username(clean_username)
+        if not user_entity and "@" in clean_username:
+            user_entity = await user_repo.get_by_email(clean_username)
+        if user_entity:
+            target_user_dict = user_entity.to_dict(include_private=True)
+            USERS_STORE[user_entity.id] = target_user_dict
+
+    if not target_user_dict:
+        raise HTTPException(status_code=401, detail="Identifiants incorrects (aucun compte trouvé pour ce pseudo).")
+
+    # Verify password if password hash exists
+    stored_hash = target_user_dict.get("password_hash", "")
+    if stored_hash and payload.password:
+        from app.domain.entities.user import verify_password
+        if not verify_password(payload.password, stored_hash):
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
+
+    ACTIVE_USER_ID = target_user_dict["id"]
+    token = f"sess_{target_user_dict['id']}_{uuid.uuid4().hex[:12]}"
+    public_user = {k: v for k, v in target_user_dict.items() if k != "password_hash"}
+    session_data = {**public_user, "token": token}
+    await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
+    return session_data
+
+
+@router.post("/logout")
+async def logout_user(
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+):
+    """Invalidate session token in Redis and log out."""
+    if x_session_token:
+        await cache_repo.delete_user_session(x_session_token)
+    return {"status": "success", "message": "Déconnexion réussie"}
+
+
 @router.get("/me")
 async def get_current_user(
     x_session_token: str | None = Header(None),
-    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """Retrieve current logged-in user profile from Redis session."""
     if x_session_token:
@@ -170,14 +266,81 @@ async def get_current_user(
                 session["balance"] = USERS_STORE[user_id]["balance"]
             return session
 
-    # Default fallback session: last active user or Sacha
+    # Default fallback session for tests or initial guest session
     user_id = ACTIVE_USER_ID if ACTIVE_USER_ID in USERS_STORE else "sacha"
-    default_user = USERS_STORE[user_id]
+    default_user = {k: v for k, v in USERS_STORE[user_id].items() if k != "password_hash"}
     token = f"sess_{default_user['id']}"
     session_data = {**default_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
 
+
+@router.post("/wallet/recharge")
+async def recharge_wallet(
+    payload: RechargeWalletRequest,
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+):
+    """Top up account wallet balance."""
+    user_id = ACTIVE_USER_ID
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and session.get("id"):
+            user_id = session["id"]
+
+    user = find_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    user["balance"] = round(user["balance"] + payload.amount, 2)
+
+    # Persist in DB
+    user_entity = await user_repo.get_by_id(user_id)
+    if user_entity:
+        user_entity.credit_balance(payload.amount)
+        await user_repo.save(user_entity)
+
+    # Update session in Redis
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session:
+            session["balance"] = user["balance"]
+            await cache_repo.set_user_session(x_session_token, session, ttl_seconds=86400)
+
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "amount_added": payload.amount,
+        "new_balance": user["balance"],
+    }
+
+
+@router.get("/me/orders")
+async def get_my_orders(
+    x_session_token: str | None = Header(None),
+    buyer_name: str | None = Query(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    order_repo: OrderRepository = Depends(get_order_repository),
+):
+    """Fetch order purchase history for current logged-in user."""
+    resolved_name = buyer_name
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session:
+            resolved_name = session.get("name") or session.get("username")
+
+    all_orders = await order_repo.list_orders(limit=100)
+    if not resolved_name:
+        return [o.to_dict() for o in all_orders]
+
+    clean_target = resolved_name.lower().strip()
+    user_orders = [
+        o.to_dict()
+        for o in all_orders
+        if clean_target in o.buyer_name.lower() or o.buyer_name.lower() in clean_target
+    ]
+    return user_orders
 
 
 @router.post("/switch")
@@ -194,7 +357,8 @@ async def switch_user(
     user = USERS_STORE[user_id]
     ACTIVE_USER_ID = user_id
     token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
-    session_data = {**user, "token": token}
+    public_user = {k: v for k, v in user.items() if k != "password_hash"}
+    session_data = {**public_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
 

@@ -61,6 +61,9 @@ class RedisCacheRepository(CacheRepository):
     async def get_user_session(self, token: str) -> dict[str, Any] | None:
         return await self.get_json(f"session:{token}")
 
+    async def delete_user_session(self, token: str) -> None:
+        await self.delete(f"session:{token}")
+
     async def get_json(self, key: str) -> Any | None:
         val = await self.client.get(key)
         if not val:

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { X, UserPlus, Sparkles, ShieldCheck, Wallet, AlertCircle } from 'lucide-react';
+import { X, UserPlus, Sparkles, ShieldCheck, Wallet, AlertCircle, Lock, Mail, User } from 'lucide-react';
 
-export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
+export default function RegisterModal({ isOpen, onClose, onUserRegistered, onOpenLogin }) {
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('Dresseur');
   const [balance, setBalance] = useState('150');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -29,6 +31,8 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
         body: JSON.stringify({
           username: username.trim(),
           name: name.trim(),
+          email: email.trim(),
+          password: password,
           role: isAdmin ? "Administrateur" : (role.trim() || "Dresseur"),
           balance: parseFloat(balance) || 100.0,
           is_admin: isAdmin,
@@ -41,8 +45,13 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
       }
 
       const newUser = await response.json();
+      if (newUser.token) {
+        localStorage.setItem('pokevinted_token', newUser.token);
+      }
       setUsername('');
       setName('');
+      setEmail('');
+      setPassword('');
       setRole('Dresseur');
       setBalance('150');
       setIsAdmin(false);
@@ -66,7 +75,7 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
             </div>
             <div>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>Créer un Compte Dresseur</h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Rejoignez la communauté PokéVinted</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Rejoignez la communauté officielle PokéVinted</p>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -81,28 +90,66 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
         )}
 
         <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
-          <div className="form-group">
-            <label className="form-label">Pseudo / Identifiant de connexion</label>
-            <input
-              type="text"
-              placeholder="ex: Red_Pallet, Cynthia, Pierre..."
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="form-input"
-              required
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Pseudo d'artiste / Dresseur</label>
+              <div style={{ position: 'relative' }}>
+                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="ex: Red_Pallet"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="form-input"
+                  style={{ paddingLeft: '36px' }}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Nom complet affiché</label>
+              <input
+                type="text"
+                placeholder="ex: Red du Mont Argenté"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="form-input"
+                required
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Nom complet affiché</label>
-            <input
-              type="text"
-              placeholder="ex: Red du Mont Argenté"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="form-input"
-              required
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="email"
+                  placeholder="votre@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="form-input"
+                  style={{ paddingLeft: '36px' }}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Mot de passe</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="form-input"
+                  style={{ paddingLeft: '36px' }}
+                />
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
@@ -148,31 +195,68 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered }) {
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ShieldCheck size={20} color={isAdmin ? "var(--accent-secondary)" : "var(--text-muted)"} />
-              <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Droits d'administration</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Accès au portail de supervision et d'audit</div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.95rem' }}>
+                <ShieldCheck size={18} color="var(--accent-secondary)" />
+                Privilèges Administrateur
               </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Donne accès au tableau de bord NoSQL et aux métriques Grafana / Elasticsearch
+              </p>
             </div>
-            <input
-              type="checkbox"
-              checked={isAdmin}
-              onChange={(e) => setIsAdmin(e.target.checked)}
-              style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
-            />
+            <label style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isAdmin}
+                onChange={(e) => setIsAdmin(e.target.checked)}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: isAdmin ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                borderRadius: '24px',
+                transition: '0.2s',
+              }}>
+                <span style={{
+                  position: 'absolute',
+                  content: '""',
+                  height: '18px',
+                  width: '18px',
+                  left: isAdmin ? '24px' : '3px',
+                  bottom: '3px',
+                  backgroundColor: 'white',
+                  borderRadius: '50%',
+                  transition: '0.2s',
+                }} />
+              </span>
+            </label>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
             className="btn btn-primary"
-            style={{ width: '100%', padding: '14px', fontSize: '1rem', fontWeight: 700 }}
+            style={{ width: '100%', padding: '12px', justifyContent: 'center', fontSize: '1rem', fontWeight: 700 }}
+            disabled={loading}
           >
-            {loading ? "Création en cours..." : (
-              <><Sparkles size={18} /> Créer mon profil Dresseur</>
-            )}
+            {loading ? 'Création en cours...' : 'Finaliser mon Inscription'}
           </button>
+
+          {onOpenLogin && (
+            <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Vous possédez déjà un compte ?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenLogin();
+                }}
+                style={{ background: 'none', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Se connecter
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

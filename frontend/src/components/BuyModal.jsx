@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, ShieldCheck, ShoppingBag, AlertCircle, Wallet, UserCheck } from 'lucide-react';
+import { X, CheckCircle, ShieldCheck, ShoppingBag, AlertCircle, Wallet, UserCheck, LogIn } from 'lucide-react';
 
-export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurchaseComplete }) {
+export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurchaseComplete, onOpenLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successOrder, setSuccessOrder] = useState(null);
+  const [isPurchased, setIsPurchased] = useState(false);
 
   if (!isOpen || !listing) return null;
 
+  const isLoggedIn = Boolean(currentUser && currentUser.id);
   const buyerName = currentUser?.name || currentUser?.username || 'Acheteur';
   const buyerId = currentUser?.id || 'sacha';
   const currentBalance = Number(currentUser?.balance ?? 0);
@@ -17,6 +19,16 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
 
   const handlePurchase = async (e) => {
     e.preventDefault();
+    if (!isLoggedIn) {
+      if (onOpenLogin) {
+        onClose();
+        onOpenLogin();
+      }
+      return;
+    }
+
+    if (isPurchased || loading) return; // Anti-duplicate double click protection
+
     if (!hasSufficientFunds) {
       setError(`Solde insuffisant : vous disposez de ${currentBalance.toFixed(2)} € pour un montant requis de ${price.toFixed(2)} €.`);
       return;
@@ -26,9 +38,13 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
     setError(null);
 
     try {
+      const token = localStorage.getItem('pokevinted_token');
       const response = await fetch(`/api/listings/${listing.id}/purchase`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-session-token': token } : {}),
+        },
         body: JSON.stringify({
           buyer_name: buyerName,
           buyer_id: buyerId,
@@ -41,6 +57,7 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
       }
 
       const order = await response.json();
+      setIsPurchased(true);
       setSuccessOrder(order);
       onPurchaseComplete(order, listing.id);
     } catch (err) {
@@ -53,6 +70,7 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
   const handleClose = () => {
     setSuccessOrder(null);
     setError(null);
+    setIsPurchased(false);
     onClose();
   };
 
@@ -111,6 +129,28 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
               </div>
             )}
 
+            {!isLoggedIn && (
+              <div style={{ marginBottom: '20px', padding: '14px 16px', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <LogIn size={20} color="var(--accent-primary)" />
+                  <span style={{ fontSize: '0.9rem', color: '#c7d2fe' }}>
+                    Connectez-vous pour finaliser cet achat avec votre solde.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onOpenLogin) onOpenLogin();
+                  }}
+                  className="btn btn-primary"
+                  style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                >
+                  Se connecter
+                </button>
+              </div>
+            )}
+
             <div className="buy-modal-grid">
               <img
                 src={listing.image_url}
@@ -144,30 +184,32 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
             </div>
 
             {/* Payment & Account balance summary */}
-            <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  <UserCheck size={16} color="var(--accent-primary)" /> Compte débité :
-                </span>
-                <strong>{buyerName}</strong>
-              </div>
+            {isLoggedIn && (
+              <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    <UserCheck size={16} color="var(--accent-primary)" /> Compte acheteur :
+                  </span>
+                  <strong>{buyerName}</strong>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  <Wallet size={16} color="var(--accent-gold)" /> Solde actuel disponible :
-                </span>
-                <span style={{ fontWeight: 700, color: hasSufficientFunds ? 'var(--text-primary)' : 'var(--accent-crimson)' }}>
-                  {currentBalance.toFixed(2)} €
-                </span>
-              </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    <Wallet size={16} color="var(--accent-gold)" /> Solde actuel disponible :
+                  </span>
+                  <span style={{ fontWeight: 700, color: hasSufficientFunds ? 'var(--text-primary)' : 'var(--accent-crimson)' }}>
+                    {currentBalance.toFixed(2)} €
+                  </span>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-subtle)', paddingTop: '10px', marginTop: '10px' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nouveau solde après achat :</span>
-                <strong style={{ color: hasSufficientFunds ? 'var(--accent-emerald)' : 'var(--accent-crimson)', fontSize: '1.05rem' }}>
-                  {hasSufficientFunds ? `${remainingBalance.toFixed(2)} €` : 'Fonds insuffisants'}
-                </strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-subtle)', paddingTop: '10px', marginTop: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nouveau solde après achat :</span>
+                  <strong style={{ color: hasSufficientFunds ? 'var(--accent-emerald)' : 'var(--accent-crimson)', fontSize: '1.05rem' }}>
+                    {hasSufficientFunds ? `${remainingBalance.toFixed(2)} €` : 'Fonds insuffisants'}
+                  </strong>
+                </div>
               </div>
-            </div>
+            )}
 
             <form onSubmit={handlePurchase} style={{ marginTop: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
@@ -181,13 +223,21 @@ export default function BuyModal({ isOpen, onClose, listing, currentUser, onPurc
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !hasSufficientFunds}
+                  disabled={loading || isPurchased || (isLoggedIn && !hasSufficientFunds)}
                   className="btn btn-gold"
-                  style={{ padding: '12px 28px', opacity: hasSufficientFunds ? 1 : 0.6, cursor: hasSufficientFunds ? 'pointer' : 'not-allowed' }}
+                  style={{
+                    padding: '12px 28px',
+                    opacity: (!isLoggedIn || hasSufficientFunds) && !loading && !isPurchased ? 1 : 0.6,
+                    cursor: (!isLoggedIn || hasSufficientFunds) && !loading && !isPurchased ? 'pointer' : 'not-allowed',
+                  }}
                 >
                   <ShoppingBag size={18} />
                   {loading
                     ? 'Traitement...'
+                    : isPurchased
+                    ? 'Acheté !'
+                    : !isLoggedIn
+                    ? 'Se connecter pour acheter'
                     : hasSufficientFunds
                     ? `Confirmer l'achat (${price.toFixed(2)} €)`
                     : 'Solde insuffisant'}

@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, UploadCloud, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 
-export default function SellCardModal({ isOpen, onClose, onListingCreated, catalogCards = [] }) {
+export default function SellCardModal({ isOpen, onClose, onListingCreated, catalogCards = [], currentUser, onOpenLogin }) {
   const [selectedCardId, setSelectedCardId] = useState('');
   const [price, setPrice] = useState('');
   const [condition, setCondition] = useState('NEAR_MINT');
-  const [sellerName, setSellerName] = useState('');
+  const [sellerName, setSellerName] = useState(currentUser?.name || currentUser?.username || '');
   const [description, setDescription] = useState('');
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      setSellerName(currentUser.name || currentUser.username || '');
+    }
+  }, [currentUser]);
 
   // Default to first catalog card on mount
   useEffect(() => {
