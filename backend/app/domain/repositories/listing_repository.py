@@ -41,3 +41,9 @@ class ListingRepository(ABC):
     async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
         """Atomically transition listing from ACTIVE to SOLD. Returns updated listing or None if already sold."""
         pass
+
+    @abstractmethod
+    async def delete(self, listing_id: str) -> bool:
+        """Permanently delete a listing from document store. Returns True if deleted, False otherwise."""
+        pass
+

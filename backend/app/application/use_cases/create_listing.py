@@ -76,5 +76,6 @@ class CreateListingUseCase:
         await self.cache_repo.increment_counter("stats:total_listings_created", 1)
         await self.cache_repo.push_recent_item("listings:recent_ids", listing.id, max_items=25)
         await self.cache_repo.delete("cache:marketplace:recent")
+        await self.cache_repo.delete_pattern("cache:listings:*")
 
         return listing

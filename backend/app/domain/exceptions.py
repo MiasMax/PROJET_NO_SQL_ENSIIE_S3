@@ -82,3 +82,12 @@ class InsufficientFundsError(DomainException):
         )
         self.balance = balance
         self.required = required
+
+
+class SelfPurchaseNotAllowedError(DomainException):
+    """Raised when a seller attempts to purchase their own listing."""
+
+    def __init__(self, seller_name: str):
+        super().__init__(f"Vous ne pouvez pas acheter votre propre annonce ('{seller_name}')")
+        self.seller_name = seller_name
+

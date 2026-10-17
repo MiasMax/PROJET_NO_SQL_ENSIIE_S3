@@ -23,7 +23,7 @@ data/
 *.log
 *.db
 
-# Env
+# Environment & OS
 .env
 .DS_Store
 Thumbs.db

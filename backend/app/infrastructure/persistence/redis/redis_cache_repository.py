@@ -79,6 +79,10 @@ class RedisCacheRepository(CacheRepository):
     async def delete(self, key: str) -> None:
         await self.client.delete(key)
 
+    async def delete_pattern(self, pattern: str) -> None:
+        async for key in self.client.scan_iter(match=pattern):
+            await self.client.delete(key)
+
     async def get_stats(self) -> dict[str, Any]:
         info = await self.client.info()
         return {

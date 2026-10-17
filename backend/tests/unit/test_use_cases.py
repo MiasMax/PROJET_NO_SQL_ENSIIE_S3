@@ -8,13 +8,22 @@ from typing import Any
 import pytest
 
 from app.application.use_cases.create_listing import CreateListingCommand, CreateListingUseCase
+from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
 from app.application.use_cases.purchase_listing import PurchaseListingCommand, PurchaseListingUseCase
+from app.application.use_cases.update_listing_price import (
+    UpdateListingPriceCommand,
+    UpdateListingPriceUseCase,
+)
 from app.domain.entities.card import Card
 from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
 from app.domain.entities.user import User
-from app.domain.exceptions import CardNotFoundError
+from app.domain.exceptions import (
+    CardNotFoundError,
+    InvalidPriceError,
+    SelfPurchaseNotAllowedError,
+)
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.card_repository import CardRepository
 from app.domain.repositories.listing_repository import ListingRepository
@@ -31,10 +40,23 @@ class MockCardRepository(CardRepository):
         self.cards = {c.id: c for c in (cards or [])}
 
     async def get_by_id(self, card_id: str) -> Card | None:
-        return self.cards.get(card_id)
+        if card_id in self.cards:
+            return self.cards[card_id]
+        if "sv3pt5-" in card_id:
+            alt = card_id.replace("sv3pt5-", "sv03.5-")
+            if alt in self.cards:
+                return self.cards[alt]
+        elif "sv03.5-" in card_id:
+            alt = card_id.replace("sv03.5-", "sv3pt5-")
+            if alt in self.cards:
+                return self.cards[alt]
+        return None
 
     async def list_cards(self, limit: int = 50, skip: int = 0, search: str | None = None) -> list[Card]:
-        return list(self.cards.values())[skip : skip + limit]
+        cards = list(self.cards.values())
+        if search and search.strip():
+            cards = [c for c in cards if search.lower() in c.name.lower()]
+        return cards[skip : skip + limit]
 
     async def save(self, card: Card) -> None:
         self.cards[card.id] = card
@@ -80,6 +102,10 @@ class MockListingRepository(ListingRepository):
             return None
         item.mark_as_sold(buyer_name)
         return item
+
+    async def delete(self, listing_id: str) -> bool:
+        return self.listings.pop(listing_id, None) is not None
+
 
 
 class MockSearchRepository(SearchRepository):
@@ -173,6 +199,12 @@ class MockCacheRepository(CacheRepository):
 
     async def delete(self, key: str) -> None:
         self.cache.pop(key, None)
+
+    async def delete_pattern(self, pattern: str) -> None:
+        import fnmatch
+        keys_to_delete = [k for k in list(self.cache.keys()) if fnmatch.fnmatch(k, pattern)]
+        for k in keys_to_delete:
+            self.cache.pop(k, None)
 
     async def get_stats(self) -> dict[str, Any]:
         return {"used_memory_human": "1.2M", "connected_clients": 1}
@@ -347,6 +379,32 @@ async def test_purchase_listing_updates_all_stores(fake_card):
 
 
 @pytest.mark.asyncio
+async def test_purchase_listing_fails_if_buyer_is_seller(fake_card):
+    listing_repo = MockListingRepository()
+    order_repo = MockOrderRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+
+    listing = Listing.create(
+        card_id=fake_card.id,
+        card_name="Dracaufeu ex",
+        set_name="151",
+        rarity="Double rare",
+        image_url="https://images.pokemontcg.io/sv3pt5/6.png",
+        price=60.0,
+        condition="NEAR_MINT",
+        seller_name="Sacha",
+        description="Superbe état",
+    )
+    await listing_repo.save(listing)
+
+    purchase_uc = PurchaseListingUseCase(listing_repo, order_repo, search_repo, cache_repo)
+
+    with pytest.raises(SelfPurchaseNotAllowedError):
+        await purchase_uc.execute(PurchaseListingCommand(listing_id=listing.id, buyer_name="Sacha"))
+
+
+@pytest.mark.asyncio
 async def test_admin_stats_shows_multi_nosql_metrics(fake_card):
     card_repo = MockCardRepository([fake_card])
     listing_repo = MockListingRepository()
@@ -362,3 +420,116 @@ async def test_admin_stats_shows_multi_nosql_metrics(fake_card):
     assert stats["systems"]["elasticsearch"]["status"] == "HEALTHY"
     assert stats["systems"]["redis"]["status"] == "HEALTHY"
     assert len(stats["terminal_commands"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_delete_listing_orchestrates_multi_system_removal(fake_card):
+    # Setup
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+
+    # Create listing first
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    command = CreateListingCommand(
+        card_id=fake_card.id,
+        price=50.0,
+        condition="NEAR_MINT",
+        seller_name="Sacha",
+        description="Mint condition",
+    )
+    listing = await create_uc.execute(command)
+
+    assert listing.id in listing_repo.listings
+    assert listing.id in search_repo.indexed
+
+    # Execute deletion
+    delete_uc = DeleteListingUseCase(listing_repo, search_repo, cache_repo)
+    result = await delete_uc.execute(listing.id)
+
+    assert result["deleted"] is True
+    assert listing.id not in listing_repo.listings
+    assert listing.id not in search_repo.indexed
+
+
+@pytest.mark.asyncio
+async def test_update_listing_price_orchestrates_nosql_updates(fake_card):
+    # Setup
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+
+    # Create listing first at 50.0 €
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    command = CreateListingCommand(
+        card_id=fake_card.id,
+        price=50.0,
+        condition="NEAR_MINT",
+        seller_name="Sacha",
+        description="Mint condition",
+    )
+    listing = await create_uc.execute(command)
+
+    # Update price to 42.50 €
+    update_uc = UpdateListingPriceUseCase(listing_repo, search_repo, cache_repo)
+    updated = await update_uc.execute(
+        UpdateListingPriceCommand(listing_id=listing.id, new_price=42.50, seller_name="Sacha")
+    )
+
+    assert updated.price == 42.50
+    # MongoDB mock document store verified
+    assert listing_repo.listings[listing.id].price == 42.50
+    # Elasticsearch mock search index verified
+    assert search_repo.indexed[listing.id].price == 42.50
+
+
+@pytest.mark.asyncio
+async def test_update_listing_price_rejects_unauthorized_seller(fake_card):
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    listing = await create_uc.execute(
+        CreateListingCommand(
+            card_id=fake_card.id,
+            price=50.0,
+            condition="NEAR_MINT",
+            seller_name="Sacha",
+        )
+    )
+
+    update_uc = UpdateListingPriceUseCase(listing_repo, search_repo, cache_repo)
+    with pytest.raises(ValueError, match="Seul le vendeur propriétaire"):
+        await update_uc.execute(
+            UpdateListingPriceCommand(listing_id=listing.id, new_price=35.0, seller_name="Ondine")
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_listing_price_rejects_invalid_price(fake_card):
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    listing = await create_uc.execute(
+        CreateListingCommand(
+            card_id=fake_card.id,
+            price=50.0,
+            condition="NEAR_MINT",
+            seller_name="Sacha",
+        )
+    )
+
+    update_uc = UpdateListingPriceUseCase(listing_repo, search_repo, cache_repo)
+    with pytest.raises(InvalidPriceError):
+        await update_uc.execute(
+            UpdateListingPriceCommand(listing_id=listing.id, new_price=-10.0, seller_name="Sacha")
+        )
+
+

@@ -25,6 +25,14 @@ class SeedCatalogUseCase:
         self.cache_repo = cache_repo
 
     async def execute(self, cards: list[Card], initial_listings: list[Listing]) -> dict:
+        # Purge existing collections if repository supports clearing
+        if hasattr(self.card_repo, "clear"):
+            await self.card_repo.clear()
+        if hasattr(self.listing_repo, "clear"):
+            await self.listing_repo.clear()
+        if hasattr(self.search_repo, "clear"):
+            await self.search_repo.clear()
+
         # Save reference cards to MongoDB catalog
         saved_cards_count = await self.card_repo.bulk_save(cards)
 
@@ -37,6 +45,10 @@ class SeedCatalogUseCase:
 
         # Clear listing caches
         await self.cache_repo.delete("cache:marketplace:recent")
+        if hasattr(self.cache_repo, "delete_pattern"):
+            await self.cache_repo.delete_pattern("cache:listings:*")
+        else:
+            await self.cache_repo.delete("cache:marketplace:recent")
 
         return {
             "cards_seeded": saved_cards_count,

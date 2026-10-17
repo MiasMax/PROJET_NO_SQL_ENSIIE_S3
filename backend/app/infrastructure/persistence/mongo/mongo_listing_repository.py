@@ -61,6 +61,14 @@ class MongoListingRepository(ListingRepository):
             return None
         return self._to_entity(doc)
 
+    async def delete(self, listing_id: str) -> bool:
+        result = await self.collection.delete_one({"_id": listing_id})
+        return result.deleted_count > 0
+
+    async def clear(self) -> None:
+        """Purge all listings in the collection."""
+        await self.collection.delete_many({})
+
     def _to_entity(self, doc: dict) -> Listing:
         return Listing(
             id=doc["_id"],

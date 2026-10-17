@@ -5,18 +5,38 @@ Handles listing creation, faceted search, and card purchasing.
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.application.dtos.listing_dtos import CreateListingRequest, ListingResponse, SearchListingsResponse
-from app.application.dtos.order_dtos import OrderResponse, PurchaseListingRequest
+from app.application.dtos.listing_dtos import (
+    CreateListingRequest,
+    ListingResponse,
+    SearchListingsResponse,
+    UpdateListingPriceRequest,
+)
+from app.application.dtos.order_dtos import (
+    CheckoutCartRequest,
+    CheckoutCartResponse,
+    OrderResponse,
+    PurchaseListingRequest,
+)
+from app.application.use_cases.checkout_cart import CheckoutCartCommand, CheckoutCartUseCase
 from app.application.use_cases.create_listing import CreateListingCommand, CreateListingUseCase
+from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.purchase_listing import PurchaseListingCommand, PurchaseListingUseCase
 from app.application.use_cases.search_listings import SearchListingsQuery, SearchListingsUseCase
+from app.application.use_cases.update_listing_price import (
+    UpdateListingPriceCommand,
+    UpdateListingPriceUseCase,
+)
+from app.domain.exceptions import ListingNotFoundError, SelfPurchaseNotAllowedError
 from app.domain.repositories.listing_repository import ListingRepository
 from app.interfaces.dependencies import (
     get_cache_repository,
+    get_checkout_cart_use_case,
     get_create_listing_use_case,
+    get_delete_listing_use_case,
     get_listing_repository,
     get_purchase_listing_use_case,
     get_search_listings_use_case,
+    get_update_listing_price_use_case,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
@@ -53,7 +73,7 @@ async def search_listings(
     status: str | None = Query("ACTIVE", description="Listing status filter"),
     sort_by: str = Query("created_at", description="Sort field: created_at, price, name"),
     sort_order: str = Query("desc", description="Sort direction: asc, desc"),
-    limit: int = Query(20, ge=1, le=100, description="Page size limit"),
+    limit: int = Query(50, ge=1, le=1000, description="Page size limit"),
     skip: int = Query(0, ge=0, le=10000, description="Pagination offset"),
     search_uc: SearchListingsUseCase = Depends(get_search_listings_use_case),
     cache_repo=Depends(get_cache_repository),
@@ -127,6 +147,7 @@ async def purchase_listing(
     payload: PurchaseListingRequest,
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
+    cache_repo=Depends(get_cache_repository),
 ):
     """
     Execute a card purchase.
@@ -148,26 +169,196 @@ async def purchase_listing(
     buyer_identifier = payload.buyer_id or payload.buyer_name
     from app.interfaces.api.users import find_user
     matched_user = find_user(buyer_identifier)
-    if matched_user and matched_user["balance"] < listing.price:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Solde insuffisant pour finaliser cet achat. Solde actuel : {matched_user['balance']:.2f} €, montant requis : {listing.price:.2f} €.",
-        )
 
     resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
 
+    # Invariant: Prevent user from buying their own listing
+    clean_seller = listing.seller_name.strip().lower()
+    buyer_names = [
+        resolved_buyer_name.strip().lower(),
+        payload.buyer_name.strip().lower(),
+        (matched_user["username"].strip().lower() if matched_user else ""),
+        (matched_user["name"].strip().lower() if matched_user else ""),
+    ]
+    if any(b and (b == clean_seller or b in clean_seller or clean_seller in b) for b in buyer_names):
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas acheter votre propre annonce.",
+        )
+
+    charge_price = (
+        payload.agreed_price
+        if (payload.agreed_price is not None and payload.agreed_price > 0)
+        else listing.price
+    )
+
+    if matched_user and matched_user["balance"] < charge_price:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant pour finaliser cet achat. Solde actuel : {matched_user['balance']:.2f} €, montant requis : {charge_price:.2f} €.",
+        )
+
     # Execute purchase and atomic transition across datastores
-    command = PurchaseListingCommand(listing_id=listing_id, buyer_name=resolved_buyer_name)
-    order = await purchase_uc.execute(command)
+    try:
+        command = PurchaseListingCommand(
+            listing_id=listing_id,
+            buyer_name=resolved_buyer_name,
+            agreed_price=payload.agreed_price,
+        )
+        order = await purchase_uc.execute(command)
+    except SelfPurchaseNotAllowedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # Invalidate search caches so refreshed listings reflect SOLD status immediately
+    await cache_repo.delete_pattern("cache:listings:*")
 
     # Upon confirmed purchase, atomically debit buyer and credit seller
     new_balance = None
     if matched_user:
-        _, new_balance = debit_user_balance(matched_user["id"], listing.price)
-    credit_user_balance(listing.seller_name, listing.price)
+        _, new_balance = debit_user_balance(matched_user["id"], charge_price)
+    credit_user_balance(listing.seller_name, charge_price)
 
     order_dict = order.to_dict()
     order_dict["buyer_balance"] = new_balance
     order_dict["buyer_name"] = resolved_buyer_name
     return order_dict
+
+
+@router.post("/checkout", response_model=CheckoutCartResponse)
+@router.post("/cart/checkout", response_model=CheckoutCartResponse)
+async def checkout_cart(
+    payload: CheckoutCartRequest,
+    checkout_uc: CheckoutCartUseCase = Depends(get_checkout_cart_use_case),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+):
+    """
+    Execute atomic multi-item cart checkout.
+    Transitions all selected listings to SOLD across datastores,
+    creates immutable order records, and atomically adjusts balances.
+    """
+    from app.interfaces.api.users import credit_user_balance, debit_user_balance, find_user
+
+    if not payload.listing_ids:
+        raise HTTPException(status_code=400, detail="Votre panier est vide.")
+
+    # Identify buyer
+    buyer_identifier = payload.buyer_id or payload.buyer_name
+    matched_user = find_user(buyer_identifier)
+    resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
+
+    # Invariant: Calculate required total and check self-purchase
+    unique_ids = list(dict.fromkeys(payload.listing_ids))
+    total_required = 0.0
+    for lid in unique_ids:
+        listing = await listing_repo.get_by_id(lid)
+        if not listing:
+            raise HTTPException(status_code=404, detail=f"L'annonce {lid} est introuvable.")
+        status_val = listing.status.value if hasattr(listing.status, "value") else str(listing.status)
+        if status_val == "SOLD":
+            raise HTTPException(status_code=400, detail=f"La carte {listing.card_name} a déjà été vendue.")
+
+        clean_seller = listing.seller_name.strip().lower()
+        buyer_names = [
+            resolved_buyer_name.strip().lower(),
+            payload.buyer_name.strip().lower(),
+            (matched_user["username"].strip().lower() if matched_user else ""),
+            (matched_user["name"].strip().lower() if matched_user else ""),
+        ]
+        if any(b and (b == clean_seller or b in clean_seller or clean_seller in b) for b in buyer_names):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Vous ne pouvez pas acheter votre propre annonce ({listing.card_name}).",
+            )
+        total_required += listing.price
+
+    total_required = round(total_required, 2)
+
+    # Balance check
+    if matched_user and matched_user["balance"] < total_required:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant pour finaliser votre commande. Solde actuel : {matched_user['balance']:.2f} €, montant requis : {total_required:.2f} €.",
+        )
+
+    # Execute batch checkout
+    try:
+        command = CheckoutCartCommand(listing_ids=unique_ids, buyer_name=resolved_buyer_name)
+        result = await checkout_uc.execute(command)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # Atomically adjust balances
+    new_balance = None
+    if matched_user:
+        _, new_balance = debit_user_balance(matched_user["id"], result.total_amount)
+
+    for order in result.orders:
+        credit_user_balance(order.seller_name, order.price)
+
+    orders_dto = [
+        OrderResponse(
+            id=o.id,
+            listing_id=o.listing_id,
+            card_id=o.card_id,
+            card_name=o.card_name,
+            price=o.price,
+            seller_name=o.seller_name,
+            buyer_name=resolved_buyer_name,
+            timestamp=o.timestamp.isoformat() if hasattr(o.timestamp, "isoformat") else str(o.timestamp),
+            buyer_balance=new_balance,
+        )
+        for o in result.orders
+    ]
+
+    return CheckoutCartResponse(
+        orders=orders_dto,
+        total_amount=result.total_amount,
+        item_count=result.item_count,
+        buyer_name=resolved_buyer_name,
+        buyer_balance=new_balance,
+    )
+
+
+@router.delete("/{listing_id}", status_code=status.HTTP_200_OK)
+async def delete_listing(
+    listing_id: str,
+    delete_uc: DeleteListingUseCase = Depends(get_delete_listing_use_case),
+):
+    """
+    Delete a marketplace listing.
+    Removes from MongoDB, deletes from Elasticsearch, and purges Redis cache.
+    """
+    try:
+        result = await delete_uc.execute(listing_id)
+        return {"status": "success", "message": "Listing deleted successfully", "details": result}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/{listing_id}/price", response_model=ListingResponse, status_code=status.HTTP_200_OK)
+@router.patch("/{listing_id}", response_model=ListingResponse, status_code=status.HTTP_200_OK)
+@router.put("/{listing_id}/price", response_model=ListingResponse, status_code=status.HTTP_200_OK)
+async def update_listing_price(
+    listing_id: str,
+    payload: UpdateListingPriceRequest,
+    update_price_uc: UpdateListingPriceUseCase = Depends(get_update_listing_price_use_case),
+):
+    """
+    Update asking price of an active marketplace listing.
+    Synchronizes MongoDB document, updates Elasticsearch index, and purges Redis cache.
+    """
+    try:
+        command = UpdateListingPriceCommand(
+            listing_id=listing_id,
+            new_price=payload.price,
+            seller_name=payload.seller_name,
+        )
+        updated_listing = await update_price_uc.execute(command)
+        return updated_listing.to_dict()
+    except ListingNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 

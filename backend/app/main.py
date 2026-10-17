@@ -7,6 +7,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -18,6 +19,7 @@ from app.domain.exceptions import (
     InvalidPriceError,
     ListingAlreadySoldError,
     ListingNotFoundError,
+    SelfPurchaseNotAllowedError,
 )
 from app.infrastructure.persistence.elastic.client import ElasticClientManager
 from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
@@ -28,8 +30,10 @@ from app.infrastructure.persistence.redis.client import RedisClientManager
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
 from app.interfaces.api.admin import router as admin_router
+from app.interfaces.api.analytics import router as analytics_router
 from app.interfaces.api.cards import router as cards_router
 from app.interfaces.api.listings import router as listings_router
+from app.interfaces.api.messages import router as messages_router
 from app.interfaces.api.orders import router as orders_router
 from app.interfaces.api.users import router as users_router
 
@@ -139,12 +143,41 @@ async def invalid_condition_handler(request: Request, exc: InvalidConditionError
     return JSONResponse(status_code=422, content={"detail": str(exc), "code": "INVALID_CONDITION"})
 
 
+@app.exception_handler(SelfPurchaseNotAllowedError)
+async def self_purchase_not_allowed_handler(request: Request, exc: SelfPurchaseNotAllowedError):
+    return JSONResponse(status_code=400, content={"detail": str(exc), "code": "SELF_PURCHASE_NOT_ALLOWED"})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    if errors:
+        first = errors[0]
+        field = ".".join(str(x) for x in first.get("loc", []) if x not in ("body", "query", "path"))
+        msg = first.get("msg", "Données de formulaire invalides.")
+        if first.get("type") == "less_than_equal":
+            ctx = first.get("ctx", {})
+            limit = ctx.get("le")
+            detail = f"Le montant maximum autorisé est de {limit:,.2f} €.".replace(",", " ") if limit is not None else msg
+        elif first.get("type") == "greater_than":
+            ctx = first.get("ctx", {})
+            limit = ctx.get("gt")
+            detail = f"Le montant doit être supérieur à {limit:,.2f} €.".replace(",", " ") if limit is not None else msg
+        else:
+            detail = f"Erreur sur le champ '{field}': {msg}" if field else msg
+        return JSONResponse(status_code=422, content={"detail": detail})
+    return JSONResponse(status_code=422, content={"detail": "Données invalides."})
+
+
+
 # Register API routers
 app.include_router(cards_router)
 app.include_router(listings_router)
 app.include_router(orders_router)
 app.include_router(admin_router)
 app.include_router(users_router)
+app.include_router(analytics_router)
+app.include_router(messages_router)
 
 
 @app.get("/api/health", tags=["Health"])

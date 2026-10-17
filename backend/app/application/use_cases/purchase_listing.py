@@ -9,7 +9,11 @@ Updates state across all three NoSQL datastores:
 from dataclasses import dataclass
 
 from app.domain.entities.order import Order
-from app.domain.exceptions import ListingAlreadySoldError, ListingNotFoundError
+from app.domain.exceptions import (
+    ListingAlreadySoldError,
+    ListingNotFoundError,
+    SelfPurchaseNotAllowedError,
+)
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
@@ -21,6 +25,7 @@ from app.domain.value_objects.listing_status import ListingStatus
 class PurchaseListingCommand:
     listing_id: str
     buyer_name: str
+    agreed_price: float | None = None
 
 
 class PurchaseListingUseCase:
@@ -44,6 +49,10 @@ class PurchaseListingUseCase:
         if listing.status == ListingStatus.SOLD:
             raise ListingAlreadySoldError(command.listing_id)
 
+        # Invariant: A seller cannot purchase their own listing
+        if command.buyer_name.strip().lower() == listing.seller_name.strip().lower():
+            raise SelfPurchaseNotAllowedError(listing.seller_name)
+
         # Concurrency-safe atomic state transition in persistence layer
         updated_listing = await self.listing_repo.mark_as_sold(command.listing_id, command.buyer_name)
         if not updated_listing:
@@ -51,13 +60,25 @@ class PurchaseListingUseCase:
 
         listing = updated_listing
 
+        cond_str = (
+            listing.condition.value
+            if hasattr(listing.condition, "value")
+            else str(listing.condition)
+        )
+        effective_price = (
+            command.agreed_price
+            if (command.agreed_price is not None and command.agreed_price > 0)
+            else listing.price
+        )
         order = Order.create(
             listing_id=listing.id,
             card_id=listing.card_id,
             card_name=listing.card_name,
-            price=listing.price,
+            price=effective_price,
             seller_name=listing.seller_name,
             buyer_name=command.buyer_name,
+            condition=cond_str,
+            image_url=listing.image_url,
         )
 
         # Multi-system persistence
@@ -70,8 +91,9 @@ class PurchaseListingUseCase:
         # 3. Redis: Update live metrics and invalidate caches
         await self.cache_repo.increment_counter("stats:active_listings", -1)
         await self.cache_repo.increment_counter("stats:total_sales_count", 1)
-        await self.cache_repo.increment_float_counter("stats:total_sales_volume", listing.price)
+        await self.cache_repo.increment_float_counter("stats:total_sales_volume", effective_price)
         await self.cache_repo.push_recent_item("orders:recent_ids", order.id, max_items=25)
         await self.cache_repo.delete("cache:marketplace:recent")
+        await self.cache_repo.delete_pattern("cache:listings:*")
 
         return order

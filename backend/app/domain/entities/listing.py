@@ -49,9 +49,10 @@ class Listing:
         description: str = "",
         custom_image_url: str | None = None,
         listing_id: str | None = None,
+        created_at: str | None = None,
     ) -> "Listing":
         """Factory creating a validated active listing."""
-        return cls(
+        inst = cls(
             id=listing_id or str(uuid.uuid4()),
             card_id=card_id,
             card_name=card_name,
@@ -64,6 +65,9 @@ class Listing:
             description=description.strip(),
             status=ListingStatus.ACTIVE,
         )
+        if created_at:
+            inst.created_at = created_at
+        return inst
 
     def mark_as_sold(self, buyer_name: str) -> None:
         """Mark listing as sold to a buyer."""
@@ -75,6 +79,15 @@ class Listing:
         self.status = ListingStatus.SOLD
         self.buyer_name = buyer_name.strip()
         self.sold_at = datetime.now(UTC).isoformat()
+
+    def update_price(self, new_price: float) -> None:
+        """Update asking price. Must be active and positive."""
+        current_status = self.status.value if isinstance(self.status, ListingStatus) else self.status
+        if current_status != ListingStatus.ACTIVE.value:
+            raise ValueError(f"Cannot update price of listing in status {current_status}.")
+        if new_price <= 0:
+            raise InvalidPriceError(new_price)
+        self.price = round(float(new_price), 2)
 
     def to_dict(self) -> dict:
         return {

@@ -12,11 +12,13 @@ from pydantic import BaseModel, Field
 
 from app.domain.entities.user import User
 from app.domain.repositories.cache_repository import CacheRepository
+from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
 from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.interfaces.dependencies import (
     get_cache_repository,
+    get_listing_repository,
     get_order_repository,
     get_user_repository,
 )
@@ -283,6 +285,12 @@ async def recharge_wallet(
     user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Top up account wallet balance."""
+    if payload.amount <= 0 or payload.amount > 10000.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Le montant de recharge doit être strictement positif et inférieur ou égal à 10 000,00 €.",
+        )
+
     user_id = ACTIVE_USER_ID
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
@@ -341,6 +349,33 @@ async def get_my_orders(
         if clean_target in o.buyer_name.lower() or o.buyer_name.lower() in clean_target
     ]
     return user_orders
+
+
+@router.get("/me/listings")
+async def get_my_listings(
+    x_session_token: str | None = Header(None),
+    seller_name: str | None = Query(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+):
+    """Fetch all marketplace listings (active and sold) created by the current logged-in user."""
+    resolved_name = seller_name
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session:
+            resolved_name = session.get("name") or session.get("username")
+
+    all_listings = await listing_repo.list_listings(limit=1000)
+    if not resolved_name:
+        return [item.to_dict() for item in all_listings]
+
+    clean_target = resolved_name.lower().strip()
+    user_listings = [
+        item.to_dict()
+        for item in all_listings
+        if clean_target in item.seller_name.lower() or item.seller_name.lower() in clean_target
+    ]
+    return user_listings
 
 
 @router.post("/switch")

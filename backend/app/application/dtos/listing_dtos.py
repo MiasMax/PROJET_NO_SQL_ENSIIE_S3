@@ -16,6 +16,11 @@ class CreateListingRequest(BaseModel):
     custom_image_url: str | None = Field(default=None, description="Optional custom image URL")
 
 
+class UpdateListingPriceRequest(BaseModel):
+    price: float = Field(..., gt=0, le=100_000, description="New sale price in EUR (must be positive)")
+    seller_name: str | None = Field(default=None, description="Optional seller handle performing the edit")
+
+
 class ListingResponse(BaseModel):
     id: str
     card_id: str

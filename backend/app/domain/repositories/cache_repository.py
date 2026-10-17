@@ -88,6 +88,11 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
+    async def delete_pattern(self, pattern: str) -> None:
+        """Invalidate all keys matching glob pattern (e.g. cache:listings:*)."""
+        pass
+
+    @abstractmethod
     async def get_stats(self) -> dict[str, Any]:
         """Fetch server runtime stats (memory, connections, uptime)."""
         pass

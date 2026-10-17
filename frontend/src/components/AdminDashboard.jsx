@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Activity, RefreshCw, Terminal, CheckCircle2, TrendingUp, Layers, Server, Copy, Check, Store, ExternalLink } from 'lucide-react';
+import { Database, Activity, RefreshCw, CheckCircle2, TrendingUp, Layers, Server, Store, ExternalLink, Trash2, Search, ShieldAlert } from 'lucide-react';
 
 export default function AdminDashboard({ onBackToMarketplace }) {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
   const [aggregations, setAggregations] = useState(null);
+  const [listings, setListings] = useState([]);
+  const [listingSearch, setListingSearch] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [moderationMessage, setModerationMessage] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [copiedIndex, setCopiedIndex] = useState(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedMessage, setSeedMessage] = useState(null);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -14,10 +17,11 @@ export default function AdminDashboard({ onBackToMarketplace }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [resStats, resOrders, resAggs] = await Promise.all([
+      const [resStats, resOrders, resAggs, resListings] = await Promise.all([
         fetch('/api/admin/stats'),
         fetch('/api/orders?limit=10'),
-        fetch('/api/admin/aggregations')
+        fetch('/api/admin/aggregations'),
+        fetch('/api/listings?limit=100&sort_by=created_at&sort_order=desc'),
       ]);
 
       if (resStats.ok) {
@@ -30,6 +34,10 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         const aggsData = await resAggs.json();
         setAggregations(aggsData.aggregations || null);
       }
+      if (resListings && resListings.ok) {
+        const listData = await resListings.json();
+        setListings(listData.items || []);
+      }
     } catch (e) {
       console.error("Erreur de récupération des stats :", e);
     } finally {
@@ -40,12 +48,6 @@ export default function AdminDashboard({ onBackToMarketplace }) {
   useEffect(() => {
     fetchStats();
   }, []);
-
-  const handleCopy = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
 
   const handleSeed = async () => {
     setSeedLoading(true);
@@ -61,6 +63,32 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       setSeedLoading(false);
     }
   };
+
+  const handleDeleteListing = async (listing) => {
+    const confirmed = window.confirm(
+      `[MODÉRATION ADMIN]\n\nConfirmer la suppression définitive de l'offre :\n"${listing.card_name}" (${listing.set_name})\nVendeur : ${listing.seller_name}\nPrix : ${listing.price.toFixed(2)} €\n\nCette action supprimera l'annonce de MongoDB, la dé-indexera d'Elasticsearch et purgera le cache Redis.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(listing.id);
+    try {
+      const res = await fetch(`/api/admin/listings/${listing.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setListings((prev) => prev.filter((item) => item.id !== listing.id));
+        setModerationMessage(`L'offre "${listing.card_name}" a été définitivement supprimée.`);
+        setTimeout(() => setModerationMessage(null), 4000);
+        fetchStats();
+      } else {
+        const errData = await res.json();
+        alert(`Erreur : ${errData.detail || 'Impossible de supprimer cette annonce'}`);
+      }
+    } catch (err) {
+      alert(`Erreur réseau : ${err.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
 
   if (loading && !stats) {
     return (
@@ -318,52 +346,6 @@ export default function AdminDashboard({ onBackToMarketplace }) {
         </div>
       </div>
 
-      {/* Terminal inspection commands */}
-      <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: 'var(--radius-lg)', padding: '28px', marginBottom: '40px', boxShadow: 'var(--shadow-glow)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <Terminal size={26} color="var(--accent-primary)" />
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Guide d'Inspection Terminal (Pour la Soutenance)</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Le professeur peut exécuter directement ces commandes dans son terminal pour constater la persistance dans chacun des 3 systèmes :
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {terminal_commands.map((cmd, idx) => (
-            <div key={idx} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', textTransform: 'uppercase' }}>
-                  {cmd.system} — {cmd.description}
-                </span>
-                <button
-                  onClick={() => handleCopy(cmd.command, idx)}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-                >
-                  {copiedIndex === idx ? <><Check size={14} color="#34d399" /> Copié !</> : <><Copy size={14} /> Copier</>}
-                </button>
-              </div>
-              <pre style={{
-                margin: 0,
-                padding: '10px 14px',
-                background: '#04070d',
-                borderRadius: '6px',
-                fontFamily: 'Consolas, monospace',
-                fontSize: '0.85rem',
-                color: '#38bdf8',
-                overflowX: 'auto',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-all',
-              }}>
-                {cmd.command}
-              </pre>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Grafana integration and Elasticsearch analytics */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-lg)', padding: '28px', marginBottom: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
@@ -463,6 +445,188 @@ export default function AdminDashboard({ onBackToMarketplace }) {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Moderation Section: Delete & Manage Marketplace Listings */}
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '40px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldAlert size={24} color="#ef4444" />
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>Modération du Marché — Suppression des Offres</h2>
+              <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '999px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontWeight: 700 }}>
+                {listings.length} annonce{listings.length > 1 ? 's' : ''} au total
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
+              Suppression administrative permanente. L'offre est retirée de MongoDB, dé-indexée d'Elasticsearch en temps réel et le cache Redis est purgé.
+            </p>
+          </div>
+
+          {/* Quick Search in Moderation List */}
+          <div style={{ position: 'relative', minWidth: '260px' }}>
+            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              value={listingSearch}
+              onChange={(e) => setListingSearch(e.target.value)}
+              placeholder="Filtrer par carte, set ou vendeur..."
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 34px',
+                background: '#04070d',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '0.85rem',
+                outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Feedback alert after successful deletion */}
+        {moderationMessage && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            color: '#34d399',
+            fontSize: '0.9rem',
+            marginBottom: '16px',
+            fontWeight: 600,
+          }}>
+            <CheckCircle2 size={18} />
+            <span>{moderationMessage}</span>
+          </div>
+        )}
+
+        {/* Moderation Listings Table */}
+        {listings.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '24px 0' }}>
+            Aucune offre en vente pour le moment.
+          </p>
+        ) : (
+          <div className="admin-table-container" style={{ maxHeight: '480px', overflowY: 'auto' }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '60px' }}>Visuel</th>
+                  <th>Carte & Extension</th>
+                  <th>État</th>
+                  <th>Prix</th>
+                  <th>Vendeur</th>
+                  <th>Statut</th>
+                  <th style={{ textAlign: 'right' }}>Action Modération</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listings
+                  .filter((l) => {
+                    if (!listingSearch) return true;
+                    const q = listingSearch.toLowerCase().trim();
+                    return (
+                      l.card_name?.toLowerCase().includes(q) ||
+                      l.set_name?.toLowerCase().includes(q) ||
+                      l.seller_name?.toLowerCase().includes(q) ||
+                      l.condition?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <div style={{
+                          width: '38px',
+                          height: '52px',
+                          borderRadius: '4px',
+                          overflow: 'hidden',
+                          background: '#000000',
+                          border: '1px solid var(--border-subtle)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <img
+                            src={item.image_url}
+                            alt={item.card_name}
+                            style={{ height: '100%', width: 'auto', objectFit: 'contain' }}
+                            loading="lazy"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.9rem' }}>{item.card_name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.set_name}</div>
+                      </td>
+                      <td>
+                        <span className={`condition-badge badge-${item.condition?.toLowerCase().replace('_', '-')}`} style={{ fontSize: '0.75rem' }}>
+                          {item.condition}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--accent-gold)', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {item.price?.toFixed(2)} €
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        {item.seller_name}
+                      </td>
+                      <td>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          padding: '3px 8px',
+                          borderRadius: '999px',
+                          fontWeight: 700,
+                          background: item.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: item.status === 'ACTIVE' ? '#34d399' : '#f87171',
+                        }}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteListing(item)}
+                          disabled={deletingId === item.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            color: '#f87171',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: deletingId === item.id ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (deletingId !== item.id) {
+                              e.currentTarget.style.background = '#dc2626';
+                              e.currentTarget.style.color = '#ffffff';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (deletingId !== item.id) {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                              e.currentTarget.style.color = '#f87171';
+                            }
+                          }}
+                        >
+                          <Trash2 size={13} />
+                          <span>{deletingId === item.id ? 'Suppression...' : 'Supprimer'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

@@ -23,20 +23,32 @@
       "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
       "datasource": {
         "type": "elasticsearch",
-        "uid": "Elasticsearch-PokéVinted"
+        "uid": "pokevinted-elasticsearch"
       },
       "targets": [
         {
           "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "created_at",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              }
+            }
+          ],
           "query": "*",
-          "refId": "A"
+          "refId": "A",
+          "timeField": "created_at"
         }
       ],
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "reduceOptions": {
-          "calcs": ["count"],
+          "calcs": ["sum"],
           "fields": "",
           "values": false
         }
@@ -49,19 +61,30 @@
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
       "datasource": {
         "type": "elasticsearch",
-        "uid": "Elasticsearch-PokéVinted"
+        "uid": "pokevinted-elasticsearch"
       },
       "targets": [
         {
           "metrics": [{ "id": "1", "type": "avg", "field": "price" }],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "date_histogram",
+              "field": "created_at",
+              "settings": {
+                "interval": "auto"
+              }
+            }
+          ],
           "query": "*",
-          "refId": "A"
+          "refId": "A",
+          "timeField": "created_at"
         }
       ],
       "options": {
         "colorMode": "value",
         "graphMode": "area",
-        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+        "reduceOptions": { "calcs": ["mean"], "values": false }
       }
     },
     {
@@ -71,7 +94,7 @@
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
       "datasource": {
         "type": "elasticsearch",
-        "uid": "Elasticsearch-PokéVinted"
+        "uid": "pokevinted-elasticsearch"
       },
       "targets": [
         {
@@ -98,7 +121,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": {
         "type": "elasticsearch",
-        "uid": "Elasticsearch-PokéVinted"
+        "uid": "pokevinted-elasticsearch"
       },
       "targets": [
         {
@@ -123,7 +146,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": {
         "type": "elasticsearch",
-        "uid": "Elasticsearch-PokéVinted"
+        "uid": "pokevinted-elasticsearch"
       },
       "targets": [
         {
@@ -142,7 +165,7 @@
   "style": "dark",
   "tags": ["pokevinted", "nosql", "elasticsearch"],
   "time": {
-    "from": "now-6h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {

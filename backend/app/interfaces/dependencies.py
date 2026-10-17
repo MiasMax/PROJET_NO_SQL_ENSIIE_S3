@@ -5,11 +5,14 @@ Instantiates database adapters and passes them to domain use cases.
 
 from fastapi import Depends
 
+from app.application.use_cases.checkout_cart import CheckoutCartUseCase
 from app.application.use_cases.create_listing import CreateListingUseCase
+from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
 from app.application.use_cases.purchase_listing import PurchaseListingUseCase
 from app.application.use_cases.search_listings import SearchListingsUseCase
 from app.application.use_cases.seed_catalog import SeedCatalogUseCase
+from app.application.use_cases.update_listing_price import UpdateListingPriceUseCase
 from app.config import settings
 from app.infrastructure.persistence.elastic.client import ElasticClientManager
 from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
@@ -76,6 +79,15 @@ def get_purchase_listing_use_case(
     return PurchaseListingUseCase(listing_repo, order_repo, search_repo, cache_repo)
 
 
+def get_checkout_cart_use_case(
+    listing_repo: MongoListingRepository = Depends(get_listing_repository),
+    order_repo: MongoOrderRepository = Depends(get_order_repository),
+    search_repo: ElasticSearchRepository = Depends(get_search_repository),
+    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+) -> CheckoutCartUseCase:
+    return CheckoutCartUseCase(listing_repo, order_repo, search_repo, cache_repo)
+
+
 def get_search_listings_use_case(
     search_repo: ElasticSearchRepository = Depends(get_search_repository),
     listing_repo: MongoListingRepository = Depends(get_listing_repository),
@@ -101,3 +113,21 @@ def get_seed_catalog_use_case(
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ) -> SeedCatalogUseCase:
     return SeedCatalogUseCase(card_repo, listing_repo, search_repo, cache_repo)
+
+
+def get_delete_listing_use_case(
+    listing_repo: MongoListingRepository = Depends(get_listing_repository),
+    search_repo: ElasticSearchRepository = Depends(get_search_repository),
+    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+) -> DeleteListingUseCase:
+    return DeleteListingUseCase(listing_repo, search_repo, cache_repo)
+
+
+def get_update_listing_price_use_case(
+    listing_repo: MongoListingRepository = Depends(get_listing_repository),
+    search_repo: ElasticSearchRepository = Depends(get_search_repository),
+    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+) -> UpdateListingPriceUseCase:
+    return UpdateListingPriceUseCase(listing_repo, search_repo, cache_repo)
+
+

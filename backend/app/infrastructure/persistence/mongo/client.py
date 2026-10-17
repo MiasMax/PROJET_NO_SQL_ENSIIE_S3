@@ -21,10 +21,11 @@ class MongoClientManager:
 
     @classmethod
     def connect(cls, uri: str, db_name: str = "pokevinted") -> AsyncIOMotorDatabase:
-        if cls.client is None:
+        if cls.client is None or cls.db is None:
             logger.info("Connecting to MongoDB at: %s", _mask_mongo_uri(uri))
-            cls.client = AsyncIOMotorClient(uri)
+            cls.client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=2000)
             cls.db = cls.client[db_name]
+        assert cls.db is not None
         return cls.db
 
     @classmethod

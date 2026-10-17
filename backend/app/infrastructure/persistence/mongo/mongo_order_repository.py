@@ -41,5 +41,7 @@ class MongoOrderRepository(OrderRepository):
             price=float(doc["price"]),
             seller_name=doc["seller_name"],
             buyer_name=doc["buyer_name"],
+            condition=doc.get("condition", "NEAR_MINT"),
+            image_url=doc.get("image_url", ""),
             timestamp=doc["timestamp"],
         )

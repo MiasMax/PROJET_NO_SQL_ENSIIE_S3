@@ -3,14 +3,16 @@ Admin and Supervision API Router.
 Provides aggregated NoSQL metrics, Elasticsearch aggregations, and catalog re-seeding.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.dtos.stats_dtos import AdminStatsResponse
+from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
 from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
 from app.interfaces.dependencies import (
     get_admin_stats_use_case,
+    get_delete_listing_use_case,
     get_search_repository,
     get_seed_catalog_use_case,
 )
@@ -57,4 +59,26 @@ async def trigger_seed(
         "message": "Catalog and marketplace successfully seeded",
         "details": result,
     }
+
+
+@router.delete("/listings/{listing_id}", status_code=status.HTTP_200_OK)
+async def delete_listing_admin(
+    listing_id: str,
+    delete_uc: DeleteListingUseCase = Depends(get_delete_listing_use_case),
+):
+    """
+    Moderation action: permanently delete any marketplace listing.
+    Removes document from MongoDB, unindexes from Elasticsearch,
+    and purges Redis query cache.
+    """
+    try:
+        result = await delete_uc.execute(listing_id)
+        return {
+            "status": "success",
+            "message": f"Listing '{listing_id}' has been permanently deleted.",
+            "details": result,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
 

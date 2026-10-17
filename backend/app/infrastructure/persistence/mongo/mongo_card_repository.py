@@ -17,6 +17,10 @@ class MongoCardRepository(CardRepository):
 
     async def get_by_id(self, card_id: str) -> Card | None:
         doc = await self.collection.find_one({"_id": card_id})
+        if not doc and "sv3pt5-" in card_id:
+            doc = await self.collection.find_one({"_id": card_id.replace("sv3pt5-", "sv03.5-")})
+        elif not doc and "sv03.5-" in card_id:
+            doc = await self.collection.find_one({"_id": card_id.replace("sv03.5-", "sv3pt5-")})
         if not doc:
             return None
         return self._to_entity(doc)
@@ -48,6 +52,10 @@ class MongoCardRepository(CardRepository):
 
     async def count(self) -> int:
         return await self.collection.count_documents({})
+
+    async def clear(self) -> None:
+        """Purge all cards in the collection."""
+        await self.collection.delete_many({})
 
     def _to_entity(self, doc: dict) -> Card:
         return Card(

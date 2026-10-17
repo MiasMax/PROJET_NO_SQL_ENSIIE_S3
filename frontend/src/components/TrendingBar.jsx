@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Flame, Eye, Sparkles } from 'lucide-react';
 
+const FALLBACK_IMG = '/images/pokemon-card-back.jpg';
+
 export default function TrendingBar({ onSelectCard }) {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,8 @@ export default function TrendingBar({ onSelectCard }) {
     try {
       const res = await fetch('/api/cards/trending/top?limit=5');
       if (res.ok) {
-        setTrending(await res.json());
+        const data = await res.json();
+        setTrending(Array.isArray(data) ? data.slice(0, 5) : []);
       }
     } catch (e) {
       console.error("Erreur chargement trending :", e);
@@ -51,61 +54,79 @@ export default function TrendingBar({ onSelectCard }) {
             borderRadius: '999px',
             fontWeight: 700
           }}>
-            En Direct
+            Redis ZSET
           </span>
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Cartes les plus recherchées aujourd'hui
+          Les 5 cartes les plus consultées en temps réel
         </span>
       </div>
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
         gap: '12px',
       }}>
         {trending.map((card, idx) => (
           <div
-            key={card.id}
+            key={card.id || card.card_id || idx}
             onClick={() => onSelectCard && onSelectCard(card)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              background: 'rgba(15, 23, 42, 0.7)',
+              gap: '10px',
+              background: 'rgba(15, 23, 42, 0.75)',
               padding: '8px 12px',
               borderRadius: '8px',
               border: '1px solid var(--border-subtle)',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+              e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.6)';
               e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.85)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = 'var(--border-subtle)';
               e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
             }}
           >
             <span style={{
               fontWeight: 900,
-              fontSize: '1.1rem',
+              fontSize: '1.05rem',
               color: idx === 0 ? 'var(--accent-gold)' : idx === 1 ? '#e2e8f0' : idx === 2 ? '#cd7f32' : 'var(--text-muted)',
-              width: '20px'
+              width: '24px',
+              textAlign: 'center',
+              flexShrink: 0,
             }}>
               #{idx + 1}
             </span>
             <img
-              src={card.image_small}
+              src={card.image_small || card.image_large || FALLBACK_IMG}
               alt={card.name}
-              style={{ width: '36px', height: '48px', objectFit: 'contain', borderRadius: '4px' }}
+              decoding="async"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = FALLBACK_IMG;
+              }}
+              style={{ width: '38px', height: '52px', objectFit: 'contain', borderRadius: '4px', flexShrink: 0 }}
             />
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#ffffff' }}>
+            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+              <div
+                style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#ffffff' }}
+                title={card.name}
+              >
                 {card.name}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--accent-gold)' }}>
+              <div
+                style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+                title={card.set_name}
+              >
+                {card.set_name || 'Écarlate et Violet'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
                 <Eye size={12} />
                 <span>{card.views} consultation{card.views > 1 ? 's' : ''}</span>
               </div>
