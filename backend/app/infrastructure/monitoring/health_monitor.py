@@ -27,11 +27,12 @@ logger = logging.getLogger("pokevinted.health")
 HEALTH_PROBE_INTERVAL_SECONDS = 15
 
 
-async def _probe(name: str, container: str, coro) -> dict:
+async def _probe(name: str, container: str, check_fn) -> dict:
     """Run a single service ping and build a health document."""
     started = time.perf_counter()
     status = 0
     try:
+        coro = check_fn()
         await asyncio.wait_for(coro, timeout=5)
         status = 1
     except Exception as exc:  # noqa: BLE001 - any failure means the service is down
@@ -49,14 +50,29 @@ async def _probe(name: str, container: str, coro) -> dict:
 
 async def _collect(
     mongo_client: Any,
-    elastic_client: AsyncElasticsearch,
-    redis_client: Redis,
+    elastic_client: AsyncElasticsearch | None,
+    redis_client: Redis | None,
 ) -> list[dict]:
     """Ping every dependency once and return their health documents."""
+    async def _check_mongo():
+        if mongo_client is None:
+            raise RuntimeError("MongoDB client is not initialized")
+        await mongo_client.admin.command("ping")
+
+    async def _check_elastic():
+        if elastic_client is None:
+            raise RuntimeError("Elasticsearch client is not initialized")
+        await elastic_client.ping()
+
+    async def _check_redis():
+        if redis_client is None:
+            raise RuntimeError("Redis client is not initialized")
+        await redis_client.ping()
+
     docs = [
-        await _probe("MongoDB", "pokevinted-mongodb", mongo_client.admin.command("ping")),
-        await _probe("Elasticsearch", "pokevinted-elasticsearch", elastic_client.ping()),
-        await _probe("Redis", "pokevinted-redis", redis_client.ping()),
+        await _probe("MongoDB", "pokevinted-mongodb", _check_mongo),
+        await _probe("Elasticsearch", "pokevinted-elasticsearch", _check_elastic),
+        await _probe("Redis", "pokevinted-redis", _check_redis),
     ]
     # The backend is necessarily up if this loop is executing.
     docs.append(

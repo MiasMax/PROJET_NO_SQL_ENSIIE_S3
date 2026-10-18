@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from app.application.use_cases.checkout_cart import CheckoutCartCommand, CheckoutCartUseCase
 from app.application.use_cases.create_listing import CreateListingCommand, CreateListingUseCase
 from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
@@ -465,6 +466,7 @@ async def test_delete_listing_orchestrates_multi_system_removal(fake_card):
     assert result["deleted"] is True
     assert listing.id not in listing_repo.listings
     assert listing.id not in search_repo.indexed
+    assert cache_repo.counters.get("stats:active_listings", 0) == 0
 
 
 @pytest.mark.asyncio
@@ -545,5 +547,58 @@ async def test_update_listing_price_rejects_invalid_price(fake_card):
         await update_uc.execute(
             UpdateListingPriceCommand(listing_id=listing.id, new_price=-10.0, seller_name="Sacha")
         )
+
+
+@pytest.mark.asyncio
+async def test_checkout_cart_multi_items_orchestration(fake_card):
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+    order_repo = MockOrderRepository()
+
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    l1 = await create_uc.execute(
+        CreateListingCommand(card_id=fake_card.id, price=20.0, condition="MINT", seller_name="Ondine")
+    )
+    l2 = await create_uc.execute(
+        CreateListingCommand(card_id=fake_card.id, price=30.0, condition="NEAR_MINT", seller_name="Ondine")
+    )
+
+    checkout_uc = CheckoutCartUseCase(listing_repo, order_repo, search_repo, cache_repo)
+    result = await checkout_uc.execute(
+        CheckoutCartCommand(listing_ids=[l1.id, l2.id], buyer_name="Sacha")
+    )
+
+    assert result.item_count == 2
+    assert result.total_amount == 50.0
+    assert len(result.orders) == 2
+    assert listing_repo.listings[l1.id].status == ListingStatus.SOLD
+    assert listing_repo.listings[l2.id].status == ListingStatus.SOLD
+    assert cache_repo.counters["stats:total_sales_count"] == 2
+    assert cache_repo.counters["stats:total_sales_volume"] == 50.0
+
+
+@pytest.mark.asyncio
+async def test_checkout_cart_rejects_empty_and_self_purchase(fake_card):
+    card_repo = MockCardRepository([fake_card])
+    listing_repo = MockListingRepository()
+    search_repo = MockSearchRepository()
+    cache_repo = MockCacheRepository()
+    order_repo = MockOrderRepository()
+
+    checkout_uc = CheckoutCartUseCase(listing_repo, order_repo, search_repo, cache_repo)
+
+    # Empty cart
+    with pytest.raises(ValueError, match="Cart is empty"):
+        await checkout_uc.execute(CheckoutCartCommand(listing_ids=[], buyer_name="Sacha"))
+
+    # Self purchase
+    create_uc = CreateListingUseCase(card_repo, listing_repo, search_repo, cache_repo)
+    listing = await create_uc.execute(
+        CreateListingCommand(card_id=fake_card.id, price=25.0, condition="MINT", seller_name="Sacha")
+    )
+    with pytest.raises(SelfPurchaseNotAllowedError):
+        await checkout_uc.execute(CheckoutCartCommand(listing_ids=[listing.id], buyer_name="Sacha"))
 
 

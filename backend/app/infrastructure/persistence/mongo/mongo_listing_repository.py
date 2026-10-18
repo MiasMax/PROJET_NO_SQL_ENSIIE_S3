@@ -51,10 +51,10 @@ class MongoListingRepository(ListingRepository):
 
     async def mark_as_sold(self, listing_id: str, buyer_name: str) -> Listing | None:
         """Atomically transition listing from ACTIVE to SOLD. Guaranteed idempotency under high concurrency."""
-        now = datetime.now(UTC)
+        now_str = datetime.now(UTC).isoformat()
         doc = await self.collection.find_one_and_update(
             {"_id": listing_id, "status": ListingStatus.ACTIVE.value},
-            {"$set": {"status": ListingStatus.SOLD.value, "buyer_name": buyer_name, "sold_at": now}},
+            {"$set": {"status": ListingStatus.SOLD.value, "buyer_name": buyer_name, "sold_at": now_str}},
             return_document=ReturnDocument.AFTER,
         )
         if not doc:
@@ -70,6 +70,13 @@ class MongoListingRepository(ListingRepository):
         await self.collection.delete_many({})
 
     def _to_entity(self, doc: dict) -> Listing:
+        created_at = doc["created_at"]
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+        sold_at = doc.get("sold_at")
+        if isinstance(sold_at, datetime):
+            sold_at = sold_at.isoformat()
+
         return Listing(
             id=doc["_id"],
             card_id=doc["card_id"],
@@ -83,6 +90,6 @@ class MongoListingRepository(ListingRepository):
             description=doc.get("description", ""),
             status=ListingStatus(doc.get("status", "ACTIVE")),
             buyer_name=doc.get("buyer_name"),
-            created_at=doc["created_at"],
-            sold_at=doc.get("sold_at"),
+            created_at=created_at,
+            sold_at=sold_at,
         )

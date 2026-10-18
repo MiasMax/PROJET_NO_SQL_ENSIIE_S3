@@ -29,6 +29,7 @@ from app.application.use_cases.update_listing_price import (
 from app.domain.exceptions import ListingNotFoundError, SelfPurchaseNotAllowedError
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
+from app.domain.repositories.user_repository import UserRepository
 from app.interfaces.dependencies import (
     get_cache_repository,
     get_checkout_cart_use_case,
@@ -38,6 +39,7 @@ from app.interfaces.dependencies import (
     get_purchase_listing_use_case,
     get_search_listings_use_case,
     get_update_listing_price_use_case,
+    get_user_repository,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
@@ -199,7 +201,8 @@ async def purchase_listing(
     payload: PurchaseListingRequest,
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
-    cache_repo=Depends(get_cache_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
     """
     Execute a card purchase.
@@ -268,7 +271,24 @@ async def purchase_listing(
     new_balance = None
     if matched_user:
         _, new_balance = debit_user_balance(matched_user["id"], charge_price)
+        try:
+            buyer_entity = await user_repo.get_by_id(matched_user["id"])
+            if buyer_entity:
+                buyer_entity.balance = matched_user["balance"]
+                await user_repo.save(buyer_entity)
+        except Exception:
+            pass
+
     credit_user_balance(listing.seller_name, charge_price)
+    seller_user = find_user(listing.seller_name)
+    if seller_user:
+        try:
+            seller_entity = await user_repo.get_by_id(seller_user["id"])
+            if seller_entity:
+                seller_entity.balance = seller_user["balance"]
+                await user_repo.save(seller_entity)
+        except Exception:
+            pass
 
     order_dict = order.to_dict()
     order_dict["buyer_balance"] = new_balance
@@ -282,6 +302,7 @@ async def checkout_cart(
     payload: CheckoutCartRequest,
     checkout_uc: CheckoutCartUseCase = Depends(get_checkout_cart_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
     """
     Execute atomic multi-item cart checkout.
@@ -343,9 +364,25 @@ async def checkout_cart(
     new_balance = None
     if matched_user:
         _, new_balance = debit_user_balance(matched_user["id"], result.total_amount)
+        try:
+            buyer_entity = await user_repo.get_by_id(matched_user["id"])
+            if buyer_entity:
+                buyer_entity.balance = matched_user["balance"]
+                await user_repo.save(buyer_entity)
+        except Exception:
+            pass
 
     for order in result.orders:
         credit_user_balance(order.seller_name, order.price)
+        seller_user = find_user(order.seller_name)
+        if seller_user:
+            try:
+                seller_entity = await user_repo.get_by_id(seller_user["id"])
+                if seller_entity:
+                    seller_entity.balance = seller_user["balance"]
+                    await user_repo.save(seller_entity)
+            except Exception:
+                pass
 
     orders_dto = [
         OrderResponse(

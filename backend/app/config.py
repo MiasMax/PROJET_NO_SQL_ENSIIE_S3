@@ -32,11 +32,20 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        """Parse CORS_ORIGINS into a list, accepting "*" or comma-separated values."""
+        """Parse CORS_ORIGINS into a list, accepting JSON array, '*', or comma-separated values."""
         stripped = self.CORS_ORIGINS.strip()
         if stripped == "*":
             return ["*"]
-        return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        if stripped.startswith("[") and stripped.endswith("]"):
+            import json
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, list):
+                    return [str(o).strip() for o in parsed if str(o).strip()]
+            except json.JSONDecodeError:
+                pass
+            stripped = stripped[1:-1]
+        return [origin.strip().strip("'\"") for origin in stripped.split(",") if origin.strip().strip("'\"")]
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 

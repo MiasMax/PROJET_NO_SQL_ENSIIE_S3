@@ -144,9 +144,46 @@ class RechargeWalletRequest(BaseModel):
     amount: float = Field(..., gt=0.0, le=10000.0)
 
 
+async def init_users_persistence(user_repo: UserRepository) -> None:
+    """Ensure seed users exist in MongoDB and sync any database users into USERS_STORE."""
+    try:
+        count = await user_repo.count()
+        if count == 0:
+            for u in USERS_STORE.values():
+                entity = User.create(
+                    username=u["username"],
+                    name=u["name"],
+                    email=u.get("email", ""),
+                    password="",
+                    role=u.get("role", "Dresseur"),
+                    balance=u.get("balance", 100.0),
+                    is_admin=u.get("is_admin", False),
+                    user_id=u["id"],
+                )
+                entity.password_hash = u.get("password_hash", "")
+                await user_repo.save(entity)
+        else:
+            db_users = await user_repo.list_users(limit=200)
+            for du in db_users:
+                if du.id not in USERS_STORE:
+                    USERS_STORE[du.id] = du.to_dict(include_private=True)
+                else:
+                    USERS_STORE[du.id]["balance"] = du.balance
+    except Exception:
+        pass
+
+
 @router.get("", response_model=list[dict[str, Any]])
-async def list_users():
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
     """List all registered members and administrators."""
+    try:
+        db_users = await user_repo.list_users(limit=200)
+        for du in db_users:
+            if du.id not in USERS_STORE:
+                USERS_STORE[du.id] = du.to_dict(include_private=True)
+    except Exception:
+        pass
+
     return [
         {k: v for k, v in u.items() if k != "password_hash"}
         for u in USERS_STORE.values()

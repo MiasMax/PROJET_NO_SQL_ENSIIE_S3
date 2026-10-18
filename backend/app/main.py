@@ -28,6 +28,7 @@ from app.infrastructure.persistence.elastic.elastic_search_repository import Ela
 from app.infrastructure.persistence.mongo.client import MongoClientManager
 from app.infrastructure.persistence.mongo.mongo_card_repository import MongoCardRepository
 from app.infrastructure.persistence.mongo.mongo_listing_repository import MongoListingRepository
+from app.infrastructure.persistence.mongo.mongo_user_repository import MongoUserRepository
 from app.infrastructure.persistence.redis.client import RedisClientManager
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
@@ -37,6 +38,7 @@ from app.interfaces.api.cards import router as cards_router
 from app.interfaces.api.listings import router as listings_router
 from app.interfaces.api.messages import router as messages_router
 from app.interfaces.api.orders import router as orders_router
+from app.interfaces.api.users import init_users_persistence
 from app.interfaces.api.users import router as users_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -83,6 +85,14 @@ async def lifespan(app: FastAPI):
 
             # Keep a reference so the task is not garbage-collected mid-flight.
             app.state.seed_task = asyncio.create_task(_run_seed())
+
+        # Ensure registered members and administrator accounts persist across container restarts
+        user_repo = MongoUserRepository(mongo_db)
+        try:
+            await init_users_persistence(user_repo)
+            logger.info("User accounts persistence synchronized with MongoDB.")
+        except Exception as e:
+            logger.warning("Failed to initialize user accounts in MongoDB: %s", e)
 
         # Container health probe: periodically ping every dependency and record
         # its state into Elasticsearch so Grafana can show an "État des conteneurs"

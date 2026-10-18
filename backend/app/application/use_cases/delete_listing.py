@@ -40,7 +40,7 @@ class DeleteListingUseCase:
         # 3. Update Redis counters & invalidate cache
         if listing.status == ListingStatus.ACTIVE:
             try:
-                await self.cache_repo.increment_counter("counter:listings:active", -1)
+                await self.cache_repo.increment_counter("stats:active_listings", -1)
             except Exception:
                 pass
 

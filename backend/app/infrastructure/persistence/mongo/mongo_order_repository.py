@@ -33,6 +33,10 @@ class MongoOrderRepository(OrderRepository):
         return await self.collection.count_documents({})
 
     def _to_entity(self, doc: dict) -> Order:
+        timestamp = doc["timestamp"]
+        if hasattr(timestamp, "isoformat"):
+            timestamp = timestamp.isoformat()
+
         return Order(
             id=doc["_id"],
             listing_id=doc["listing_id"],
@@ -43,5 +47,5 @@ class MongoOrderRepository(OrderRepository):
             buyer_name=doc["buyer_name"],
             condition=doc.get("condition", "NEAR_MINT"),
             image_url=doc.get("image_url", ""),
-            timestamp=doc["timestamp"],
+            timestamp=str(timestamp),
         )

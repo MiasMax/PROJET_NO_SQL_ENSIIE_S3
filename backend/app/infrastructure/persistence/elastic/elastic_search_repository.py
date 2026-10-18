@@ -41,7 +41,12 @@ class ElasticSearchRepository(SearchRepository):
         await self.client.bulk(operations=operations, refresh=True)
 
     async def delete_listing(self, listing_id: str) -> None:
-        await self.client.delete(index=self.index_name, id=listing_id, ignore=[404], refresh="wait_for")
+        try:
+            await self.client.delete(index=self.index_name, id=listing_id, refresh="wait_for")
+        except Exception as exc:
+            if getattr(exc, "status_code", None) == 404 or "NotFoundError" in exc.__class__.__name__:
+                return
+            raise
 
     async def clear(self) -> None:
         """Purge all documents in the Elasticsearch listings index."""
@@ -49,7 +54,6 @@ class ElasticSearchRepository(SearchRepository):
             await self.client.delete_by_query(
                 index=self.index_name,
                 body={"query": {"match_all": {}}},
-                ignore=[404],
                 refresh=True,
             )
         except Exception:
