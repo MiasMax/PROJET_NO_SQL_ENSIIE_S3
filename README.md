@@ -225,6 +225,6 @@ Pour déployer sur un VPS (OVH, Hetzner, DigitalOcean, AWS EC2, etc.) :
 ---
 
 ## 👥 Équipe Projet
-* **Membres** : [À compléter avec vos noms]
+* **Membres** : Maxence Tournaud · Tony UY
 * **Formation** : ENSIIE — Semestre S3
 * **Module** : Bases de Données NoSQL
