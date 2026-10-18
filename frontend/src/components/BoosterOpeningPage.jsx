@@ -712,7 +712,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
       `}</style>
 
       {/* ── Top Bar / Header ──────────────────────────────────────────────── */}
-      <header className="w-full px-6 py-4 flex items-center justify-between border-b border-white/[0.08] bg-black/40 backdrop-blur-md z-40">
+      <header className="shrink-0 w-full px-6 py-4 flex items-center justify-between border-b border-white/[0.08] bg-black/60 backdrop-blur-md z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center shadow-lg border border-white/20">
             <Sparkles size={20} className="text-white drop-shadow" />
@@ -783,7 +783,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
       </header>
 
       {/* ── Main Canvas Content by Phase ─────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 flex flex-col items-center justify-center relative">
+      <main className="flex-1 overflow-y-auto px-4 py-8 flex flex-col items-center justify-start relative">
         {/* Error notification banner */}
         {error && (
           <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-sm flex items-center gap-2 max-w-md animate-bounce">
@@ -794,7 +794,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
 
         {/* ── STAGE 1: SERIES SELECTION (AUTHENTIC PACK ARTWORKS) ──────────── */}
         {phase === 'SELECT_SERIES' && (
-          <div className="w-full max-w-7xl flex flex-col items-center gap-6">
+          <div className="w-full max-w-7xl flex flex-col items-center gap-6 pb-16">
             <div className="text-center max-w-xl">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">
                 Étape 1 • Choix de l'Extension
@@ -938,7 +938,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
 
         {/* ── STAGE 2: TEAR PACK (PHYSICAL RIPPING RITUAL WITH AUTHENTIC PACK) ─ */}
         {phase === 'TEAR_PACK' && selectedSeries && (
-          <div className="flex flex-col items-center gap-6 max-w-md text-center">
+          <div className="my-auto flex flex-col items-center gap-6 max-w-md text-center py-4">
             <div>
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">
                 Étape 2 • Le Rituel de Déchirement
@@ -982,7 +982,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
 
         {/* ── STAGE 3: REVEAL DECK STACK (CARD BY CARD TCG SUSPENSE) ────────── */}
         {phase === 'REVEAL_STACK' && packData && currentCard && (
-          <div className="flex flex-col items-center gap-5 w-full max-w-4xl">
+          <div className="my-auto flex flex-col items-center gap-5 w-full max-w-4xl py-4">
             {/* Top slot pill & indicator */}
             <div className="flex items-center justify-between w-full max-w-md px-2">
               <div className="flex items-center gap-2">
