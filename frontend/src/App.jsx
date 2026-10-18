@@ -308,12 +308,18 @@ export default function App() {
             ? cardId.replace('sv03.5-', 'sv3pt5-')
             : null;
 
+          // The backend favorites every catalog card sharing the same name; mirror
+          // that set locally so all same-name variants toggle together in the UI.
+          const affectedIds = Array.isArray(data.affected_ids) && data.affected_ids.length
+            ? data.affected_ids
+            : [cardId, altId].filter(Boolean);
+
           if (data.is_favorite) {
-            next.add(cardId);
+            affectedIds.forEach((fid) => next.add(fid));
             if (altId) next.add(altId);
             showToast(`❤️ Ajouté à vos favoris`);
           } else {
-            next.delete(cardId);
+            affectedIds.forEach((fid) => next.delete(fid));
             if (altId) next.delete(altId);
             showToast(`💔 Retiré de vos favoris`);
           }

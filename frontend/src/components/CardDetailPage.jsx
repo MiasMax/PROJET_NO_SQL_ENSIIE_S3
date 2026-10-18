@@ -242,10 +242,13 @@ export default function CardDetailPage({
           setCardMeta(currentCard);
           setOtherOffers(altOffers.filter((o) => o.id !== currentListing?.id));
 
-          // Track real-time card popularity in Redis Sorted Set (ZINCRBY) strictly once per card consultation
-          if (cardIdToFetch && prevTrackedCardIdRef.current !== cardIdToFetch) {
-            prevTrackedCardIdRef.current = cardIdToFetch;
-            fetch(`/api/cards/${cardIdToFetch}/view`, { method: 'POST' }).catch(() => {});
+          // Track real-time listing popularity in Redis Sorted Set (ZINCRBY) once per
+          // listing consultation. Catalog-only cards (no active offer) have no listing id
+          // and are therefore not counted in the marketplace trending ranking.
+          const trackListingId = currentListing?.id;
+          if (trackListingId && prevTrackedCardIdRef.current !== trackListingId) {
+            prevTrackedCardIdRef.current = trackListingId;
+            fetch(`/api/listings/${trackListingId}/view`, { method: 'POST' }).catch(() => {});
           }
         }
       } catch (err) {

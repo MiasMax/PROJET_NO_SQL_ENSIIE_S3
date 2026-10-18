@@ -18,6 +18,7 @@ from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.persistence.redis.redis_cache_repository import RedisCacheRepository
 from app.interfaces.dependencies import (
     get_cache_repository,
+    get_card_repository,
     get_listing_repository,
     get_order_repository,
     get_user_repository,
@@ -412,19 +413,38 @@ async def toggle_favorite(
     card_id: str,
     user_id: str = "sacha",
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+    card_repo=Depends(get_card_repository),
 ):
-    """Toggle a card in user favorites using atomic Redis Set operations (SADD / SREM)."""
+    """
+    Toggle a card in user favorites using atomic Redis Set operations (SADD / SREM).
+    Favoriting applies to every catalog card sharing the same name, so all artworks
+    and set variants of that Pokémon are added or removed together.
+    """
+    # Resolve all catalog card IDs sharing the same name as the clicked card.
+    target_ids: list[str] = [card_id]
+    card = await card_repo.get_by_id(card_id)
+    if card and card.name:
+        all_cards = await card_repo.list_cards(limit=5000)
+        same_name_ids = [c.id for c in all_cards if c.name == card.name]
+        if same_name_ids:
+            target_ids = same_name_ids
+        if card_id not in target_ids:
+            target_ids.append(card_id)
+
+    # Toggle direction is driven by the clicked card's current membership.
     favorites = await cache_repo.get_favorites(user_id)
-    if card_id in favorites:
-        await cache_repo.remove_favorite(user_id, card_id)
-        is_favorite = False
-    else:
-        await cache_repo.add_favorite(user_id, card_id)
-        is_favorite = True
+    is_favorite = card_id not in favorites
+
+    for tid in target_ids:
+        if is_favorite:
+            await cache_repo.add_favorite(user_id, tid)
+        else:
+            await cache_repo.remove_favorite(user_id, tid)
 
     return {
         "status": "success",
         "card_id": card_id,
+        "affected_ids": target_ids,
         "is_favorite": is_favorite,
         "storage": "redis_set",
     }

@@ -44,6 +44,10 @@ class DeleteListingUseCase:
             except Exception:
                 pass
 
+        # Drop the listing from the trending Sorted Set so the Top 5 never points
+        # to a removed offer.
+        await self.cache_repo.remove_trending_listing(listing_id)
+
         await self.cache_repo.delete("cache:marketplace:recent")
         await self.cache_repo.delete_pattern("cache:listings:*")
 

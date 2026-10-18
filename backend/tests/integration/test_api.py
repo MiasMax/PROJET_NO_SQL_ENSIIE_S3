@@ -118,17 +118,24 @@ def test_redis_sessions_and_favorites(test_env):
 def test_redis_trending_views(test_env):
     client = test_env["client"]
 
-    # Increment view score in Redis Sorted Set (ZINCRBY)
-    view_res = client.post("/api/cards/sv3pt5-006/view")
+    # Publish a listing, then record a consultation on it (ZINCRBY on the listing ZSET)
+    create = client.post(
+        "/api/listings",
+        json={"card_id": "sv3pt5-006", "price": 42.0, "condition": "NEAR_MINT", "seller_name": "Pierre"},
+    )
+    assert create.status_code == 201
+    listing_id = create.json()["id"]
+
+    view_res = client.post(f"/api/listings/{listing_id}/view")
     assert view_res.status_code == 200
 
-    # Fetch top trending ranking (ZREVRANGE)
-    top_res = client.get("/api/cards/trending/top")
+    # Fetch top trending ranking (ZREVRANGE) — by listing
+    top_res = client.get("/api/listings/trending/top")
     assert top_res.status_code == 200
-    trending_cards = top_res.json()
-    assert len(trending_cards) > 0
-    assert trending_cards[0]["id"] == "sv3pt5-006"
-    assert trending_cards[0]["views"] >= 1
+    trending = top_res.json()
+    assert len(trending) > 0
+    assert trending[0]["id"] == listing_id
+    assert trending[0]["views"] >= 1
 
 
 def test_elasticsearch_aggregations(test_env):
@@ -243,19 +250,34 @@ def test_duplicate_purchase_prevention(test_env):
     assert "déjà été vendue" in buy2.json()["detail"] or "already been sold" in buy2.json()["detail"].lower()
 
 
-def test_trending_top_five_guarantee(test_env):
-    """Ensure GET /api/cards/trending/top guarantees exactly 5 cards even when Redis is fresh."""
+def test_trending_caps_at_limit_and_ranks_by_views(test_env):
+    """Trending reflects real listing views, is capped at the requested limit, and
+    ranks the most-viewed listing first (no hardcoded placeholder data)."""
     client = test_env["client"]
-    res = client.get("/api/cards/trending/top?limit=5")
+
+    listing_ids = []
+    for i in range(7):
+        res = client.post(
+            "/api/listings",
+            json={"card_id": "sv3pt5-006", "price": 10.0 + i, "condition": "NEAR_MINT", "seller_name": f"Seller{i}"},
+        )
+        assert res.status_code == 201
+        lid = res.json()["id"]
+        listing_ids.append(lid)
+        # View listing i exactly (i + 1) times
+        for _ in range(i + 1):
+            assert client.post(f"/api/listings/{lid}/view").status_code == 200
+
+    res = client.get("/api/listings/trending/top?limit=5")
     assert res.status_code == 200
-    cards = res.json()
-    assert len(cards) == 5
-    # Verify card structures and view scores
-    for card in cards:
-        assert "id" in card
-        assert "name" in card
-        assert "views" in card
-        assert card["views"] > 0
+    trending = res.json()
+    assert len(trending) <= 5
+    # The last listing was viewed the most (7x) -> ranks first
+    assert trending[0]["id"] == listing_ids[-1]
+    for item in trending:
+        assert "id" in item
+        assert "name" in item
+        assert item["views"] > 0
 
 
 def test_card_id_alias_resolution(test_env):
@@ -272,22 +294,54 @@ def test_card_id_alias_resolution(test_env):
 
 
 def test_trending_views_atomic_ranking(test_env):
-    """Verify tracking multiple views dynamically elevates card rank in Redis ZSET."""
+    """Verify tracking multiple views dynamically elevates a listing's rank in the Redis ZSET."""
     client = test_env["client"]
 
-    # View Mew (30th-B) 5 times
-    for _ in range(5):
-        view_res = client.post("/api/cards/30th-B/view")
-        assert view_res.status_code == 200
+    create = client.post(
+        "/api/listings",
+        json={"card_id": "sv3pt5-006", "price": 99.0, "condition": "NEAR_MINT", "seller_name": "Blue"},
+    )
+    assert create.status_code == 201
+    listing_id = create.json()["id"]
 
-    top_res = client.get("/api/cards/trending/top?limit=5")
+    # Consult the listing 5 times (ZINCRBY)
+    for _ in range(5):
+        assert client.post(f"/api/listings/{listing_id}/view").status_code == 200
+
+    top_res = client.get("/api/listings/trending/top?limit=5")
     assert top_res.status_code == 200
     trending = top_res.json()
-    assert len(trending) == 5
 
-    mew_item = next((c for c in trending if c["id"] == "30th-B"), None)
-    assert mew_item is not None
-    assert mew_item["views"] >= 5
+    item = next((c for c in trending if c["id"] == listing_id), None)
+    assert item is not None
+    assert item["views"] >= 5
+
+
+def test_sold_listing_removed_from_trending(test_env):
+    """A listing that gets sold must drop out of the trending ranking."""
+    client = test_env["client"]
+
+    create = client.post(
+        "/api/listings",
+        json={"card_id": "sv3pt5-006", "price": 30.0, "condition": "NEAR_MINT", "seller_name": "Ondine"},
+    )
+    assert create.status_code == 201
+    listing_id = create.json()["id"]
+
+    for _ in range(3):
+        assert client.post(f"/api/listings/{listing_id}/view").status_code == 200
+
+    # Present before sale
+    before = client.get("/api/listings/trending/top?limit=10").json()
+    assert any(c["id"] == listing_id for c in before)
+
+    # Purchase it
+    buy = client.post(f"/api/listings/{listing_id}/purchase", json={"buyer_name": "Regis"})
+    assert buy.status_code == 200
+
+    # Gone after sale
+    after = client.get("/api/listings/trending/top?limit=10").json()
+    assert all(c["id"] != listing_id for c in after)
 
 
 def test_get_my_listings_endpoint(test_env):

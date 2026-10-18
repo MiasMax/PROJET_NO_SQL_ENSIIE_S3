@@ -9,7 +9,7 @@ export default function TrendingBar({ onSelectCard }) {
 
   const fetchTrending = async () => {
     try {
-      const res = await fetch('/api/cards/trending/top?limit=5');
+      const res = await fetch('/api/listings/trending/top?limit=5');
       if (res.ok) {
         const data = await res.json();
         setTrending(Array.isArray(data) ? data.slice(0, 5) : []);
@@ -58,7 +58,7 @@ export default function TrendingBar({ onSelectCard }) {
           </span>
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Les 5 cartes les plus consultées en temps réel
+          Les 5 annonces les plus consultées en temps réel
         </span>
       </div>
 
@@ -104,8 +104,8 @@ export default function TrendingBar({ onSelectCard }) {
               #{idx + 1}
             </span>
             <img
-              src={card.image_small || card.image_large || FALLBACK_IMG}
-              alt={card.name}
+              src={card.image_url || card.image_small || card.image_large || FALLBACK_IMG}
+              alt={card.name || card.card_name}
               decoding="async"
               onError={(e) => {
                 e.currentTarget.onerror = null;
@@ -116,15 +116,17 @@ export default function TrendingBar({ onSelectCard }) {
             <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
               <div
                 style={{ fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#ffffff' }}
-                title={card.name}
+                title={card.name || card.card_name}
               >
-                {card.name}
+                {card.name || card.card_name}
               </div>
               <div
                 style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
-                title={card.set_name}
+                title={`${card.set_name || ''}${card.seller_name ? ' — ' + card.seller_name : ''}`}
               >
-                {card.set_name || 'Écarlate et Violet'}
+                {(card.set_name || 'Écarlate et Violet')}
+                {typeof card.price === 'number' ? ` · ${card.price.toFixed(2)} €` : ''}
+                {card.seller_name ? ` · ${card.seller_name}` : ''}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
                 <Eye size={12} />

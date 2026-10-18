@@ -93,6 +93,8 @@ class PurchaseListingUseCase:
         await self.cache_repo.increment_counter("stats:total_sales_count", 1)
         await self.cache_repo.increment_float_counter("stats:total_sales_volume", effective_price)
         await self.cache_repo.push_recent_item("orders:recent_ids", order.id, max_items=25)
+        # A sold listing is no longer purchasable: drop it from the trending ZSET.
+        await self.cache_repo.remove_trending_listing(command.listing_id)
         await self.cache_repo.delete("cache:marketplace:recent")
         await self.cache_repo.delete_pattern("cache:listings:*")
 

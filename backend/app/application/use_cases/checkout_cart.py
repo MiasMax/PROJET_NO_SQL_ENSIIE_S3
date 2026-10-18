@@ -104,6 +104,8 @@ class CheckoutCartUseCase:
         await self.cache_repo.increment_float_counter("stats:total_sales_volume", total_amount)
         for order in orders:
             await self.cache_repo.push_recent_item("orders:recent_ids", order.id, max_items=25)
+            # Sold listings are no longer purchasable: drop them from the trending ZSET.
+            await self.cache_repo.remove_trending_listing(order.listing_id)
         await self.cache_repo.delete("cache:marketplace:recent")
         await self.cache_repo.delete_pattern("cache:listings:*")
 

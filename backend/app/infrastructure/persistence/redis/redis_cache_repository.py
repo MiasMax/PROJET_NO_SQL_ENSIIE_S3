@@ -45,6 +45,20 @@ class RedisCacheRepository(CacheRepository):
         results = await self.client.zrevrange("cards:trending_views", 0, limit - 1, withscores=True)
         return [{"card_id": card_id, "views": int(score)} for card_id, score in results]
 
+    async def track_listing_view(self, listing_id: str) -> None:
+        await self.client.zincrby("listings:trending_views", 1, listing_id)
+
+    async def get_trending_listing_ids(self, limit: int = 5) -> list[dict[str, Any]]:
+        results = await self.client.zrevrange("listings:trending_views", 0, limit - 1, withscores=True)
+        return [{"listing_id": listing_id, "views": int(score)} for listing_id, score in results]
+
+    async def remove_trending_listing(self, listing_id: str) -> None:
+        await self.client.zrem("listings:trending_views", listing_id)
+
+    async def seed_trending_listings(self, scores: dict[str, int]) -> None:
+        if scores:
+            await self.client.zadd("listings:trending_views", scores)
+
     async def add_favorite(self, user_id: str, card_id: str) -> None:
         await self.client.sadd(f"user:{user_id}:favorites", card_id)
 

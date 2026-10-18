@@ -43,6 +43,26 @@ class CacheRepository(ABC):
         pass
 
     @abstractmethod
+    async def track_listing_view(self, listing_id: str) -> None:
+        """Increment popularity of a marketplace listing in a Sorted Set (trending)."""
+        pass
+
+    @abstractmethod
+    async def get_trending_listing_ids(self, limit: int = 5) -> list[dict[str, Any]]:
+        """Fetch most viewed listing IDs with their view count."""
+        pass
+
+    @abstractmethod
+    async def remove_trending_listing(self, listing_id: str) -> None:
+        """Remove a listing from the trending Sorted Set (e.g. once sold or deleted)."""
+        pass
+
+    @abstractmethod
+    async def seed_trending_listings(self, scores: dict[str, int]) -> None:
+        """Initialize trending Sorted Set with listing_id -> view count scores."""
+        pass
+
+    @abstractmethod
     async def add_favorite(self, user_id: str, card_id: str) -> None:
         """Add a card to user favorites Set (Redis SADD)."""
         pass

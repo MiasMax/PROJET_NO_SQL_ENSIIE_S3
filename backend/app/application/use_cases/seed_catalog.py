@@ -50,6 +50,16 @@ class SeedCatalogUseCase:
         else:
             await self.cache_repo.delete("cache:marketplace:recent")
 
+        # Reset and seed the trending Sorted Set (Redis ZSET) with realistic initial
+        # view counts on the flagship listings, so the Top 5 is populated with real,
+        # persistent scores from the first launch (no hardcoded placeholder values).
+        await self.cache_repo.delete("listings:trending_views")
+        trending_seed = {
+            listing.id: max(20, 150 - rank * 14)
+            for rank, listing in enumerate(initial_listings[:10])
+        }
+        await self.cache_repo.seed_trending_listings(trending_seed)
+
         return {
             "cards_seeded": saved_cards_count,
             "listings_seeded": listings_count,

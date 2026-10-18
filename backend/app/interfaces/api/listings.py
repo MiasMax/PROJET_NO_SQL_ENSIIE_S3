@@ -129,6 +129,57 @@ async def search_listings(
     }
 
 
+@router.get("/trending/top", response_model=list[dict])
+async def get_trending_listings(
+    limit: int = Query(5, ge=1, le=20),
+    cache_repo=Depends(get_cache_repository),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+):
+    """
+    Top trending listings computed in real time via a Redis Sorted Set (ZREVRANGE).
+    Each view increments a listing's score (ZINCRBY). Listings that are sold or no
+    longer exist are filtered out (Mongo stays the source of truth), so the ranking
+    only ever surfaces purchasable offers.
+    """
+    candidate_limit = max(limit * 3, 15)
+    trending = await cache_repo.get_trending_listing_ids(limit=candidate_limit)
+
+    enriched: list[dict] = []
+    for item in trending:
+        listing = await listing_repo.get_by_id(item["listing_id"])
+        if not listing:
+            continue
+        status_val = listing.status.value if hasattr(listing.status, "value") else str(listing.status)
+        if status_val != "ACTIVE":
+            continue
+        enriched.append({**listing.to_dict(), "name": listing.card_name, "views": item["views"]})
+        if len(enriched) >= limit:
+            break
+
+    return enriched
+
+
+@router.post("/{listing_id}/view")
+async def track_listing_view(
+    listing_id: str,
+    cache_repo=Depends(get_cache_repository),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+):
+    """
+    Increment a listing's real-time view counter in the Redis Sorted Set (ZINCRBY).
+    Only active listings are counted so sold/removed offers never re-enter the ranking.
+    """
+    listing = await listing_repo.get_by_id(listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+
+    status_val = listing.status.value if hasattr(listing.status, "value") else str(listing.status)
+    if status_val == "ACTIVE":
+        await cache_repo.track_listing_view(listing_id)
+        return {"status": "tracked", "listing_id": listing_id}
+    return {"status": "skipped", "listing_id": listing_id, "reason": "listing_not_active"}
+
+
 @router.get("/{listing_id}", response_model=ListingResponse)
 async def get_listing_detail(
     listing_id: str,

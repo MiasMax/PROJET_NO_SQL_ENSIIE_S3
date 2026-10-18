@@ -150,6 +150,7 @@ class MockCacheRepository(CacheRepository):
         self.lists: dict[str, list[str]] = {}
         self.cache: dict[str, Any] = {}
         self.trending: dict[str, int] = {}
+        self.listing_trending: dict[str, int] = {}
         self.favorites: dict[str, set[str]] = {}
         self.sessions: dict[str, dict[str, Any]] = {}
 
@@ -179,6 +180,19 @@ class MockCacheRepository(CacheRepository):
     async def get_trending_card_ids(self, limit: int = 5) -> list[dict[str, Any]]:
         sorted_items = sorted(self.trending.items(), key=lambda x: x[1], reverse=True)[:limit]
         return [{"card_id": k, "views": v} for k, v in sorted_items]
+
+    async def track_listing_view(self, listing_id: str) -> None:
+        self.listing_trending[listing_id] = self.listing_trending.get(listing_id, 0) + 1
+
+    async def get_trending_listing_ids(self, limit: int = 5) -> list[dict[str, Any]]:
+        sorted_items = sorted(self.listing_trending.items(), key=lambda x: x[1], reverse=True)[:limit]
+        return [{"listing_id": k, "views": v} for k, v in sorted_items]
+
+    async def remove_trending_listing(self, listing_id: str) -> None:
+        self.listing_trending.pop(listing_id, None)
+
+    async def seed_trending_listings(self, scores: dict[str, int]) -> None:
+        self.listing_trending.update(scores)
 
     async def add_favorite(self, user_id: str, card_id: str) -> None:
         if user_id not in self.favorites:
