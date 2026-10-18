@@ -426,21 +426,21 @@ def _normalize_rarity(raw: str | None) -> str:
     if not raw:
         return "Commune"
     s = raw.strip().lower()
-    if "spéciale" in s or "special" in s:
+    if "spéciale" in s or "speciale" in s or "sar" in s or "special illustration" in s:
         return "Illustration spéciale rare"
-    if "hyper" in s or "gold" in s:
+    if "hyper" in s or "gold" in s or "secrète" in s:
         return "Hyper rare"
-    if "chromatique ultra" in s:
+    if "chromatique ultra" in s or "shiny ultra" in s:
         return "Chromatique ultra rare"
     if "shiny" in s:
         return "Shiny rare"
-    if "high-tech" in s or "ace" in s:
+    if "high-tech" in s or "ace spec" in s or "ace" in s:
         return "HIGH-TECH rare"
-    if "illustration" in s or "ar" in s:
+    if "illustration rare" in s or "illustration" in s or s == "ar":
         return "Illustration rare"
-    if "double" in s:
+    if "double" in s or s == "rr":
         return "Double rare"
-    if "ultra" in s:
+    if "ultra" in s or s == "ur" or "full art" in s:
         return "Ultra Rare"
     if "peu" in s or "uncommon" in s:
         return "Peu Commune"
@@ -510,8 +510,8 @@ async def open_booster_pack(
       - Slots 1-4: 4 Commons (no duplicates)
       - Slots 5-7: 3 Uncommons (no duplicates)
       - Slot 8: Reverse Holo 1 (Common or Uncommon in reverse foil)
-      - Slot 9: Reverse Holo 2 / Wildcard (Reverse Rare, Illustration Rare, or Ace Spec)
-      - Slot 10: Climax Rare / Hit Slot (Rare Holo, Double Rare ex, Full Art, SAR, or Gold UR)
+      - Slot 9: Reverse Holo 2 / Wildcard (Reverse Rare, Illustration Rare, Ace Spec, or Shiny)
+      - Slot 10: Climax Rare / Guaranteed Holo Slot (Rare Holo ~67%, Double Rare ex ~20%, Full Art ~8%, SAR ~3.5%, Gold ~1.5%)
     """
     all_cards = await card_repo.list_cards(limit=5000)
 
@@ -561,36 +561,33 @@ async def open_booster_pack(
 
     chosen_card_ids: set[str] = set()
 
-    def draw_unique_from_categories(allowed_rarities: list[str]) -> tuple[Any, str]:
-        """Draw one card not yet in this pack from the specified rarity categories."""
-        candidates = []
-        for r in allowed_rarities:
+    def draw_card(target_rarity: str, fallback_rarities: list[str] | None = None) -> tuple[Any, str]:
+        """Draw an unpicked card prioritizing target_rarity, falling back down the priority chain."""
+        chain = [target_rarity] + (fallback_rarities or [])
+        for r in chain:
             cards_in_r = by_rarity.get(r, [])
             unpicked = [c for c in cards_in_r if c.id not in chosen_card_ids]
             if unpicked:
-                candidates.extend([(c, r) for c in unpicked])
+                chosen = random.choice(unpicked)
+                chosen_card_ids.add(chosen.id)
+                return chosen, r
 
-        if candidates:
-            chosen, cat = random.choice(candidates)
-            chosen_card_ids.add(chosen.id)
-            return chosen, cat
-
-        # Fallback if specific unpicked category exhausted
+        # If chain categories are fully exhausted, pick any unpicked card from pool
         unpicked_pool = [c for c in pool if c.id not in chosen_card_ids]
         if unpicked_pool:
             chosen = random.choice(unpicked_pool)
             chosen_card_ids.add(chosen.id)
             return chosen, _normalize_rarity(chosen.rarity)
 
-        # Extreme fallback
+        # Extreme fallback if pool has < 10 unique cards
         chosen = random.choice(pool)
         return chosen, _normalize_rarity(chosen.rarity)
 
     pack_cards: list[dict[str, Any]] = []
 
-    # 1. Slots 1 to 4: 4 Commons
+    # 1. Slots 1 to 4: 4 Commons (no duplicates)
     for slot_idx in range(1, 5):
-        card, norm_r = draw_unique_from_categories(["Commune"])
+        card, norm_r = draw_card("Commune", fallback_rarities=["Peu Commune"])
         is_hit, is_holo, hit_tier = _classify_card_attributes(norm_r)
         pack_cards.append({
             **card.to_dict(),
@@ -604,9 +601,9 @@ async def open_booster_pack(
             "market_price": round(float(card.market_price or 0.15), 2),
         })
 
-    # 2. Slots 5 to 7: 3 Uncommons
+    # 2. Slots 5 to 7: 3 Uncommons (no duplicates)
     for slot_idx in range(5, 8):
-        card, norm_r = draw_unique_from_categories(["Peu Commune", "Commune"])
+        card, norm_r = draw_card("Peu Commune", fallback_rarities=["Commune"])
         is_hit, is_holo, hit_tier = _classify_card_attributes(norm_r)
         pack_cards.append({
             **card.to_dict(),
@@ -621,7 +618,8 @@ async def open_booster_pack(
         })
 
     # 3. Slot 8: Reverse Holo 1 (Common or Uncommon in reverse holographic foil)
-    slot8_card, norm_r8 = draw_unique_from_categories(["Commune", "Peu Commune"])
+    slot8_target = random.choice(["Commune", "Peu Commune"])
+    slot8_card, norm_r8 = draw_card(slot8_target, fallback_rarities=["Peu Commune", "Commune"])
     pack_cards.append({
         **slot8_card.to_dict(),
         "slot_number": 8,
@@ -635,10 +633,28 @@ async def open_booster_pack(
     })
 
     # 4. Slot 9: Reverse Holo 2 / Wildcard
-    # Roll odds: 70% Reverse Common/Uncommon/Rare, 18% Illustration Rare, 8% Ace Spec / Shiny, 4% SAR
+    is_shiny_set = (effective_set_id and "04.5" in effective_set_id) or "destinées" in effective_set_name.lower()
     roll_s9 = random.random()
-    if roll_s9 < 0.70:
-        card9, norm_r9 = draw_unique_from_categories(["Rare", "Peu Commune", "Commune"])
+
+    if is_shiny_set and roll_s9 < 0.32:
+        # Paldean Fates Baby Shiny pull!
+        card9, norm_r9 = draw_card("Shiny rare", fallback_rarities=["Illustration rare", "Rare"])
+        is_hit9, is_holo9, hit_tier9 = _classify_card_attributes(norm_r9)
+        pack_cards.append({
+            **card9.to_dict(),
+            "slot_number": 9,
+            "slot_label": "Slot 9 — Chromatique Shiny ✨",
+            "pull_rarity": norm_r9,
+            "is_holo": True,
+            "is_reverse": False,
+            "is_hit": is_hit9,
+            "hit_tier": hit_tier9,
+            "market_price": round(float(card9.market_price or 14.0), 2),
+        })
+    elif roll_s9 < 0.70:
+        # Standard Reverse Holo 2 (Common, Uncommon, or Rare in reverse foil)
+        rev_target9 = random.choice(["Peu Commune", "Rare", "Commune"])
+        card9, norm_r9 = draw_card(rev_target9, fallback_rarities=["Peu Commune", "Commune"])
         pack_cards.append({
             **card9.to_dict(),
             "slot_number": 9,
@@ -650,9 +666,9 @@ async def open_booster_pack(
             "hit_tier": "rare_holo" if norm_r9 == "Rare" else "uncommon",
             "market_price": round(max(float(card9.market_price or 0.8) * 1.8, 1.20), 2),
         })
-    elif roll_s9 < 0.88:
-        # Illustration Rare hit!
-        card9, norm_r9 = draw_unique_from_categories(["Illustration rare", "Shiny rare", "Rare"])
+    elif roll_s9 < 0.86:
+        # Illustration Rare hit! (~16%)
+        card9, norm_r9 = draw_card("Illustration rare", fallback_rarities=["Rare", "Double rare"])
         is_hit9, is_holo9, hit_tier9 = _classify_card_attributes(norm_r9)
         pack_cards.append({
             **card9.to_dict(),
@@ -665,9 +681,9 @@ async def open_booster_pack(
             "hit_tier": hit_tier9,
             "market_price": round(float(card9.market_price or 18.0), 2),
         })
-    elif roll_s9 < 0.96:
-        # Ace Spec / High-Tech
-        card9, norm_r9 = draw_unique_from_categories(["HIGH-TECH rare", "Illustration rare", "Double rare", "Rare"])
+    elif roll_s9 < 0.94:
+        # HIGH-TECH Ace Spec (~8%)
+        card9, norm_r9 = draw_card("HIGH-TECH rare", fallback_rarities=["Illustration rare", "Double rare", "Rare"])
         is_hit9, is_holo9, hit_tier9 = _classify_card_attributes(norm_r9)
         pack_cards.append({
             **card9.to_dict(),
@@ -681,13 +697,13 @@ async def open_booster_pack(
             "market_price": round(float(card9.market_price or 24.0), 2),
         })
     else:
-        # Secret SAR early hit in slot 9!
-        card9, norm_r9 = draw_unique_from_categories(["Illustration spéciale rare", "Illustration rare", "Double rare"])
+        # Secret SAR hit in slot 9! (~6%)
+        card9, norm_r9 = draw_card("Illustration spéciale rare", fallback_rarities=["Illustration rare", "Double rare"])
         is_hit9, is_holo9, hit_tier9 = _classify_card_attributes(norm_r9)
         pack_cards.append({
             **card9.to_dict(),
             "slot_number": 9,
-            "slot_label": "Slot 9 — GOD PACK Hit Spéciale ✨",
+            "slot_label": "Slot 9 — Hit Spéciale SAR ✨",
             "pull_rarity": norm_r9,
             "is_holo": True,
             "is_reverse": False,
@@ -696,42 +712,44 @@ async def open_booster_pack(
             "market_price": round(float(card9.market_price or 85.0), 2),
         })
 
-    # 5. Slot 10: Climax Rare / Hit Slot (SV Era exact weights)
-    # 62% Rare Holo, 20% Double Rare ex, 9% Ultra Rare Full Art, 6% SAR, 3% Hyper Rare Gold
+    # 5. Slot 10: Climax Rare / Guaranteed Holo Slot (Official Scarlet & Violet drop rates)
+    # 67% Rare Holo, 20% Double Rare ex, 8% Ultra Rare Full Art, 3.5% SAR, 1.5% Hyper Rare Gold
     roll_s10 = random.random()
-    if roll_s10 < 0.62:
-        target_rarities_10 = ["Rare", "Peu Commune"]
-    elif roll_s10 < 0.82:
-        target_rarities_10 = ["Double rare", "Rare"]
-    elif roll_s10 < 0.91:
-        target_rarities_10 = ["Ultra Rare", "Double rare", "Rare"]
-    elif roll_s10 < 0.97:
-        target_rarities_10 = ["Illustration spéciale rare", "Ultra Rare", "Double rare"]
+    if roll_s10 < 0.67:
+        card10, norm_r10 = draw_card("Rare", fallback_rarities=["Double rare"])
+        slot_label10 = "Slot 10 — Rare Holo ✨"
+    elif roll_s10 < 0.87:
+        card10, norm_r10 = draw_card("Double rare", fallback_rarities=["Rare"])
+        slot_label10 = "Slot 10 — Double Rare ex ⚡"
+    elif roll_s10 < 0.95:
+        card10, norm_r10 = draw_card("Ultra Rare", fallback_rarities=["Double rare", "Rare"])
+        slot_label10 = "Slot 10 — Ultra Rare Full Art 🌟"
+    elif roll_s10 < 0.985:
+        card10, norm_r10 = draw_card("Illustration spéciale rare", fallback_rarities=["Ultra Rare", "Double rare"])
+        slot_label10 = "Slot 10 — HIT SUPRÊME SAR 🔥"
     else:
-        target_rarities_10 = ["Hyper rare", "Illustration spéciale rare", "Ultra Rare"]
+        card10, norm_r10 = draw_card("Hyper rare", fallback_rarities=["Illustration spéciale rare", "Ultra Rare"])
+        slot_label10 = "Slot 10 — HYPER RARE GOLD 👑"
 
-    card10, norm_r10 = draw_unique_from_categories(target_rarities_10)
-    is_hit10, is_holo10, hit_tier10 = _classify_card_attributes(norm_r10)
+    is_hit10, _, hit_tier10 = _classify_card_attributes(norm_r10)
 
-    # If target was Double Rare or above but fallback gave Rare, verify hit flag
-    if norm_r10 in ("Double rare", "Ultra Rare", "Illustration spéciale rare", "Hyper rare"):
+    # If target is Double Rare or above, ensure is_hit
+    if norm_r10 in ("Double rare", "Ultra Rare", "Illustration spéciale rare", "Hyper rare", "Chromatique ultra rare"):
         is_hit10 = True
-        is_holo10 = True
 
     pack_cards.append({
         **card10.to_dict(),
         "slot_number": 10,
-        "slot_label": "Slot 10 — HIT RARE CLIMAX 🔥",
+        "slot_label": slot_label10,
         "pull_rarity": norm_r10,
-        "is_holo": is_holo10 or True,
+        "is_holo": True,
         "is_reverse": False,
         "is_hit": is_hit10,
         "hit_tier": hit_tier10,
         "market_price": round(float(card10.market_price or 4.5), 2),
     })
 
-    # Ensure suspense: if ANY card in the pack is a hit, ensure that a hit card is placed at the very end
-    # so that pack_cards[-1]["is_hit"] is True (satisfies suspense and backwards compatibility tests)
+    # Ensure suspense: if there are hits in the pack, ensure the pack's biggest hit is placed at the end
     has_any_hit = any(c["is_hit"] for c in pack_cards)
     if has_any_hit and not pack_cards[-1]["is_hit"]:
         hit_indices = [i for i, c in enumerate(pack_cards) if c["is_hit"]]
@@ -740,6 +758,8 @@ async def open_booster_pack(
             pack_cards[idx], pack_cards[-1] = pack_cards[-1], pack_cards[idx]
             pack_cards[-1]["slot_number"] = 10
             pack_cards[-1]["slot_label"] = "Slot 10 — HIT RARE CLIMAX 🔥"
+            pack_cards[idx]["slot_number"] = idx + 1
+            pack_cards[idx]["slot_label"] = f"Slot {idx + 1} — Rare Holo ✨"
 
     total_value = sum(c.get("market_price", 1.0) for c in pack_cards)
     hits = [c for c in pack_cards if c.get("is_hit")]
