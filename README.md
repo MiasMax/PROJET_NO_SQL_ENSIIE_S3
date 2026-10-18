@@ -98,7 +98,7 @@ Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalo
 | **Elasticsearch** | `http://localhost:9200` | Loopback uniquement, sans mot de passe |
 | **Grafana** | `http://localhost:3001` | `admin` / `ChangeMe_Grafana_Admin_Password!` (défaut, surchargeable via `.env`) |
 
-> L'onglet **Admin Dashboard** (supervision NoSQL, ré-amorçage, modération) est réservé aux administrateurs : connectez-vous avec le compte `chen` ci-dessus (bouton « Connexion rapide → Admin »). Les comptes *dresseurs* de démo (`sacha`, `ondine`) restent accessibles en un clic sans mot de passe.
+> L'onglet **Admin Dashboard** (supervision NoSQL, ré-amorçage, modération) est réservé aux administrateurs : dans la fenêtre de connexion, le bouton « Admin (Prof. Chen) » pré-remplit le pseudo — saisissez le mot de passe `PokeAdmin2026!` puis « Se connecter ». Le mot de passe admin n'est **jamais** embarqué dans le code frontend (rien à trouver dans F12 → Sources). Les comptes *dresseurs* de démo (`sacha`, `ondine`) restent accessibles en un clic sans mot de passe.
 
 ---
 
