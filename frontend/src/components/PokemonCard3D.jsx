@@ -154,32 +154,10 @@ export default function PokemonCard3D({
 
   return (
     <div
-      ref={cardRef}
       id={`card-listing-${listing.id}`}
       data-card-id={listing.card_id}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       className={`card-item ${isSold ? 'opacity-70' : ''}`}
-      style={{
-        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-        transition: 'transform 0.15s ease-out',
-      }}
     >
-      {/* Subtle specular sheen */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `radial-gradient(circle at ${glarePos.x}% ${glarePos.y}%, rgba(255, 255, 255, 0.18) 0%, transparent 60%)`,
-          opacity: glarePos.opacity,
-          pointerEvents: 'none',
-          zIndex: 10,
-          transition: 'opacity 0.2s ease',
-          borderRadius: 'inherit',
-          mixBlendMode: 'overlay',
-        }}
-      />
-
       {/* Sold ribbon banner */}
       {isSold && (
         <div style={{
@@ -200,22 +178,37 @@ export default function PokemonCard3D({
         </div>
       )}
 
-      {/* Card image container */}
-      <div className="card-image-wrap cursor-pointer" onClick={handleOpenDetail}>
+      {/* Card image container - 3D interaction zone */}
+      <div
+        ref={cardRef}
+        className="card-image-wrap cursor-pointer relative select-none"
+        onClick={handleOpenDetail}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Action icons (Heart, Cart, Admin Trash) - Fixed, stable, never rotate */}
         {onToggleFavorite && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleFavorite(listing.id);
             }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+              setRotateX(0);
+              setRotateY(0);
+              setGlarePos((prev) => ({ ...prev, opacity: 0 }));
+            }}
+            onMouseMove={(e) => e.stopPropagation()}
             title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
             style={{
               position: 'absolute',
               top: '12px',
               left: '12px',
-              zIndex: 25,
-              background: 'rgba(15, 23, 42, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              zIndex: 35,
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               borderRadius: '999px',
               width: '32px',
               height: '32px',
@@ -225,14 +218,17 @@ export default function PokemonCard3D({
               cursor: 'pointer',
               color: isFavorite ? '#ef4444' : '#94a3b8',
               backdropFilter: 'blur(8px)',
-              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              transition: 'transform 0.15s ease, color 0.15s ease, background 0.15s ease',
             }}
+            className="hover:scale-115 active:scale-95"
           >
             <Heart size={16} fill={isFavorite ? '#ef4444' : 'none'} />
           </button>
         )}
         {!isSold && !isOwnListing && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (isInCart(listing.id)) {
@@ -241,14 +237,21 @@ export default function PokemonCard3D({
                 addToCart(listing);
               }
             }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+              setRotateX(0);
+              setRotateY(0);
+              setGlarePos((prev) => ({ ...prev, opacity: 0 }));
+            }}
+            onMouseMove={(e) => e.stopPropagation()}
             title={isInCart(listing.id) ? "Carte déjà dans votre panier • Ouvrir le panier" : "Ajouter cette carte à votre panier"}
             style={{
               position: 'absolute',
               top: '12px',
               left: onToggleFavorite ? '48px' : '12px',
-              zIndex: 25,
-              background: isInCart(listing.id) ? 'rgba(79, 70, 229, 0.9)' : 'rgba(15, 23, 42, 0.75)',
-              border: isInCart(listing.id) ? '1px solid rgba(129, 140, 248, 0.6)' : '1px solid rgba(255, 255, 255, 0.15)',
+              zIndex: 35,
+              background: isInCart(listing.id) ? 'rgba(79, 70, 229, 0.95)' : 'rgba(15, 23, 42, 0.85)',
+              border: isInCart(listing.id) ? '1px solid rgba(129, 140, 248, 0.8)' : '1px solid rgba(255, 255, 255, 0.2)',
               borderRadius: '999px',
               width: '32px',
               height: '32px',
@@ -258,24 +261,34 @@ export default function PokemonCard3D({
               cursor: 'pointer',
               color: isInCart(listing.id) ? '#ffffff' : '#94a3b8',
               backdropFilter: 'blur(8px)',
-              transition: 'all 0.2s ease',
+              boxShadow: isInCart(listing.id) ? '0 2px 10px rgba(99, 102, 241, 0.5)' : '0 2px 8px rgba(0,0,0,0.4)',
+              transition: 'transform 0.15s ease, background 0.15s ease, border-color 0.15s ease',
             }}
+            className="hover:scale-115 active:scale-95"
           >
             <ShoppingCart size={15} />
           </button>
         )}
         {currentUser?.is_admin && onDeleteListing && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onDeleteListing(listing);
             }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+              setRotateX(0);
+              setRotateY(0);
+              setGlarePos((prev) => ({ ...prev, opacity: 0 }));
+            }}
+            onMouseMove={(e) => e.stopPropagation()}
             title="Supprimer cette offre (Modération Admin)"
             style={{
               position: 'absolute',
               top: '12px',
               right: isSold ? '52px' : '12px',
-              zIndex: 25,
+              zIndex: 35,
               background: 'rgba(239, 68, 68, 0.9)',
               border: '1px solid rgba(255, 255, 255, 0.3)',
               borderRadius: '999px',
@@ -290,34 +303,60 @@ export default function PokemonCard3D({
               boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
               transition: 'transform 0.15s ease, background 0.15s ease',
             }}
-            className="hover:scale-110 active:scale-95 hover:bg-red-600"
+            className="hover:scale-115 active:scale-95 hover:bg-red-600"
           >
             <Trash2 size={15} />
           </button>
         )}
-        {!imgLoaded && (
-          <div className="absolute inset-0 bg-slate-800/80 rounded-t-2xl flex items-center justify-center animate-pulse">
-            <Sparkles size={22} className="text-indigo-400/40 animate-spin-slow" />
-          </div>
-        )}
-        <img
-          ref={checkImgStatus}
-          src={imgSrc}
-          alt={listing.card_name}
-          className={`card-img transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+
+        {/* 3D Tilted Card Visual - Only the card image rotates */}
+        <div
+          className="relative flex items-center justify-center w-full h-full pointer-events-none"
           style={{
-            filter: listing.condition === 'PLAYED'
-              ? 'saturate(0.90) contrast(0.96)'
-              : listing.condition === 'GOOD'
-              ? 'saturate(0.95)'
-              : 'none',
+            transform: `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+            transformStyle: 'preserve-3d',
+            transition: 'transform 0.15s ease-out',
           }}
-          decoding="async"
-          onLoad={() => setImgLoaded(true)}
-          onError={handleImgError}
-        />
-        {/* Physical condition wear overlay (creases, edge whitening, scratches) */}
-        <CardWearOverlay condition={listing.condition} glarePos={glarePos} />
+        >
+          {/* Specular sheen confined to card visual */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `radial-gradient(circle at ${glarePos.x}% ${glarePos.y}%, rgba(255, 255, 255, 0.22) 0%, transparent 60%)`,
+              opacity: glarePos.opacity,
+              pointerEvents: 'none',
+              zIndex: 20,
+              transition: 'opacity 0.2s ease',
+              borderRadius: '10px',
+              mixBlendMode: 'overlay',
+            }}
+          />
+
+          {!imgLoaded && (
+            <div className="absolute inset-0 bg-slate-800/80 rounded-lg flex items-center justify-center animate-pulse">
+              <Sparkles size={22} className="text-indigo-400/40 animate-spin-slow" />
+            </div>
+          )}
+          <img
+            ref={checkImgStatus}
+            src={imgSrc}
+            alt={listing.card_name}
+            className={`card-img transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+            style={{
+              filter: listing.condition === 'PLAYED'
+                ? 'saturate(0.90) contrast(0.96)'
+                : listing.condition === 'GOOD'
+                ? 'saturate(0.95)'
+                : 'none',
+            }}
+            decoding="async"
+            onLoad={() => setImgLoaded(true)}
+            onError={handleImgError}
+          />
+          {/* Physical condition wear overlay (creases, edge whitening, scratches) */}
+          <CardWearOverlay condition={listing.condition} glarePos={glarePos} />
+        </div>
       </div>
 
       {/* Listing details */}
