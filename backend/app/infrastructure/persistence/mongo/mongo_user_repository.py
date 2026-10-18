@@ -3,6 +3,7 @@ MongoDB implementation of UserRepository.
 Persists member and admin accounts in the 'users' collection.
 """
 
+import re
 from datetime import datetime
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -28,7 +29,7 @@ class MongoUserRepository(UserRepository):
 
     async def get_by_username(self, username: str) -> User | None:
         clean = username.strip().lower()
-        doc = await self.collection.find_one({"username": {"$regex": f"^{clean}$", "$options": "i"}})
+        doc = await self.collection.find_one({"username": {"$regex": f"^{re.escape(clean)}$", "$options": "i"}})
         if not doc:
             return None
         return self._to_entity(doc)

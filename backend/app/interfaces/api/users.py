@@ -3,11 +3,11 @@ User accounts, authentication, sessions, and watchlist router (MongoDB + Redis).
 Manages member profiles, registration, login/logout, wallet operations, and favorites.
 """
 
-import uuid
+import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.domain.entities.user import User, hash_password, verify_password
@@ -66,8 +66,6 @@ USERS_STORE: dict[str, dict[str, Any]] = {
         "created_at": datetime.now(UTC).isoformat(),
     },
 }
-
-ACTIVE_USER_ID: str = "sacha"
 
 
 def find_user(identifier: str | None) -> dict[str, Any] | None:
@@ -162,7 +160,6 @@ async def register_user(
     user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Register a new marketplace member or administrator and initialize session."""
-    global ACTIVE_USER_ID
     user_id = payload.username.lower().strip().replace(" ", "_")
 
     # Check persistence and store
@@ -193,9 +190,8 @@ async def register_user(
     user_dict: dict[str, Any] = new_user.to_dict()
     user_dict_with_pwd = new_user.to_dict(include_private=True)
     USERS_STORE[user_id] = user_dict_with_pwd
-    ACTIVE_USER_ID = user_id
 
-    token = f"sess_{user_id}_{uuid.uuid4().hex[:12]}"
+    token = f"sess_{user_id}_{secrets.token_urlsafe(32)}"
     session_data = {**user_dict, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
@@ -208,7 +204,6 @@ async def login_user(
     user_repo: UserRepository = Depends(get_user_repository),
 ):
     """Authenticate registered member with username and password, returns session token."""
-    global ACTIVE_USER_ID
     clean_username = payload.username.strip().lower()
 
     # Find user in store or repository
@@ -245,8 +240,7 @@ async def login_user(
         if not verify_password(payload.password, stored_hash):
             raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
 
-    ACTIVE_USER_ID = target_user_dict["id"]
-    token = f"sess_{target_user_dict['id']}_{uuid.uuid4().hex[:12]}"
+    token = f"sess_{target_user_dict['id']}_{secrets.token_urlsafe(32)}"
     public_user = {k: v for k, v in target_user_dict.items() if k != "password_hash"}
     session_data = {**public_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
@@ -277,11 +271,14 @@ async def get_current_user(
             if user_id in USERS_STORE:
                 session["balance"] = USERS_STORE[user_id]["balance"]
             return session
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expirée ou invalide.",
+        )
 
-    # Default fallback session for tests or initial guest session
-    user_id = ACTIVE_USER_ID if ACTIVE_USER_ID in USERS_STORE else "sacha"
-    default_user = {k: v for k, v in USERS_STORE[user_id].items() if k != "password_hash"}
-    token = f"sess_{default_user['id']}"
+    # Isolated default session for initial guest visitor or automated test suite
+    default_user = {k: v for k, v in USERS_STORE["sacha"].items() if k != "password_hash"}
+    token = f"sess_sacha_{secrets.token_urlsafe(32)}"
     session_data = {**default_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
@@ -301,12 +298,20 @@ async def recharge_wallet(
             detail="Le montant de recharge doit être strictement positif et inférieur ou égal à 10 000,00 €.",
         )
 
-    user_id = ACTIVE_USER_ID
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session and session.get("id"):
-            user_id = session["id"]
+    if not x_session_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentification requise pour recharger le portefeuille.",
+        )
 
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session or not session.get("id"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expirée ou invalide.",
+        )
+
+    user_id = session["id"]
     user = find_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
@@ -320,11 +325,8 @@ async def recharge_wallet(
         await user_repo.save(user_entity)
 
     # Update session in Redis
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            session["balance"] = user["balance"]
-            await cache_repo.set_user_session(x_session_token, session, ttl_seconds=86400)
+    session["balance"] = user["balance"]
+    await cache_repo.set_user_session(x_session_token, session, ttl_seconds=86400)
 
     return {
         "status": "success",
@@ -394,7 +396,6 @@ async def switch_user(
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """Switch active trainer account and persist session in Redis."""
-    global ACTIVE_USER_ID
     user_id = payload.user_id.lower().strip()
     if user_id not in USERS_STORE:
         raise HTTPException(status_code=400, detail="Profil utilisateur inconnu.")
@@ -407,8 +408,7 @@ async def switch_user(
             status_code=403,
             detail="Un compte administrateur requiert une connexion sécurisée avec mot de passe.",
         )
-    ACTIVE_USER_ID = user_id
-    token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
+    token = f"sess_{user_id}_{secrets.token_urlsafe(32)}"
     public_user = {k: v for k, v in user.items() if k != "password_hash"}
     session_data = {**public_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)

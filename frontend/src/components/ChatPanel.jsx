@@ -298,7 +298,10 @@ export default function ChatPanel({
     if (!myName) return;
     setLoadingConvs(true);
     try {
-      const res = await fetch(`/api/messages/conversations?username=${encodeURIComponent(myName)}`);
+      const token = localStorage.getItem('pokevinted_token');
+      const res = await fetch(`/api/messages/conversations?username=${encodeURIComponent(myName)}`, {
+        headers: token ? { 'x-session-token': token } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
@@ -315,8 +318,12 @@ export default function ChatPanel({
     if (!conv || !myName || isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
+      const token = localStorage.getItem('pokevinted_token');
       const res = await fetch(
-        `/api/messages/thread?listing_id=${encodeURIComponent(conv.listing_id)}&user_a=${encodeURIComponent(myName)}&user_b=${encodeURIComponent(conv.other_party)}`
+        `/api/messages/thread?listing_id=${encodeURIComponent(conv.listing_id)}&user_a=${encodeURIComponent(myName)}&user_b=${encodeURIComponent(conv.other_party)}`,
+        {
+          headers: token ? { 'x-session-token': token } : {},
+        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -402,9 +409,13 @@ export default function ChatPanel({
         offer_type: isOffer ? 'offer' : 'chat',
       };
 
+      const token = localStorage.getItem('pokevinted_token');
       const res = await fetch('/api/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-session-token': token } : {}),
+        },
         body: JSON.stringify(body),
       });
 
@@ -447,9 +458,13 @@ export default function ChatPanel({
     scrollToBottom(true);
 
     try {
+      const token = localStorage.getItem('pokevinted_token');
       await fetch('/api/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-session-token': token } : {}),
+        },
         body: JSON.stringify(body),
       });
 
@@ -458,8 +473,14 @@ export default function ChatPanel({
         try {
           await fetch(`/api/listings/${activeConv.listing_id}/price`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_price: price }),
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'x-session-token': token } : {}),
+            },
+            body: JSON.stringify({
+              price: price,
+              seller_name: myName,
+            }),
           });
         } catch (e) {
           // Best effort

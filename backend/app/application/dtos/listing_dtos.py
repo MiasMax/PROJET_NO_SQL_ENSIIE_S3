@@ -17,8 +17,13 @@ class CreateListingRequest(BaseModel):
 
 
 class UpdateListingPriceRequest(BaseModel):
-    price: float = Field(..., gt=0, le=100_000, description="New sale price in EUR (must be positive)")
+    price: float = Field(default=0.0, ge=0.0, le=100_000, description="New sale price in EUR (must be positive)")
     seller_name: str | None = Field(default=None, description="Optional seller handle performing the edit")
+    new_price: float | None = Field(default=None, description="Optional alias for price")
+
+    def get_price(self) -> float:
+        val = self.price if self.price > 0 else (self.new_price or 0.0)
+        return val
 
 
 class ListingResponse(BaseModel):

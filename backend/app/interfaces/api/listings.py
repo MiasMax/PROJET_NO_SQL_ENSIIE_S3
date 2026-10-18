@@ -3,7 +3,7 @@ Marketplace Listings API Router.
 Handles listing creation, faceted search, and card purchasing.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app.application.dtos.listing_dtos import (
     CreateListingRequest,
@@ -27,6 +27,7 @@ from app.application.use_cases.update_listing_price import (
     UpdateListingPriceUseCase,
 )
 from app.domain.exceptions import ListingNotFoundError, SelfPurchaseNotAllowedError
+from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.interfaces.dependencies import (
     get_cache_repository,
@@ -373,12 +374,54 @@ async def checkout_cart(
 @router.delete("/{listing_id}", status_code=status.HTTP_200_OK)
 async def delete_listing(
     listing_id: str,
+    x_session_token: str | None = Header(None),
     delete_uc: DeleteListingUseCase = Depends(get_delete_listing_use_case),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Delete a marketplace listing.
+    Verifies that the caller owns the listing or possesses administrator privileges.
     Removes from MongoDB, deletes from Elasticsearch, and purges Redis cache.
     """
+    if not x_session_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentification requise pour supprimer une annonce.",
+        )
+
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expirée ou invalide.",
+        )
+
+    listing = await listing_repo.get_by_id(listing_id)
+    if not listing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Annonce '{listing_id}' introuvable.",
+        )
+
+    is_admin = bool(session.get("is_admin"))
+    user_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+    seller_name = listing.seller_name.lower().strip()
+    user_id = str(session.get("id", "")).lower().strip()
+
+    is_owner = (
+        (user_name == seller_name)
+        or (user_id == seller_name)
+        or (user_name in seller_name)
+        or (seller_name in user_name)
+    )
+
+    if not (is_admin or is_owner):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul le vendeur propriétaire ou un administrateur peut supprimer cette annonce.",
+        )
+
     try:
         result = await delete_uc.execute(listing_id)
         return {"status": "success", "message": "Listing deleted successfully", "details": result}
@@ -392,17 +435,46 @@ async def delete_listing(
 async def update_listing_price(
     listing_id: str,
     payload: UpdateListingPriceRequest,
+    x_session_token: str | None = Header(None),
     update_price_uc: UpdateListingPriceUseCase = Depends(get_update_listing_price_use_case),
+    listing_repo: ListingRepository = Depends(get_listing_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Update asking price of an active marketplace listing.
+    Verifies that the caller owns the listing or possesses administrator privileges.
     Synchronizes MongoDB document, updates Elasticsearch index, and purges Redis cache.
     """
+    listing = await listing_repo.get_by_id(listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail=f"Annonce '{listing_id}' introuvable.")
+
+    price = payload.get_price() if hasattr(payload, "get_price") else payload.price
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="Le prix doit être strictement positif.")
+
+    resolved_seller_name: str | None = None
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if not session:
+            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
+        if session.get("is_admin"):
+            resolved_seller_name = listing.seller_name
+        else:
+            resolved_seller_name = session.get("name") or session.get("username") or session.get("id")
+    elif payload.seller_name:
+        resolved_seller_name = payload.seller_name
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentification requise pour modifier le prix d'une annonce.",
+        )
+
     try:
         command = UpdateListingPriceCommand(
             listing_id=listing_id,
-            new_price=payload.price,
-            seller_name=payload.seller_name,
+            new_price=price,
+            seller_name=resolved_seller_name,
         )
         updated_listing = await update_price_uc.execute(command)
         return updated_listing.to_dict()

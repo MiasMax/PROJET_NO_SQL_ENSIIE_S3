@@ -7,17 +7,20 @@ Includes low-latency in-memory fallback and offline demo support to ensure insta
 
 import asyncio
 import os
+import re
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.domain.repositories.cache_repository import CacheRepository
 from app.infrastructure.persistence.mongo.client import MongoClientManager
 from app.infrastructure.persistence.redis.client import RedisClientManager
+from app.interfaces.dependencies import get_cache_repository
 
 router = APIRouter(prefix="/api/messages", tags=["P2P Messaging"])
 
@@ -221,12 +224,27 @@ def _extract_sent_at(doc: dict[str, Any]) -> datetime:
 # ─── Endpoints ────────────────────────────────────────────────────────────
 
 @router.post("", status_code=201)
-async def send_message(payload: SendMessageRequest):
+async def send_message(
+    payload: SendMessageRequest,
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+):
     """
     Persist a message (or negotiation offer) to MongoDB.
     Increments the recipient's unread counter in Redis via INCR.
     Falls back instantly to in-memory store in demo mode or when offline.
     """
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and not session.get("is_admin"):
+            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            sender = payload.sender_name.lower().strip()
+            if caller_name != sender and caller_name not in sender and sender not in caller_name:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Usurpation d'identité interdite : l'expéditeur doit correspondre à votre compte connecté.",
+                )
+
     msg_id = str(uuid.uuid4())
     conv_id = _conversation_id(payload.listing_id, payload.sender_name, payload.recipient_name)
     now = datetime.now(UTC)
@@ -283,11 +301,25 @@ async def send_message(payload: SendMessageRequest):
 async def list_conversations(
     username: str = Query(..., description="Authenticated user name"),
     limit: int = Query(20, ge=1, le=100),
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Return all conversation threads the user participates in, enriched with
     the latest message and unread count.
     """
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and not session.get("is_admin"):
+            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            target = username.lower().strip()
+            if caller_name != target and caller_name not in target and target not in caller_name:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Accès refusé : vous ne pouvez pas consulter les conversations d'un autre utilisateur.",
+                )
+
+    safe_username = re.escape(username.strip())
     docs: list[dict[str, Any]] = []
     mongo_success = False
 
@@ -298,8 +330,8 @@ async def list_conversations(
                 {
                     "$match": {
                         "$or": [
-                            {"sender_name": {"$regex": f"^{username}$", "$options": "i"}},
-                            {"recipient_name": {"$regex": f"^{username}$", "$options": "i"}},
+                            {"sender_name": {"$regex": f"^{safe_username}$", "$options": "i"}},
+                            {"recipient_name": {"$regex": f"^{safe_username}$", "$options": "i"}},
                         ]
                     }
                 },
@@ -407,11 +439,33 @@ async def get_thread(
     user_a: str = Query(..., description="First participant"),
     user_b: str = Query(..., description="Second participant"),
     limit: int = Query(100, ge=1, le=500),
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Fetch all messages in a conversation thread, sorted chronologically.
     Marks all messages as read for user_a by resetting their unread counter.
     """
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and not session.get("is_admin"):
+            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            ua = user_a.lower().strip()
+            ub = user_b.lower().strip()
+            is_participant = (
+                caller_name == ua
+                or caller_name in ua
+                or ua in caller_name
+                or caller_name == ub
+                or caller_name in ub
+                or ub in caller_name
+            )
+            if not is_participant:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Accès refusé : vous n'êtes pas participant à cette conversation.",
+                )
+
     conv_id = _conversation_id(listing_id, user_a, user_b)
     docs: list[dict[str, Any]] = []
     mongo_success = False
@@ -489,14 +543,30 @@ async def get_thread(
 
 
 @router.get("/unread-count")
-async def get_unread_count(username: str = Query(...)):
+async def get_unread_count(
+    username: str = Query(...),
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+):
     """
     Sum of all unread message counters for a user.
     """
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and not session.get("is_admin"):
+            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            target = username.lower().strip()
+            if caller_name != target and caller_name not in target and target not in caller_name:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Accès refusé : vous ne pouvez pas consulter les notifications d'un autre utilisateur.",
+                )
+
     if _can_try_redis():
         try:
             redis = _get_redis()
-            pattern = f"unread:{username.lower()}:*"
+            safe_prefix = _canonical_name(username)
+            pattern = f"unread:{safe_prefix}:*"
             total = 0
             async for key in redis.scan_iter(pattern):
                 val = await asyncio.wait_for(redis.get(key), timeout=OPERATION_TIMEOUT_SECONDS)

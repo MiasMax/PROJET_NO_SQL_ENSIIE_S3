@@ -44,11 +44,16 @@ class UpdateListingPriceUseCase:
             raise ValueError(f"Impossible de modifier le prix d'une annonce avec le statut '{current_status}'.")
 
         # Seller ownership verification
-        if command.seller_name and command.seller_name.strip():
-            clean_cmd_seller = command.seller_name.strip().lower()
-            clean_listing_seller = listing.seller_name.strip().lower()
-            if clean_cmd_seller != clean_listing_seller and clean_cmd_seller not in clean_listing_seller and clean_listing_seller not in clean_cmd_seller:
-                raise ValueError("Seul le vendeur propriétaire de cette annonce peut en modifier le prix.")
+        if not command.seller_name or not command.seller_name.strip():
+            raise ValueError("L'identité du vendeur est requise pour modifier le prix d'une annonce.")
+        clean_cmd_seller = command.seller_name.strip().lower()
+        clean_listing_seller = listing.seller_name.strip().lower()
+        if (
+            clean_cmd_seller != clean_listing_seller
+            and clean_cmd_seller not in clean_listing_seller
+            and clean_listing_seller not in clean_cmd_seller
+        ):
+            raise ValueError("Seul le vendeur propriétaire de cette annonce peut en modifier le prix.")
 
         # 1. Update Domain entity price
         listing.update_price(command.new_price)

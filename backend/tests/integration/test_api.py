@@ -710,6 +710,135 @@ def test_cart_batch_checkout_multiple_cards(test_env):
     assert fail_res.status_code == 400
 
 
+def test_security_listing_mutations_bola_prevention(test_env):
+    client = test_env["client"]
+
+    # 1. Create listing owned by Sacha
+    create_res = client.post(
+        "/api/listings",
+        json={
+            "card_id": "sv3pt5-006",
+            "price": 60.0,
+            "condition": "NEAR_MINT",
+            "seller_name": "Sacha",
+            "description": "Dracaufeu pour test BOLA",
+        },
+    )
+    assert create_res.status_code == 201
+    listing_id = create_res.json()["id"]
+
+    # 2. Anonymous attempt to delete listing (must fail with 401 Unauthorized)
+    anon_del = client.delete(f"/api/listings/{listing_id}")
+    assert anon_del.status_code == 401
+    assert "Authentification requise" in anon_del.json()["detail"]
+
+    # 3. Ondine logs in
+    ondine_login = client.post("/api/users/login", json={"username": "ondine", "password": ""})
+    assert ondine_login.status_code == 200
+    ondine_token = ondine_login.json()["token"]
+
+    # 4. Ondine attempts to delete Sacha's listing (BOLA attack: must fail with 403 Forbidden)
+    attacker_del = client.delete(
+        f"/api/listings/{listing_id}",
+        headers={"x-session-token": ondine_token},
+    )
+    assert attacker_del.status_code == 403
+    assert "Seul le vendeur propriétaire" in attacker_del.json()["detail"]
+
+    # 5. Ondine attempts to change the price of Sacha's listing (must fail)
+    attacker_patch = client.patch(
+        f"/api/listings/{listing_id}/price",
+        headers={"x-session-token": ondine_token},
+        json={"price": 0.01},
+    )
+    assert attacker_patch.status_code == 400
+    assert "Seul le vendeur propriétaire" in attacker_patch.json()["detail"]
+
+    # 6. Sacha logs in
+    sacha_login = client.post("/api/users/login", json={"username": "sacha", "password": ""})
+    assert sacha_login.status_code == 200
+    sacha_token = sacha_login.json()["token"]
+
+    # 7. Sacha successfully updates asking price
+    owner_patch = client.patch(
+        f"/api/listings/{listing_id}/price",
+        headers={"x-session-token": sacha_token},
+        json={"price": 55.0},
+    )
+    assert owner_patch.status_code == 200
+    assert owner_patch.json()["price"] == 55.0
+
+    # 8. Sacha successfully deletes their own listing
+    owner_del = client.delete(
+        f"/api/listings/{listing_id}",
+        headers={"x-session-token": sacha_token},
+    )
+    assert owner_del.status_code == 200
+    assert owner_del.json()["status"] == "success"
+
+
+def test_security_orders_access_control(test_env):
+    client = test_env["client"]
+
+    # 1. Anonymous request to /api/orders (must fail with 401 Unauthorized)
+    anon_orders = client.get("/api/orders")
+    assert anon_orders.status_code == 401
+    assert "Authentification requise" in anon_orders.json()["detail"]
+
+    # 2. Admin logs in
+    login_admin = client.post("/api/users/login", json={"username": "chen", "password": "PokeAdmin2026!"})
+    assert login_admin.status_code == 200
+    admin_token = login_admin.json()["token"]
+
+    # 3. Admin can view platform orders
+    admin_orders = client.get("/api/orders", headers={"x-session-token": admin_token})
+    assert admin_orders.status_code == 200
+    assert isinstance(admin_orders.json(), list)
+
+
+def test_security_messaging_bola_and_regex_sanitization(test_env):
+    client = test_env["client"]
+
+    # Sacha logs in
+    sacha_login = client.post("/api/users/login", json={"username": "sacha", "password": ""})
+    sacha_token = sacha_login.json()["token"]
+
+    # Regis logs in
+    regis_login = client.post(
+        "/api/users/register",
+        json={"username": "regis_oak", "name": "Régis", "password": "pwd"},
+    )
+    assert regis_login.status_code == 200
+    regis_token = regis_login.json()["token"]
+
+    # 1. Sacha can legitimately access their own thread
+    sacha_thread = client.get(
+        "/api/messages/thread?listing_id=sv3pt5-006&user_a=Sacha&user_b=Ondine",
+        headers={"x-session-token": sacha_token},
+    )
+    assert sacha_thread.status_code == 200
+
+    # 2. Regis attempts to eavesdrop on Sacha and Ondine's thread (BOLA: must fail with 403)
+    eavesdrop_res = client.get(
+        "/api/messages/thread?listing_id=sv3pt5-006&user_a=Sacha&user_b=Ondine",
+        headers={"x-session-token": regis_token},
+    )
+    assert eavesdrop_res.status_code == 403
+    assert "vous n'êtes pas participant" in eavesdrop_res.json()["detail"]
+
+    # 2. Regis attempts to spy on Sacha's conversations list (must fail with 403)
+    eavesdrop_convs = client.get(
+        "/api/messages/conversations?username=Sacha",
+        headers={"x-session-token": regis_token},
+    )
+    assert eavesdrop_convs.status_code == 403
+    assert "consulter les conversations d'un autre utilisateur" in eavesdrop_convs.json()["detail"]
+
+    # 3. Regex special character injection in username parameter (must not crash or raise 500)
+    regex_res = client.get("/api/messages/conversations?username=.*")
+    assert regex_res.status_code == 200
+
+
 
 
 

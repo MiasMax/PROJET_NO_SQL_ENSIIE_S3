@@ -126,7 +126,10 @@ export default function App() {
     const username = currentUser.name || currentUser.username;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/messages/unread-count?username=${encodeURIComponent(username)}`);
+        const token = localStorage.getItem('pokevinted_token');
+        const res = await fetch(`/api/messages/unread-count?username=${encodeURIComponent(username)}`, {
+          headers: token ? { 'x-session-token': token } : {},
+        });
         if (res.ok) {
           const data = await res.json();
           setUnreadMessages(data.unread_total || 0);
@@ -158,6 +161,9 @@ export default function App() {
         if (res.ok) {
           const user = await res.json();
           setCurrentUser(user);
+          if (user.token) {
+            localStorage.setItem('pokevinted_token', user.token);
+          }
           try {
             localStorage.setItem('pokevinted_cached_user', JSON.stringify(user));
           } catch {}

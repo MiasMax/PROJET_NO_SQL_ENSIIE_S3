@@ -43,10 +43,14 @@ export default function EditListingPriceModal({
     setError(null);
 
     try {
+      const token = localStorage.getItem('pokevinted_token');
       const sellerHandle = currentUser?.name || currentUser?.username || listing.seller_name;
       const res = await fetch(`/api/listings/${listing.id}/price`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-session-token': token } : {}),
+        },
         body: JSON.stringify({
           price: parsedNewPrice,
           seller_name: sellerHandle,
