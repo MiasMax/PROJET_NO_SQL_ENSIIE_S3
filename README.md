@@ -11,10 +11,10 @@
 1. **Marketplace Moderne & Réactif (Style Vinted)** :
    * Consultation du catalogue officiel avec **images officielles HD** (*151, Flammes Obsidiennes, Écarlate et Violet, Faille Paradoxe*).
    * **Effet 3D Holographique interactif** au survol des cartes (inclinaison tilt et reflet spéculaire dynamique).
-   * **Top 5 Tendances en Direct (Redis ZSET)** : classement temps réel des cartes les plus vues mis à jour instantanément à chaque clic (`ZINCRBY` / `ZREVRANGE`).
+   * **Top 5 Tendances en Direct (Redis ZSET)** : classement temps réel des **annonces** les plus consultées, mis à jour à chaque consultation (`ZINCRBY` / `ZREVRANGE` sur `listings:trending_views`). Une annonce vendue ou supprimée est automatiquement retirée du classement (`ZREM`).
    * **Gestion de Sessions & Favoris (Redis)** :
      * Bascule instantanée de compte dresseur (Sacha, Ondine, Prof. Chen) avec session persistée en cache Redis (`TTL 24h`).
-     * Liste de favoris gérée en mémoire vive via des ensembles Redis Sets (`SADD` / `SREM` / `SMEMBERS`).
+     * Favoris gérés par **annonce** via des ensembles Redis Sets (`SADD` / `SREM` / `SMEMBERS`).
    * **Indicateur de Benchmark de Latence** : affichage en direct du gain de performance (`⚡ Cache Redis HIT : 0.4 ms` vs `🔍 Elasticsearch : 12 ms`).
    * Recherche instantanée tolérante aux fautes de frappe (*fuzzy search*) avec filtres par série, état d'usure et tri par prix.
 
@@ -28,7 +28,7 @@
 3. **Synergie JSON MongoDB + Elasticsearch & Dashboards Grafana** :
    * **Pipeline Document JSON fluide** : le schéma JSON flexible de MongoDB est directement indexé par Elasticsearch sans transformation complexe ni jointure SQL lourde.
    * **Agrégations analytiques natives** : Elasticsearch calcule à la volée le prix moyen par extension, la distribution par état et les ratios actifs/vendus.
-   * **Supervision Grafana (Port 3001)** : tableau de bord préconfiguré auto-provisionné interrogeant directement Elasticsearch comme Data Source.
+   * **Supervision Grafana (Port 3001)** : un dashboard **« PokéVinted — Analytics NoSQL & Elasticsearch »** auto-provisionné (datasource + dashboard par fichiers dans `grafana/provisioning/`, rien à configurer à la main). 5 panneaux rafraîchis toutes les 5 s : total d'annonces indexées, prix moyen global, répartition ACTIVE/SOLD, prix moyen par extension, et répartition par état d'usure.
 
 ---
 
@@ -84,7 +84,9 @@ cd PROJET_NO_SQL_ENSIIE_S3
 docker compose up --build
 ```
 
-Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalogue avec les cartes de référence et quelques annonces de départ.
+> ℹ️ **Aucune configuration requise** : le `docker-compose.yml` embarque des valeurs par défaut sûres, donc `docker compose up` fonctionne immédiatement après le clone, sans créer de `.env`. Pour la production (VPS), copiez `.env.example` vers `.env` et personnalisez les mots de passe — ils écraseront alors les valeurs par défaut.
+
+Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalogue avec les cartes de référence et des annonces de départ (indexées en masse dans Elasticsearch via une requête *bulk*).
 
 ### Points d'accès de l'application
 | Service | URL | Identifiants |
@@ -92,7 +94,7 @@ Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalo
 | **Marketplace (Frontend)** | `http://localhost:3000` | Accès libre |
 | **Documentation API (Swagger)** | `http://localhost:8000/docs` | Accès libre |
 | **Elasticsearch** | `http://localhost:9200` | Sans mot de passe |
-| **Grafana** | `http://localhost:3001` | `admin` / `Grafana_P0k3_Admin_2026!` (ou `.env`) |
+| **Grafana** | `http://localhost:3001` | `admin` / `ChangeMe_Grafana_Admin_Password!` (défaut, surchargeable via `.env`) |
 
 ---
 
@@ -161,6 +163,24 @@ docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! L
 ```
 > 👉 *Les compteurs atomiques ont été incrémentés et l'ID de l'annonce est en tête de file.*
 
+```bash
+# Top 5 des annonces les plus consultées (Sorted Set temps réel)
+docker exec -it pokevinted-redis redis-cli -a ChangeMe_P0k3V1nt3d_R3d1s_T0k3n! ZREVRANGE listings:trending_views 0 4 WITHSCORES
+```
+> 👉 *Le classement de popularité est tenu par un Redis Sorted Set, trié par nombre de consultations.*
+
+---
+
+## ⚠️ Limites Connues & Évolutions
+
+* **Double écriture non atomique** : une publication d'annonce écrit séquentiellement dans MongoDB, puis Elasticsearch, puis Redis. Il n'existe **pas de transaction distribuée** couvrant les trois systèmes.
+  * **Choix assumé** : **MongoDB est la source de vérité**. Elasticsearch et Redis sont des vues dérivées (recherche, cache, compteurs). Le classement de tendances filtre d'ailleurs à la lecture les annonces absentes ou vendues, pour ne jamais exposer un état incohérent avec Mongo.
+  * **Conséquence** : en cas de panne temporaire d'Elasticsearch ou de Redis au moment de l'écriture, l'index de recherche ou les compteurs peuvent diverger de Mongo.
+* **Pistes d'évolution** :
+  * **Change streams MongoDB** pour propager automatiquement les écritures vers Elasticsearch (nécessite un *replica set* Mongo).
+  * **[Monstache](https://github.com/rwynn/monstache)** : synchronisation continue MongoDB → Elasticsearch en side-car.
+  * Un endpoint de **réindexation** reconstruisant l'index Elasticsearch à partir de MongoDB (*bulk*) pour réparer toute divergence.
+
 ---
 
 ## 🧪 Tests Automatisés (TDD)
@@ -199,6 +219,8 @@ Pour déployer sur un VPS (OVH, Hetzner, DigitalOcean, AWS EC2, etc.) :
    docker compose up -d --build
    ```
 5. L'application est immédiatement accessible publiquement sur `http://<IP_DU_SERVEUR>:3000`.
+
+> 🌍 **Instance de démonstration déployée** : `http://<À_COMPLÉTER_APRÈS_DÉPLOIEMENT>`
 
 ---
 
