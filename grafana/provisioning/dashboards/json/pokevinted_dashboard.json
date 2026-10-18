@@ -13,151 +13,152 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "⚡ Métriques Clés & Recherche Elasticsearch",
+      "title": "💰 Santé du marché (agrégations Elasticsearch)",
       "type": "row"
     },
     {
       "id": 1,
-      "title": "Total Annonces Indexées (Elasticsearch)",
+      "title": "GMV — Chiffre d'affaires réalisé",
       "type": "stat",
       "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "pokevinted-elasticsearch"
-      },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-elasticsearch" },
       "targets": [
         {
-          "metrics": [{ "id": "1", "type": "count" }],
+          "metrics": [{ "id": "1", "type": "sum", "field": "price" }],
           "bucketAggs": [
-            {
-              "id": "2",
-              "type": "date_histogram",
-              "field": "created_at",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
+            { "id": "2", "type": "date_histogram", "field": "created_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
           ],
-          "query": "*",
+          "query": "status:SOLD",
           "refId": "A",
           "timeField": "created_at"
         }
       ],
+      "fieldConfig": { "defaults": { "unit": "currencyEUR", "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
       "options": {
         "colorMode": "value",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": ["sum"],
-          "fields": "",
-          "values": false
-        }
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
       }
     },
     {
       "id": 2,
-      "title": "Prix Moyen Global (€)",
+      "title": "Annonces vendues",
       "type": "stat",
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "pokevinted-elasticsearch"
-      },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-elasticsearch" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "created_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "status:SOLD",
+          "refId": "A",
+          "timeField": "created_at"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "orange" } }, "overrides": [] },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Prix moyen global (€)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-elasticsearch" },
       "targets": [
         {
           "metrics": [{ "id": "1", "type": "avg", "field": "price" }],
           "bucketAggs": [
-            {
-              "id": "2",
-              "type": "date_histogram",
-              "field": "created_at",
-              "settings": {
-                "interval": "auto"
-              }
-            }
+            { "id": "2", "type": "date_histogram", "field": "created_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
           ],
           "query": "*",
           "refId": "A",
           "timeField": "created_at"
         }
       ],
+      "fieldConfig": { "defaults": { "unit": "currencyEUR", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
       "options": {
         "colorMode": "value",
         "graphMode": "area",
-        "reduceOptions": { "calcs": ["mean"], "values": false }
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }
       }
     },
     {
-      "id": 3,
-      "title": "Répartition des Statuts (ACTIVE vs SOLD)",
-      "type": "piechart",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 1 },
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "pokevinted-elasticsearch"
-      },
+      "id": 4,
+      "title": "Carte la plus chère en vente (€)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-elasticsearch" },
       "targets": [
         {
+          "metrics": [{ "id": "1", "type": "max", "field": "price" }],
           "bucketAggs": [
-            { "field": "status", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "5" }, "type": "terms" }
+            { "id": "2", "type": "date_histogram", "field": "created_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
-          "refId": "A"
+          "query": "status:ACTIVE",
+          "refId": "A",
+          "timeField": "created_at"
         }
-      ]
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyEUR", "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["max"], "fields": "", "values": false }
+      }
     },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
       "id": 101,
-      "title": "📊 Analyses Avancées par Extension & Rareté (JSON Aggregations)",
+      "title": "📈 Activité du marché dans le temps",
       "type": "row"
     },
     {
-      "id": 4,
-      "title": "Prix Moyen par Série / Extension Pokémon",
-      "type": "bargauge",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "pokevinted-elasticsearch"
-      },
+      "id": 5,
+      "title": "Ventes réalisées vs nouvelles annonces",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-elasticsearch" },
       "targets": [
         {
+          "metrics": [{ "id": "1", "type": "count" }],
           "bucketAggs": [
-            { "field": "set_name.keyword", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "1", "size": "10" }, "type": "terms" }
+            { "id": "2", "type": "date_histogram", "field": "created_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
           ],
-          "metrics": [{ "field": "price", "id": "1", "type": "avg" }],
           "query": "*",
-          "refId": "A"
+          "refId": "A",
+          "alias": "Nouvelles annonces",
+          "timeField": "created_at"
+        },
+        {
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "sold_at", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "status:SOLD",
+          "refId": "B",
+          "alias": "Ventes",
+          "timeField": "sold_at"
         }
       ],
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "showUnfilled": true
-      }
-    },
-    {
-      "id": 5,
-      "title": "Nombre d'annonces par État d'usure",
-      "type": "bargauge",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "pokevinted-elasticsearch"
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1, "showPoints": "never", "stacking": { "mode": "none" } } },
+        "overrides": []
       },
-      "targets": [
-        {
-          "bucketAggs": [
-            { "field": "condition", "id": "2", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "5" }, "type": "terms" }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
-          "refId": "A"
-        }
-      ]
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
     }
   ],
   "refresh": "5s",
@@ -165,7 +166,7 @@
   "style": "dark",
   "tags": ["pokevinted", "nosql", "elasticsearch"],
   "time": {
-    "from": "now-7d",
+    "from": "now-90d",
     "to": "now"
   },
   "timepicker": {
@@ -174,5 +175,5 @@
   "timezone": "browser",
   "title": "PokéVinted — Analytics NoSQL & Elasticsearch",
   "uid": "pokevinted-analytics",
-  "version": 1
+  "version": 3
 }
