@@ -95,6 +95,7 @@ export default function SellCardModal({
   onClose,
   onListingCreated,
   catalogCards = [],
+  initialCardId = null,
   currentUser,
   onOpenLogin,
 }) {
@@ -137,21 +138,37 @@ export default function SellCardModal({
     }
   }, [currentUser]);
 
-  // Set default selected card
+  // Set default selected card (only when no specific card was requested)
   useEffect(() => {
-    if (catalog.length > 0 && !selectedCardId) {
+    if (catalog.length > 0 && !selectedCardId && !initialCardId) {
       setSelectedCardId(catalog[0].id);
       setPrice(catalog[0].market_price ? catalog[0].market_price.toString() : '20');
     }
-  }, [catalog, selectedCardId]);
+  }, [catalog, selectedCardId, initialCardId]);
 
-  // Reset step to 1 when modal is opened
+  // Reset step when modal is opened. When a specific card was requested
+  // (e.g. "Vendre cette carte" from a booster pull), the pre-select effect below
+  // jumps straight to step 2, so only reset to step 1 for the generic flow.
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
       setError(null);
+      if (!initialCardId) setStep(1);
     }
-  }, [isOpen]);
+  }, [isOpen, initialCardId]);
+
+  // Pre-select a card passed from the parent (booster pull) and jump to pricing.
+  useEffect(() => {
+    if (!isOpen || !initialCardId || catalog.length === 0) return;
+    const card = catalog.find((c) => c.id === initialCardId);
+    if (card) {
+      setSelectedCardId(card.id);
+      setPrice(card.market_price ? card.market_price.toFixed(2) : '20');
+      setStep(2);
+    } else {
+      // Requested card not in catalog: fall back to manual selection.
+      setStep(1);
+    }
+  }, [isOpen, initialCardId, catalog]);
 
   const selectedCard = useMemo(() => {
     return catalog.find((c) => c.id === selectedCardId) || catalog[0] || null;

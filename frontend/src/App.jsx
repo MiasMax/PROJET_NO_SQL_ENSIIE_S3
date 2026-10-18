@@ -101,6 +101,7 @@ export default function App() {
 
   // Modals
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  const [sellInitialCardId, setSellInitialCardId] = useState(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -443,12 +444,16 @@ export default function App() {
     }
   };
 
-  const handleOpenSell = () => {
+  const handleOpenSell = (cardId) => {
     if (!currentUser) {
       showToast("🔒 Veuillez vous connecter pour vendre une carte.");
       setIsLoginModalOpen(true);
       return;
     }
+    // cardId is only a real id when called with one (e.g. "Vendre cette carte"
+    // after a booster pull). When used directly as an onClick handler it receives
+    // a DOM event, so only keep string ids.
+    setSellInitialCardId(typeof cardId === 'string' ? cardId : null);
     setIsSellModalOpen(true);
   };
 
@@ -976,9 +981,10 @@ export default function App() {
       {/* Global Modals */}
       <SellCardModal
         isOpen={isSellModalOpen}
-        onClose={() => setIsSellModalOpen(false)}
+        onClose={() => { setIsSellModalOpen(false); setSellInitialCardId(null); }}
         onListingCreated={handleListingCreated}
         catalogCards={catalogCards}
+        initialCardId={sellInitialCardId}
         currentUser={currentUser}
         onOpenLogin={() => setIsLoginModalOpen(true)}
       />
