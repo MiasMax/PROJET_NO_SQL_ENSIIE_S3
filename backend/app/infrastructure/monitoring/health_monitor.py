@@ -14,10 +14,10 @@ signal that Elasticsearch was unavailable.
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from elasticsearch import AsyncElasticsearch
-from motor.motor_asyncio import AsyncIOMotorClient
 from redis.asyncio import Redis
 
 from app.infrastructure.persistence.elastic.client import HEALTH_INDEX
@@ -38,7 +38,7 @@ async def _probe(name: str, container: str, coro) -> dict:
         logger.debug("Health probe failed for %s: %s", name, exc)
     latency_ms = round((time.perf_counter() - started) * 1000, 2)
     return {
-        "@timestamp": datetime.now(timezone.utc).isoformat(),
+        "@timestamp": datetime.now(UTC).isoformat(),
         "service": name,
         "container": container,
         "status": status,
@@ -48,7 +48,7 @@ async def _probe(name: str, container: str, coro) -> dict:
 
 
 async def _collect(
-    mongo_client: AsyncIOMotorClient,
+    mongo_client: Any,
     elastic_client: AsyncElasticsearch,
     redis_client: Redis,
 ) -> list[dict]:
@@ -61,7 +61,7 @@ async def _collect(
     # The backend is necessarily up if this loop is executing.
     docs.append(
         {
-            "@timestamp": datetime.now(timezone.utc).isoformat(),
+            "@timestamp": datetime.now(UTC).isoformat(),
             "service": "Backend API",
             "container": "pokevinted-backend",
             "status": 1,
@@ -73,7 +73,7 @@ async def _collect(
 
 
 async def run_health_monitor(
-    mongo_client: AsyncIOMotorClient,
+    mongo_client: Any,
     elastic_client: AsyncElasticsearch,
     redis_client: Redis,
     interval: int = HEALTH_PROBE_INTERVAL_SECONDS,
