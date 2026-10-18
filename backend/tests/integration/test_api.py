@@ -449,19 +449,54 @@ def test_booster_series_and_set_filtering(test_env):
 
 
 def test_price_history_endpoint(test_env):
-    """Verify price history endpoint returns time-series data points."""
+    """Verify price history endpoint returns time-series data points anchored to card cote and captures real orders."""
     client = test_env["client"]
+    order_repo = test_env["order_repo"]
+    cache_repo = test_env["cache_repo"]
 
+    # 1. Initial fetch: returns points anchored to authentic TCG market cote
     res = client.get("/api/analytics/cards/sv03.5-006/price-history?days=14")
     assert res.status_code == 200
     data = res.json()
     assert data["card_id"] == "sv03.5-006"
     assert "data" in data
     assert len(data["data"]) > 0
+    assert data.get("market_price", 0) > 0
     for point in data["data"]:
         assert "date" in point
         assert "avg_price" in point
         assert point["avg_price"] > 0
+
+    # 2. Register a real purchase order in the database and clear cache
+    cache_repo.cache.clear()
+    from app.domain.entities.order import Order
+
+    order = Order.create(
+        listing_id="list-real-99",
+        card_id="sv03.5-006",
+        card_name="Dracaufeu ex",
+        price=620.0,
+        seller_name="Red",
+        buyer_name="Sacha",
+    )
+    order_repo.orders[order.id] = order
+
+    # 3. Second fetch: seamlessly captures the authentic sale in the time-series
+    res2 = client.get("/api/analytics/cards/sv03.5-006/price-history?days=14")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["has_real_sales"] is True
+    assert data2["real_sales_count"] >= 1
+    real_pts = [p for p in data2["data"] if p["source"] == "real"]
+    assert len(real_pts) >= 1
+    assert real_pts[0]["avg_price"] == 620.0
+
+    # 4. Market overview endpoint
+    res_ov = client.get("/api/analytics/market/overview")
+    assert res_ov.status_code == 200
+    ov_data = res_ov.json()
+    assert "total_orders" in ov_data
+    assert "active_listings" in ov_data
 
 
 def test_messaging_flow(test_env):

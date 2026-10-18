@@ -97,5 +97,6 @@ class PurchaseListingUseCase:
         await self.cache_repo.remove_trending_listing(command.listing_id)
         await self.cache_repo.delete("cache:marketplace:recent")
         await self.cache_repo.delete_pattern("cache:listings:*")
+        await self.cache_repo.delete_pattern("cache:analytics:*")
 
         return order

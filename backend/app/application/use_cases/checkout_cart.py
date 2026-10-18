@@ -123,6 +123,7 @@ class CheckoutCartUseCase:
             await self.cache_repo.remove_trending_listing(order.listing_id)
         await self.cache_repo.delete("cache:marketplace:recent")
         await self.cache_repo.delete_pattern("cache:listings:*")
+        await self.cache_repo.delete_pattern("cache:analytics:*")
 
         return CheckoutCartResult(
             orders=orders,
