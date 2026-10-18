@@ -9,13 +9,51 @@ import {
   VolumeX,
   Flame,
   Trophy,
-  Tag,
   Layers,
   ArrowRight,
   ArrowLeft,
   CheckCircle,
   HelpCircle,
+  Eye,
+  Bookmark,
+  BookmarkCheck,
+  RotateCcw,
 } from 'lucide-react';
+
+// ─── POKÉMON CARD BACK FALLBACK (Vector SVG) ────────────────────────────────
+export const POKEMON_CARD_BACK_FALLBACK =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+    <radialGradient id="ballGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="60%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </radialGradient>
+  </defs>
+  <rect width="300" height="420" rx="16" fill="url(#bg)"/>
+  <rect x="10" y="10" width="280" height="400" rx="12" fill="none" stroke="url(#borderGrad)" stroke-width="2" opacity="0.6"/>
+  <circle cx="150" cy="200" r="56" fill="#0f172a" stroke="#6366f1" stroke-width="4"/>
+  <path d="M 94 200 A 56 56 0 0 1 206 200 Z" fill="url(#ballGrad)"/>
+  <path d="M 94 200 A 56 56 0 0 0 206 200 Z" fill="#f8fafc"/>
+  <line x1="94" y1="200" x2="206" y2="200" stroke="#0f172a" stroke-width="8"/>
+  <circle cx="150" cy="200" r="18" fill="#0f172a"/>
+  <circle cx="150" cy="200" r="12" fill="#f8fafc" stroke="#6366f1" stroke-width="2"/>
+  <text x="150" y="315" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#a5b4fc" text-anchor="middle" letter-spacing="3">POKÉVINTED</text>
+  <text x="150" y="335" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#64748b" text-anchor="middle">OFFICIAL TRADING CARD</text>
+</svg>
+`);
 
 // ─── Pure Web Audio API Sound Synthesizer ──────────────────────────────────
 const playBoosterAudio = (type, enabled = true) => {
@@ -28,41 +66,41 @@ const playBoosterAudio = (type, enabled = true) => {
 
     if (type === 'tear') {
       // Crisp metallic foil tearing sound
-      const bufferSize = Math.floor(ctx.sampleRate * 0.35);
+      const bufferSize = Math.floor(ctx.sampleRate * 0.4);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.09));
+        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1600, now);
-      filter.Q.setValueAtTime(2.8, now);
+      filter.frequency.setValueAtTime(1800, now);
+      filter.Q.setValueAtTime(3.0, now);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
       noise.start(now);
     } else if (type === 'flip') {
-      // Clean card swoosh
+      // Clean card glide swoosh
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(260, now);
-      osc.frequency.exponentialRampToValueAtTime(560, now + 0.12);
-      gain.gain.setValueAtTime(0.2, now);
+      osc.frequency.setValueAtTime(280, now);
+      osc.frequency.exponentialRampToValueAtTime(620, now + 0.12);
+      gain.gain.setValueAtTime(0.22, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.15);
     } else if (type === 'holo') {
-      // Dual crystalline shimmer
-      [880, 1320, 1760].forEach((freq, idx) => {
+      // High-pitched crystalline shimmer
+      [900, 1350, 1800].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
@@ -75,19 +113,19 @@ const playBoosterAudio = (type, enabled = true) => {
         osc.stop(now + idx * 0.05 + 0.5);
       });
     } else if (type === 'god_pull') {
-      // Grand major fanfare arpeggio
-      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+      // Grand celebratory fanfare arpeggio
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + i * 0.08);
-        gain.gain.setValueAtTime(0.24, now + i * 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.7);
+        osc.frequency.setValueAtTime(freq, now + i * 0.07);
+        gain.gain.setValueAtTime(0.28, now + i * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.7);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + i * 0.08);
-        osc.stop(now + i * 0.08 + 0.75);
+        osc.start(now + i * 0.07);
+        osc.stop(now + i * 0.07 + 0.75);
       });
     }
   } catch {
@@ -97,7 +135,7 @@ const playBoosterAudio = (type, enabled = true) => {
 
 // ─── Rarity Configuration & Styling ─────────────────────────────────────────
 const RARITY_CONFIG = {
-  'Commune': {
+  Commune: {
     color: '#9ca3af',
     glow: 'rgba(156,163,175,0.3)',
     border: 'rgba(156,163,175,0.4)',
@@ -113,7 +151,7 @@ const RARITY_CONFIG = {
     bg: 'bg-emerald-950/80',
     tier: 2,
   },
-  'Rare': {
+  Rare: {
     color: '#60a5fa',
     glow: 'rgba(96,165,250,0.5)',
     border: 'rgba(96,165,250,0.6)',
@@ -202,7 +240,7 @@ const FALLBACK_SERIES = [
     badge: 'Édition Culte Kanto',
     description: 'Le retour légendaire des 151 premiers Pokémon avec Dracaufeu SAR, Tortank et Florizarre.',
     chase_cards: [
-      { name: 'Dracaufeu ex', rarity: 'Illustration spéciale rare', price: 340.70, image: 'https://assets.tcgdex.net/fr/sv/sv03.5/199/low.webp' },
+      { name: 'Dracaufeu ex', rarity: 'Illustration spéciale rare', price: 340.7, image: 'https://assets.tcgdex.net/fr/sv/sv03.5/199/low.webp' },
       { name: 'Tortank ex', rarity: 'Illustration spéciale rare', price: 142.86, image: 'https://assets.tcgdex.net/fr/sv/sv03.5/200/low.webp' },
       { name: 'Florizarre ex', rarity: 'Illustration spéciale rare', price: 109.04, image: 'https://assets.tcgdex.net/fr/sv/sv03.5/198/low.webp' },
     ],
@@ -218,11 +256,11 @@ const FALLBACK_SERIES = [
     theme_gradient: 'from-amber-400 via-yellow-500 to-indigo-900',
     accent_color: '#eab308',
     badge: 'Apogée Électrique',
-    description: 'L\'apogée électrique de Pikachu ex Téracristal Stellaire et les dragons légendaires Latias & Latios.',
+    description: "L'apogée électrique de Pikachu ex Téracristal Stellaire et les dragons légendaires Latias & Latios.",
     chase_cards: [
       { name: 'Pikachu ex', rarity: 'Illustration spéciale rare', price: 299.86, image: 'https://assets.tcgdex.net/fr/sv/sv08/238/low.webp' },
       { name: 'Pikachu ex (Gold)', rarity: 'Hyper rare', price: 60.16, image: 'https://assets.tcgdex.net/fr/sv/sv08/247/low.webp' },
-      { name: 'Latias ex', rarity: 'Illustration spéciale rare', price: 185.00, image: 'https://assets.tcgdex.net/fr/sv/sv08/239/low.webp' },
+      { name: 'Latias ex', rarity: 'Illustration spéciale rare', price: 185.0, image: 'https://assets.tcgdex.net/fr/sv/sv08/239/low.webp' },
     ],
   },
   {
@@ -236,11 +274,11 @@ const FALLBACK_SERIES = [
     theme_gradient: 'from-cyan-400 via-teal-500 to-indigo-950',
     accent_color: '#06b6d4',
     badge: 'Téracristal Stellaire',
-    description: 'Les mystères du Cratère de Paldea révélés avec Terapagos ex Stellaire et l\'Institut Myrtille.',
+    description: "Les mystères du Cratère de Paldea révélés avec Terapagos ex Stellaire et l'Institut Myrtille.",
     chase_cards: [
       { name: 'Terapagos ex', rarity: 'Illustration spéciale rare', price: 31.14, image: 'https://assets.tcgdex.net/fr/sv/sv07/170/low.webp' },
-      { name: 'Pomdorochi ex', rarity: 'Ultra Rare', price: 28.50, image: 'https://assets.tcgdex.net/fr/sv/sv07/156/low.webp' },
-      { name: 'Lokhlass ex', rarity: 'Ultra Rare', price: 22.00, image: 'https://assets.tcgdex.net/fr/sv/sv07/158/low.webp' },
+      { name: 'Pomdorochi ex', rarity: 'Ultra Rare', price: 28.5, image: 'https://assets.tcgdex.net/fr/sv/sv07/156/low.webp' },
+      { name: 'Lokhlass ex', rarity: 'Ultra Rare', price: 22.0, image: 'https://assets.tcgdex.net/fr/sv/sv07/158/low.webp' },
     ],
   },
   {
@@ -249,16 +287,16 @@ const FALLBACK_SERIES = [
     series: 'Écarlate et Violet',
     code: 'PRE',
     release_year: '2025',
-    card_count: 180,
+    card_count: 175,
     pack_image: '/boosters/sv08.5.jpg',
-    theme_gradient: 'from-pink-500 via-purple-600 to-sky-500',
+    theme_gradient: 'from-pink-500 via-purple-600 to-amber-500',
     accent_color: '#ec4899',
-    badge: 'Évolitions Spéciales',
-    description: 'L\'extension célébrant Évoli et toutes ses Évolitions dans des versions féeriques.',
+    badge: 'Évolitions Téracristal',
+    description: 'Les 8 évolutions emblématiques d\'Évoli sublimées par les cristaux stellaires et les dorures.',
     chase_cards: [
-      { name: 'Phyllali ex', rarity: 'Illustration spéciale rare', price: 211.34, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/144/low.webp' },
-      { name: 'Pyroli ex', rarity: 'Illustration spéciale rare', price: 166.85, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/146/low.webp' },
-      { name: 'Malvalame ex', rarity: 'Illustration spéciale rare', price: 70.14, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/147/low.webp' },
+      { name: 'Noctali ex', rarity: 'Illustration spéciale rare', price: 380.0, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/161/low.webp' },
+      { name: 'Mentali ex', rarity: 'Illustration spéciale rare', price: 195.0, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/155/low.webp' },
+      { name: 'Évoli ex', rarity: 'Illustration spéciale rare', price: 160.0, image: 'https://assets.tcgdex.net/fr/sv/sv08.5/143/low.webp' },
     ],
   },
   {
@@ -269,14 +307,13 @@ const FALLBACK_SERIES = [
     release_year: '2024',
     card_count: 245,
     pack_image: '/boosters/sv04.5.jpg',
-    theme_gradient: 'from-violet-600 via-purple-800 to-slate-950',
+    theme_gradient: 'from-violet-500 via-indigo-600 to-slate-900',
     accent_color: '#8b5cf6',
     badge: 'Pokémon Chromatiques',
-    description: 'Le paradis des Pokémon chromatiques avec l\'incontournable Dracaufeu ex Noir Brillant.',
+    description: 'La fête des Pokémon Shiny et les illustrations alternatives exclusives de Dracaufeu & Mew.',
     chase_cards: [
-      { name: 'Dracaufeu ex Shiny', rarity: 'Illustration spéciale rare', price: 356.33, image: 'https://assets.tcgdex.net/fr/sv/sv04.5/234/low.webp' },
-      { name: 'Mew ex Shiny', rarity: 'Illustration spéciale rare', price: 128.50, image: 'https://assets.tcgdex.net/fr/sv/sv04.5/232/low.webp' },
-      { name: 'Dracaufeu ex', rarity: 'Double rare', price: 14.80, image: 'https://assets.tcgdex.net/fr/sv/sv04.5/054/low.webp' },
+      { name: 'Dracaufeu ex Shiny', rarity: 'Illustration spéciale rare', price: 135.0, image: 'https://assets.tcgdex.net/fr/sv/sv04.5/234/low.webp' },
+      { name: 'Mew ex Shiny', rarity: 'Illustration spéciale rare', price: 110.0, image: 'https://assets.tcgdex.net/fr/sv/sv04.5/232/low.webp' },
     ],
   },
   {
@@ -287,14 +324,13 @@ const FALLBACK_SERIES = [
     release_year: '2024',
     card_count: 218,
     pack_image: '/boosters/sv05.jpg',
-    theme_gradient: 'from-emerald-500 via-teal-600 to-slate-900',
-    accent_color: '#10b981',
+    theme_gradient: 'from-blue-500 via-cyan-600 to-emerald-800',
+    accent_color: '#3b82f6',
     badge: 'Temps Passé & Futur',
-    description: 'Le choc des époques entre Pokémon Temps Passé et Temps Futur avec les cartes HIGH-TECH.',
+    description: 'La collision entre Pokémon Temps Passé et Futur avec Serpente-Eau ex et Ire-Foudre ex.',
     chase_cards: [
-      { name: 'Ire-Foudre ex', rarity: 'Illustration spéciale rare', price: 115.00, image: 'https://assets.tcgdex.net/fr/sv/sv05/208/low.webp' },
-      { name: 'Serpente-Eau ex', rarity: 'Illustration spéciale rare', price: 95.00, image: 'https://assets.tcgdex.net/fr/sv/sv05/205/low.webp' },
-      { name: 'Attrape-Suprême', rarity: 'HIGH-TECH rare', price: 38.00, image: 'https://assets.tcgdex.net/fr/sv/sv05/157/low.webp' },
+      { name: 'Ire-Foudre ex', rarity: 'Illustration spéciale rare', price: 115.0, image: 'https://assets.tcgdex.net/fr/sv/sv05/208/low.webp' },
+      { name: 'Serpente-Eau ex', rarity: 'Illustration spéciale rare', price: 65.0, image: 'https://assets.tcgdex.net/fr/sv/sv05/205/low.webp' },
     ],
   },
   {
@@ -308,11 +344,11 @@ const FALLBACK_SERIES = [
     theme_gradient: 'from-teal-400 via-emerald-600 to-purple-900',
     accent_color: '#14b8a6',
     badge: 'Festival de Septentria',
-    description: 'Le festival traditionnel de Septentria et les masques mythiques d\'Ogerpon avec Amphinobi ex.',
+    description: "Le festival traditionnel de Septentria et les masques mythiques d'Ogerpon avec Amphinobi ex.",
     chase_cards: [
-      { name: 'Amphinobi ex', rarity: 'Illustration spéciale rare', price: 240.00, image: 'https://assets.tcgdex.net/fr/sv/sv06/214/low.webp' },
-      { name: 'Carmine', rarity: 'Illustration spéciale rare', price: 110.00, image: 'https://assets.tcgdex.net/fr/sv/sv06/217/low.webp' },
-      { name: 'Ogerpon Masque Turquoise ex', rarity: 'Illustration spéciale rare', price: 42.00, image: 'https://assets.tcgdex.net/fr/sv/sv06/211/low.webp' },
+      { name: 'Amphinobi ex', rarity: 'Illustration spéciale rare', price: 240.0, image: 'https://assets.tcgdex.net/fr/sv/sv06/214/low.webp' },
+      { name: 'Carmine', rarity: 'Illustration spéciale rare', price: 110.0, image: 'https://assets.tcgdex.net/fr/sv/sv06/217/low.webp' },
+      { name: 'Ogerpon Masque Turquoise ex', rarity: 'Illustration spéciale rare', price: 42.0, image: 'https://assets.tcgdex.net/fr/sv/sv06/211/low.webp' },
     ],
   },
   {
@@ -326,44 +362,201 @@ const FALLBACK_SERIES = [
     theme_gradient: 'from-fuchsia-600 via-purple-900 to-zinc-950',
     accent_color: '#c026d3',
     badge: 'Ombres & Toxines',
-    description: 'L\'influence toxique de Pêchaminus et des Adorables Trois dans une ambiance mystique obscure.',
+    description: "L'influence toxique de Pêchaminus et des Adorables Trois dans une ambiance mystique obscure.",
     chase_cards: [
-      { name: 'Félinferno ex', rarity: 'Illustration spéciale rare', price: 68.00, image: 'https://assets.tcgdex.net/fr/sv/sv06.5/094/low.webp' },
-      { name: 'Pêchaminus ex', rarity: 'Illustration spéciale rare', price: 55.00, image: 'https://assets.tcgdex.net/fr/sv/sv06.5/095/low.webp' },
+      { name: 'Félinferno ex', rarity: 'Illustration spéciale rare', price: 68.0, image: 'https://assets.tcgdex.net/fr/sv/sv06.5/094/low.webp' },
+      { name: 'Pêchaminus ex', rarity: 'Illustration spéciale rare', price: 55.0, image: 'https://assets.tcgdex.net/fr/sv/sv06.5/095/low.webp' },
     ],
   },
 ];
 
-// ─── Official Pokémon Card Back Component ───────────────────────────────────
-function PokemonCardBack() {
+// ─── Official Authentic Pokémon Card Back Component ────────────────────────
+export function PokemonCardBack({ className = '', style = {} }) {
   return (
     <div
-      className="w-full h-full rounded-2xl relative overflow-hidden select-none"
-      style={{
-        background: 'radial-gradient(ellipse at center, #1b357d 0%, #0c1842 60%, #050b24 100%)',
-        border: '3px solid #233b85',
-        boxShadow: 'inset 0 0 14px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.6)',
-      }}
+      className={`w-full h-full rounded-2xl relative overflow-hidden select-none bg-[#111936] shadow-xl ${className}`}
+      style={style}
     >
-      <div className="absolute inset-1.5 rounded-xl border-2 border-amber-600/60 pointer-events-none" />
-      <div
-        className="absolute inset-0 opacity-40 mix-blend-screen"
-        style={{
-          background: 'radial-gradient(circle at 50% 50%, rgba(99,102,241,0.5) 0%, transparent 60%)',
+      <img
+        src="/images/pokemon-card-back.jpg"
+        alt="Dos officiel de carte Pokémon"
+        className="w-full h-full object-cover rounded-2xl pointer-events-none select-none"
+        draggable={false}
+        onError={(e) => {
+          e.currentTarget.src = POKEMON_CARD_BACK_FALLBACK;
         }}
       />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-24 h-24 rounded-full border-4 border-amber-400/80 flex items-center justify-center shadow-[0_0_20px_rgba(251,191,36,0.3)]">
-          <div className="w-16 h-16 rounded-full bg-slate-900/90 border-2 border-amber-300 flex items-center justify-center">
-            <div className="w-6 h-6 rounded-full bg-amber-400 shadow-inner" />
+      {/* Subtle edge highlight */}
+      <div className="absolute inset-0 rounded-2xl border border-blue-400/20 pointer-events-none" />
+    </div>
+  );
+}
+
+// ─── 3D Card Inspector Modal (For Fun Simulation Showcase) ──────────────────
+function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isFlipped, setIsFlipped] = useState(false);
+  const cardRef = useRef(null);
+
+  if (!card) return null;
+  const cfg = getRarityCfg(card.pull_rarity || card.rarity);
+
+  const handleMouseMove = (e) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 30;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -30;
+    setTilt({ x, y });
+  };
+
+  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
+
+  return (
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col md:flex-row items-center gap-8 max-w-4xl p-6 rounded-3xl bg-slate-900/90 border border-white/10 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-xl text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors z-20"
+          title="Fermer"
+        >
+          <X size={20} />
+        </button>
+
+        {/* 3D Card Stage */}
+        <div
+          ref={cardRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          className="relative select-none cursor-grab active:cursor-grabbing"
+          style={{
+            width: '300px',
+            height: '420px',
+            perspective: '1200px',
+          }}
+        >
+          <div
+            className="w-full h-full relative transition-transform duration-300 ease-out"
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: `rotateY(${tilt.x + (isFlipped ? 180 : 0)}deg) rotateX(${tilt.y}deg)`,
+              boxShadow: `0 25px 50px -12px rgba(0,0,0,0.8), 0 0 40px ${cfg.glow}`,
+            }}
+          >
+            {/* FRONT FACE */}
+            <div
+              className="absolute inset-0 rounded-2xl overflow-hidden bg-slate-950 border-2"
+              style={{
+                backfaceVisibility: 'hidden',
+                borderColor: cfg.color,
+              }}
+            >
+              <img
+                src={card.image_large || card.image_small || '/placeholder-card.png'}
+                alt={card.name}
+                className="w-full h-full object-cover"
+              />
+              {/* Holographic light reflection */}
+              {(card.is_holo || card.is_hit || card.is_reverse) && (
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-50 mix-blend-color-dodge transition-opacity"
+                  style={{
+                    background: `radial-gradient(circle at ${50 + tilt.x * 2}% ${50 - tilt.y * 2}%, rgba(255,255,255,0.85) 0%, rgba(255,200,255,0.3) 30%, transparent 60%)`,
+                  }}
+                />
+              )}
+            </div>
+
+            {/* BACK FACE (Official Card Back) */}
+            <div
+              className="absolute inset-0 rounded-2xl overflow-hidden"
+              style={{
+                backfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)',
+              }}
+            >
+              <PokemonCardBack />
+            </div>
           </div>
         </div>
-      </div>
-      <div className="absolute top-4 left-0 right-0 text-center font-black tracking-widest text-amber-400 text-xs uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-        Pokémon
-      </div>
-      <div className="absolute bottom-4 left-0 right-0 text-center font-black tracking-widest text-amber-400 text-[10px] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-        Trading Card Game
+
+        {/* Card Details & Actions */}
+        <div className="flex flex-col justify-between max-w-sm space-y-4 text-left">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full border shadow-sm"
+                style={{
+                  background: `${cfg.color}20`,
+                  borderColor: cfg.border,
+                  color: cfg.color,
+                }}
+              >
+                {card.pull_rarity || card.rarity}
+              </span>
+              {card.is_hit && (
+                <span className="flex items-center gap-1 text-xs font-black text-amber-400">
+                  <Star size={13} fill="currentColor" />
+                  <span>Hit Majeur</span>
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-2xl font-black text-white">{card.name}</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Extension <strong className="text-white">{card.set_name}</strong> • N° {card.number}
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">Cote indicative marché</span>
+              <span className="text-base font-black text-emerald-400">
+                {card.market_price ? `${card.market_price.toFixed(2)} €` : '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">État de sortie de booster</span>
+              <span className="font-bold text-amber-300">Neuf (MINT / Pack Fresh)</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-400">Mode</span>
+              <span className="font-bold text-violet-300">Simulation de Collection</span>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={() => setIsFlipped(!isFlipped)}
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={14} />
+              <span>{isFlipped ? 'Voir le recto' : 'Retourner la carte (Verso)'}</span>
+            </button>
+
+            <button
+              onClick={() => onToggleSave(card.id)}
+              className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                isSaved
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                  : 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-lg'
+              }`}
+            >
+              {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+              <span>{isSaved ? 'Enregistrée dans mon classeur' : 'Conserver dans mon classeur'}</span>
+            </button>
+          </div>
+
+          <p className="text-[11px] text-gray-400 text-center italic">
+            Carte virtuelle tirée pour le plaisir de collectionner • Non vendable sur la marketplace.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -391,7 +584,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       className={`relative select-none cursor-pointer group transition-transform duration-200 ${
-        isShaking ? 'animate-[shake_0.25s_infinite]' : ''
+        isShaking ? 'animate-[shake_0.2s_infinite]' : ''
       }`}
       style={{
         width: '320px',
@@ -402,7 +595,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
     >
       {/* 3D tilt container */}
       <div
-        className="w-full h-full relative transition-transform duration-200 ease-out"
+        className="w-full h-full relative transition-transform duration-300 ease-out"
         style={{
           transform: `rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
           transformStyle: 'preserve-3d',
@@ -410,27 +603,27 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
       >
         {/* Ambient atmospheric backlight matching series theme */}
         <div
-          className="absolute inset-4 rounded-3xl blur-3xl opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none"
+          className="absolute inset-4 rounded-3xl blur-3xl opacity-50 group-hover:opacity-80 transition-opacity pointer-events-none"
           style={{ background: series.accent_color }}
         />
 
         {/* Cards emerging from inside the torn booster wrapper */}
         <div
-          className={`absolute inset-x-8 top-10 h-44 rounded-xl overflow-hidden transition-all duration-500 pointer-events-none z-10 flex flex-col items-center justify-start ${
-            isTorn ? 'translate-y-[-24px] opacity-100 scale-100' : 'opacity-0 scale-95'
+          className={`absolute inset-x-8 top-10 h-48 rounded-xl overflow-hidden transition-all duration-700 ease-out pointer-events-none z-10 flex flex-col items-center justify-start ${
+            isTorn ? 'translate-y-[-48px] opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}
           style={{
-            boxShadow: '0 0 35px rgba(251,191,36,0.9)',
+            boxShadow: '0 0 45px rgba(251,191,36,0.95), 0 0 20px rgba(255,255,255,0.8)',
           }}
         >
           <div className="w-full h-full rounded-xl bg-gradient-to-t from-amber-500 via-rose-500 to-indigo-600 p-1 flex items-center justify-center">
             <PokemonCardBack />
           </div>
-          {/* Prismatic flare beam */}
+          {/* Prismatic flare beam erupting */}
           <div
-            className="absolute inset-0 animate-ping opacity-70"
+            className="absolute inset-0 animate-ping opacity-80"
             style={{
-              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(251,191,36,0.6) 50%, transparent 80%)',
             }}
           />
         </div>
@@ -444,10 +637,10 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
         >
           {/* Top Foil Crimp (The serrated sealed hanger strip that rips away) */}
           <div
-            className="absolute inset-0 z-30 transition-all duration-500 ease-out pointer-events-none"
+            className="absolute inset-0 z-30 transition-all duration-700 ease-out pointer-events-none"
             style={{
               clipPath: 'polygon(0% 0%, 100% 0%, 100% 16%, 85% 18%, 70% 15%, 50% 19%, 30% 16%, 15% 20%, 0% 17%)',
-              transform: isTorn ? 'translateY(-120px) rotate(-10deg) scale(0.9)' : 'translateY(0) rotate(0deg)',
+              transform: isTorn ? 'translateY(-140px) rotate(-14deg) scale(0.85)' : 'translateY(0) rotate(0deg)',
               opacity: isTorn ? 0 : 1,
             }}
           >
@@ -469,10 +662,10 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
 
           {/* Lower Booster Foil Sleeve (Slides downward slightly when ripped) */}
           <div
-            className="absolute inset-0 z-20 transition-all duration-500 ease-out"
+            className="absolute inset-0 z-20 transition-all duration-700 ease-out"
             style={{
               clipPath: 'polygon(0% 17%, 15% 20%, 30% 16%, 50% 19%, 70% 15%, 85% 18%, 100% 16%, 100% 100%, 0% 100%)',
-              transform: isTorn ? 'translateY(40px)' : 'translateY(0)',
+              transform: isTorn ? 'translateY(28px)' : 'translateY(0)',
             }}
           >
             <img
@@ -494,7 +687,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
           {/* Tear notch / pull cue ribbon when intact */}
           {!isTorn && (
             <div className="absolute top-12 left-4 right-4 z-40 text-center pointer-events-none animate-pulse">
-              <span className="px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white bg-black/85 border border-amber-400/70 shadow-[0_0_15px_rgba(251,191,36,0.5)] inline-flex items-center gap-1.5">
+              <span className="px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white bg-black/85 border border-amber-400/70 shadow-[0_0_15px_rgba(251,191,36,0.6)] inline-flex items-center gap-1.5">
                 <Zap size={13} className="text-amber-400" />
                 <span>Cliquer pour déchirer le scellé</span>
               </span>
@@ -507,7 +700,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
 }
 
 // ─── Main Booster Studio Component ──────────────────────────────────────────
-export default function BoosterOpeningPage({ onClose, onOpenSell }) {
+export default function BoosterOpeningPage({ onClose }) {
   // Phase: 'SELECT_SERIES' | 'TEAR_PACK' | 'REVEAL_STACK' | 'SUMMARY_BINDER'
   const [phase, setPhase] = useState('SELECT_SERIES');
   const [seriesList, setSeriesList] = useState(FALLBACK_SERIES);
@@ -524,6 +717,9 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
   const [isTorn, setIsTorn] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
 
+  // 3D Tilt for active card in stack
+  const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
+
   // Session stats tracker
   const [sessionStats, setSessionStats] = useState({
     openedCount: 0,
@@ -531,7 +727,10 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
     totalValue: 0.0,
   });
 
-  // Pull rates modal toggle
+  // 3D Inspector Modal State
+  const [inspectCard, setInspectCard] = useState(null);
+
+  // Pull rates modal toggle & bookmarks
   const [showPullRates, setShowPullRates] = useState(false);
   const [savedToPortfolio, setSavedToPortfolio] = useState(new Set());
 
@@ -542,7 +741,6 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (isMounted && Array.isArray(data) && data.length > 0) {
-          // Merge API data with pack_image fallbacks
           const enriched = data.map((item) => ({
             ...item,
             pack_image: item.pack_image || `/boosters/${item.id}.jpg`,
@@ -557,19 +755,29 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
     };
   }, []);
 
-  // Keyboard shortcut: Escape to close, Space/Enter to reveal next
+  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        onClose?.();
+        if (inspectCard) {
+          setInspectCard(null);
+        } else {
+          onClose?.();
+        }
       } else if ((e.key === ' ' || e.key === 'Enter') && phase === 'REVEAL_STACK') {
         e.preventDefault();
         handleNextCard();
+      } else if (e.key === 'ArrowRight' && phase === 'REVEAL_STACK') {
+        e.preventDefault();
+        handleNextCard();
+      } else if (e.key === 'ArrowLeft' && phase === 'REVEAL_STACK') {
+        e.preventDefault();
+        handlePreviousCard();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase, currentSlotIndex, packData]);
+  }, [phase, currentSlotIndex, packData, inspectCard]);
 
   // Start pack opening process
   const handleSelectSeriesAndOpen = async (series) => {
@@ -606,8 +814,17 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
         setPhase('REVEAL_STACK');
         setCurrentSlotIndex(0);
         setRevealedCardIndices(new Set());
-      }, 500);
-    }, 450);
+      }, 1000);
+    }, 350);
+  };
+
+  // Fast forward directly into reveal stack
+  const handleSkipTear = () => {
+    if (!packData) return;
+    setIsTorn(true);
+    setPhase('REVEAL_STACK');
+    setCurrentSlotIndex(0);
+    setRevealedCardIndices(new Set());
   };
 
   // Reveal current card on the stack
@@ -629,7 +846,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
       }
 
       setRevealedCardIndices((prev) => new Set(prev).add(currentSlotIndex));
-      setTimeout(() => setIsCardFlipping(false), 300);
+      setTimeout(() => setIsCardFlipping(false), 350);
     }
   };
 
@@ -642,6 +859,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
     }
     if (currentSlotIndex < packData.cards.length - 1) {
       setCurrentSlotIndex((prev) => prev + 1);
+      setCardTilt({ x: 0, y: 0 });
     } else {
       // Reached the end of the 10-card pack! Update session statistics and view summary
       const hitsCount = packData.cards.filter((c) => c.is_hit).length;
@@ -651,6 +869,14 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
         totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
       }));
       setPhase('SUMMARY_BINDER');
+    }
+  };
+
+  // Previous card navigation
+  const handlePreviousCard = () => {
+    if (currentSlotIndex > 0) {
+      setCurrentSlotIndex((prev) => prev - 1);
+      setCardTilt({ x: 0, y: 0 });
     }
   };
 
@@ -669,7 +895,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
     setPhase('SUMMARY_BINDER');
   };
 
-  // Bookmark card to local portfolio
+  // Bookmark card to personal collection binder
   const handleToggleSavePortfolio = (cardId) => {
     setSavedToPortfolio((prev) => {
       const next = new Set(prev);
@@ -678,6 +904,16 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
       return next;
     });
   };
+
+  // Mouse tilt tracking on active card
+  const handleCardMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -22;
+    setCardTilt({ x, y });
+  };
+
+  const handleCardMouseLeave = () => setCardTilt({ x: 0, y: 0 });
 
   // Current card being inspected in REVEAL_STACK
   const currentCard = packData?.cards?.[currentSlotIndex];
@@ -708,6 +944,10 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        @keyframes hitPulse {
+          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(251,191,36,0.5)); }
+          50% { transform: scale(1.02); filter: drop-shadow(0 0 35px rgba(251,191,36,0.9)); }
+        }
       `}</style>
 
       {/* ── Top Bar / Header ──────────────────────────────────────────────── */}
@@ -722,11 +962,11 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                 PokéVinted Booster Studio
               </h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                TCG PRO
+                TCG SIMULATOR
               </span>
             </div>
             <p className="text-xs text-gray-400">
-              Simulation conforme aux ratios officiels Écarlate & Violet
+              Ouverture pour le fun & la collection • Ratios officiels Écarlate & Violet
             </p>
           </div>
         </div>
@@ -746,7 +986,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
               </div>
               <div className="w-px h-3 bg-white/10" />
               <div>
-                <span className="text-gray-400">Valeur cumulée : </span>
+                <span className="text-gray-400">Cote cumulée : </span>
                 <span className="font-black text-emerald-400">{sessionStats.totalValue.toFixed(2)} €</span>
               </div>
             </div>
@@ -758,105 +998,83 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
             className="p-2 rounded-xl text-gray-400 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] transition-colors border border-white/[0.08]"
             title={audioEnabled ? 'Désactiver le son' : 'Activer le son'}
           >
-            {audioEnabled ? <Volume2 size={18} className="text-yellow-400" /> : <VolumeX size={18} />}
+            {audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
 
-          {/* Drop rates modal trigger */}
+          {/* Pull rates modal button */}
           <button
             onClick={() => setShowPullRates(true)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-300 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-colors"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] transition-colors border border-white/[0.08]"
+            title="Consulter les probabilités de tirage"
           >
             <HelpCircle size={14} />
-            <span>Taux TCG</span>
+            <span>Probabilités TCG</span>
           </button>
 
-          {/* Close studio */}
+          {/* Close studio button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white bg-white/[0.05] hover:bg-red-500/20 hover:text-red-300 transition-colors border border-white/[0.08]"
-            title="Quitter le Booster Studio (Échap)"
+            className="p-2 rounded-xl text-gray-400 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] transition-colors border border-white/[0.08]"
+            title="Fermer le studio (Échap)"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
       </header>
 
-      {/* ── Main Canvas Content by Phase ─────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto px-4 py-8 flex flex-col items-center justify-start relative">
-        {/* Error notification banner */}
+      {/* ── Main Dynamic Stage ────────────────────────────────────────────── */}
+      <main className="flex-1 w-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto relative">
+        {/* Error notification */}
         {error && (
-          <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-950/80 border border-red-500/50 text-red-200 text-sm flex items-center gap-2 max-w-md animate-bounce">
+          <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-900/40 border border-red-500/40 text-red-200 text-xs font-bold flex items-center gap-2">
             <X size={16} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* ── STAGE 1: SERIES SELECTION (AUTHENTIC PACK ARTWORKS) ──────────── */}
+        {/* ── STAGE 1: SERIES SELECTION SCREEN ─────────────────────────────── */}
         {phase === 'SELECT_SERIES' && (
-          <div className="w-full max-w-7xl flex flex-col items-center gap-6 pb-16">
+          <div className="w-full max-w-6xl flex flex-col items-center gap-6 py-4">
             <div className="text-center max-w-xl">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">
-                Étape 1 • Choix de l'Extension
+                Mode Découverte & Simulation Gratuite
               </span>
-              <h2 className="text-3xl font-black text-white mt-2 mb-1">
+              <h2 className="text-2xl sm:text-3xl font-black text-white mt-2">
                 Choisissez votre Booster Pokémon
               </h2>
-              <p className="text-sm text-gray-400">
-                Chaque extension dispose de son illustration officielle de booster, de son pool exclusif de cartes et de ses taux de tirage certifiés.
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                Ouvrez des packs virtuels pour le plaisir de collectionner, admirez les illustrations et enrichissez votre classeur personnel.
               </p>
             </div>
 
-            {/* Expansions Grid with Real Pack Artwork */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+            {/* Grid of SV Era Series */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
               {seriesList.map((series) => {
                 const isSelected = selectedSeries?.id === series.id;
-                const packImg = series.pack_image || `/boosters/${series.id}.jpg`;
                 return (
                   <div
                     key={series.id}
                     onClick={() => setSelectedSeries(series)}
-                    className={`rounded-2xl p-4 border transition-all duration-300 flex flex-col justify-between cursor-pointer relative overflow-hidden group ${
+                    className={`rounded-2xl p-4 transition-all duration-300 cursor-pointer border flex flex-col justify-between group relative overflow-hidden ${
                       isSelected
-                        ? 'bg-slate-900/95 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.25)] scale-[1.02]'
-                        : 'bg-slate-900/50 border-white/[0.08] hover:border-white/30 hover:bg-slate-900/80 hover:scale-[1.01]'
+                        ? 'border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.3)] bg-slate-900/90 scale-[1.02]'
+                        : 'border-white/[0.08] hover:border-white/20 bg-slate-900/50 hover:bg-slate-900/80 hover:scale-[1.01]'
                     }`}
                   >
-                    {/* Background glow accent */}
+                    {/* Top ambient glow */}
                     <div
-                      className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none"
+                      className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none"
                       style={{ background: series.accent_color }}
                     />
 
                     <div>
-                      {/* Badge & Code */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white shadow"
-                          style={{ background: series.accent_color }}
-                        >
-                          {series.badge || series.series}
-                        </span>
-                        <span className="text-[11px] font-mono font-bold text-gray-400">
-                          {series.code} • {series.release_year || '2024'}
-                        </span>
-                      </div>
-
-                      {/* REAL BOOSTER PACK ILLUSTRATION SHOWCASE */}
-                      <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden mb-3.5 bg-black/40 flex items-center justify-center p-1 shadow-[0_6px_20px_rgba(0,0,0,0.5)] group-hover:shadow-[0_10px_30px_rgba(0,0,0,0.8)] transition-all">
+                      {/* Pack Visual Preview with realistic packaging */}
+                      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-black/40 mb-3 shadow-inner flex items-center justify-center p-2">
                         <img
-                          src={packImg}
-                          alt={`Booster ${series.name}`}
-                          className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_8px_18px_rgba(0,0,0,0.9)]"
+                          src={series.pack_image}
+                          alt={series.name}
+                          className="w-full h-full object-contain filter drop-shadow-[0_10px_15px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
-                        />
-                        {/* Metallic foil shine on hover */}
-                        <div
-                          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                          style={{
-                            background:
-                              'linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%)',
-                            mixBlendMode: 'overlay',
-                          }}
                         />
                         {/* 10 cards badge */}
                         <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[9px] font-black text-amber-300 border border-white/20">
@@ -965,16 +1183,26 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                 className="px-8 py-3 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-white/20"
               >
                 <Zap size={16} className="text-yellow-300 animate-pulse" />
-                <span>DÉCHIRER LE SCELLÉ HOLOGRAPHIQUE</span>
+                <span>{isTorn ? 'OUVERTURE DU PACK...' : 'DÉCHIRER LE SCELLÉ HOLOGRAPHIQUE'}</span>
               </button>
 
-              <button
-                onClick={() => setPhase('SELECT_SERIES')}
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1 mt-2"
-              >
-                <ArrowLeft size={12} />
-                <span>Changer d'extension</span>
-              </button>
+              <div className="flex items-center gap-4 mt-2">
+                <button
+                  onClick={handleSkipTear}
+                  className="text-xs text-amber-400/80 hover:text-amber-300 transition-colors flex items-center gap-1"
+                >
+                  <Zap size={12} />
+                  <span>Passer l'animation</span>
+                </button>
+                <span className="text-gray-600">•</span>
+                <button
+                  onClick={() => setPhase('SELECT_SERIES')}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+                >
+                  <ArrowLeft size={12} />
+                  <span>Changer d'extension</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1008,7 +1236,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
               )}
             </div>
 
-            {/* 3D Stack Area */}
+            {/* 3D Stack Area with Authentic Pokémon Card Backs */}
             <div
               className="relative cursor-pointer select-none"
               style={{
@@ -1017,16 +1245,18 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                 perspective: '1200px',
               }}
               onClick={handleRevealCurrentCard}
+              onMouseMove={handleCardMouseMove}
+              onMouseLeave={handleCardMouseLeave}
             >
-              {/* Stack depth perspective cards underneath */}
+              {/* Stack depth perspective cards underneath with authentic Pokémon back */}
               {Array.from({ length: Math.min(3, 9 - currentSlotIndex) }).map((_, i) => (
                 <div
                   key={i}
                   className="absolute inset-0 rounded-2xl pointer-events-none transition-transform"
                   style={{
-                    transform: `translateY(${(i + 1) * 3}px) scale(${1 - (i + 1) * 0.02})`,
+                    transform: `translateY(${(i + 1) * 4}px) scale(${1 - (i + 1) * 0.02})`,
                     zIndex: -i - 1,
-                    opacity: 0.7 - i * 0.2,
+                    opacity: 0.85 - i * 0.2,
                   }}
                 >
                   <PokemonCardBack />
@@ -1035,19 +1265,23 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
 
               {/* The Active Top Card */}
               <div
-                className="w-full h-full relative rounded-2xl transition-transform duration-500 ease-out"
+                className={`w-full h-full relative rounded-2xl transition-transform duration-500 ease-out ${
+                  currentCard.is_hit && isCurrentCardRevealed ? 'animate-[hitPulse_2s_infinite]' : ''
+                }`}
                 style={{
                   transformStyle: 'preserve-3d',
-                  transform: isCurrentCardRevealed ? 'rotateY(0deg)' : 'rotateY(180deg)',
+                  transform: isCurrentCardRevealed
+                    ? `rotateY(0deg) rotateX(${cardTilt.y}deg) rotateY(${cardTilt.x}deg)`
+                    : 'rotateY(180deg)',
                   boxShadow:
                     currentCard.is_hit && isCurrentCardRevealed
                       ? `0 0 35px ${currentRarityCfg.glow}, 0 20px 40px rgba(0,0,0,0.8)`
                       : '0 15px 35px rgba(0,0,0,0.7)',
                 }}
               >
-                {/* BACK FACE (Unrevealed Pokéball back) */}
+                {/* BACK FACE (Unrevealed Authentic Pokémon Card Back) */}
                 <div
-                  className="absolute inset-0 rounded-2xl overflow-hidden"
+                  className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
@@ -1055,15 +1289,16 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                 >
                   <PokemonCardBack />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/0 transition-colors">
-                    <span className="px-4 py-2 rounded-xl bg-black/80 text-white text-xs font-bold border border-white/20 shadow-lg animate-pulse">
-                      Cliquer pour révéler ⚡
+                    <span className="px-4 py-2 rounded-xl bg-black/85 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-xl animate-pulse flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-400" />
+                      <span>Cliquer pour révéler ⚡</span>
                     </span>
                   </div>
                 </div>
 
                 {/* FRONT FACE (Revealed official card artwork) */}
                 <div
-                  className="absolute inset-0 rounded-2xl overflow-hidden"
+                  className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
                   style={{
                     backfaceVisibility: 'hidden',
                     border: `3px solid ${currentRarityCfg.color}`,
@@ -1167,7 +1402,17 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-3 w-full justify-center">
+              <div className="flex items-center gap-2 w-full justify-center">
+                {currentSlotIndex > 0 && (
+                  <button
+                    onClick={handlePreviousCard}
+                    className="p-3 rounded-xl text-gray-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-colors"
+                    title="Carte précédente (Flèche gauche)"
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                )}
+
                 {!isCurrentCardRevealed ? (
                   <button
                     onClick={handleRevealCurrentCard}
@@ -1197,7 +1442,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
           </div>
         )}
 
-        {/* ── STAGE 4: SUMMARY BINDER (COLLECTOR PORTFOLIO & SELLING) ───────── */}
+        {/* ── STAGE 4: SUMMARY BINDER (COLLECTOR PORTFOLIO SHOWCASE) ────────── */}
         {phase === 'SUMMARY_BINDER' && packData && (
           <div className="w-full max-w-6xl flex flex-col items-center gap-6">
             {/* Header Hero Banner */}
@@ -1227,12 +1472,15 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                     Pack régulier composé de communes, peu communes et reverse holos.
                   </p>
                 )}
+                <p className="text-[11px] text-gray-400 mt-2 italic">
+                  Mode Découverte & Simulation • Cartes ajoutées à votre classeur personnel pour le fun (non vendables).
+                </p>
               </div>
 
               {/* Total Pack Valuation */}
               <div className="relative z-10 flex flex-col items-center md:items-end">
                 <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-                  Valeur totale estimée du pack
+                  Valeur totale indicative du pack
                 </span>
                 <span className="text-3xl md:text-4xl font-black text-emerald-400 drop-shadow">
                   {packData.total_estimated_value.toFixed(2)} €
@@ -1259,11 +1507,14 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                   >
                     <div>
                       {/* Card thumbnail container */}
-                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-black/50 mb-2">
+                      <div
+                        className="relative aspect-[2/3] rounded-lg overflow-hidden bg-black/50 mb-2 cursor-pointer"
+                        onClick={() => setInspectCard(card)}
+                      >
                         <img
                           src={card.image_small || card.image_large || '/placeholder-card.png'}
                           alt={card.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                           loading="lazy"
                         />
                         {/* Reverse Holo overlay */}
@@ -1282,6 +1533,13 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                             <Star size={11} fill="currentColor" />
                           </div>
                         )}
+                        {/* Quick 3D inspect hover pill */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="px-2.5 py-1 rounded-lg bg-black/80 text-white text-[10px] font-bold border border-white/20 flex items-center gap-1">
+                            <Eye size={12} />
+                            <span>Inspecter 3D</span>
+                          </span>
+                        </div>
                       </div>
 
                       {/* Card meta */}
@@ -1307,18 +1565,15 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
                       </p>
                     </div>
 
-                    {/* Quick action buttons on card */}
+                    {/* Fun Collector Actions (NO SELLING) */}
                     <div className="mt-2.5 pt-2 border-t border-white/[0.06] flex items-center gap-1.5">
                       <button
-                        onClick={() => {
-                          onClose?.();
-                          onOpenSell?.(card.id);
-                        }}
-                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-bold text-white bg-violet-600/80 hover:bg-violet-500 transition-colors flex items-center justify-center gap-1"
-                        title="Créer une annonce pour cette carte sur la marketplace"
+                        onClick={() => setInspectCard(card)}
+                        className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-bold text-white bg-indigo-600/80 hover:bg-indigo-500 transition-colors flex items-center justify-center gap-1"
+                        title="Examiner la carte en 3D avec reflets et dos officiel"
                       >
-                        <Tag size={10} />
-                        <span>Vendre</span>
+                        <Eye size={11} />
+                        <span>Inspecter 3D</span>
                       </button>
 
                       <button
@@ -1361,6 +1616,16 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
         )}
       </main>
 
+      {/* ── 3D Card Inspector Modal Overlay ─────────────────────────────── */}
+      {inspectCard && (
+        <Card3DInspectModal
+          card={inspectCard}
+          onClose={() => setInspectCard(null)}
+          isSaved={savedToPortfolio.has(inspectCard.id)}
+          onToggleSave={handleToggleSavePortfolio}
+        />
+      )}
+
       {/* ── Drop Rates Modal Overlay ────────────────────────────────────── */}
       {showPullRates && (
         <div
@@ -1383,7 +1648,7 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
               <span>Taux de Tirage Officiels (Ère SV)</span>
             </h3>
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-              Basés sur l'échantillonnage statistique communautaire officiel (Limitless TCG, PokeData) pour les boosters modernes à 10 cartes.
+              Basés sur l'échantillonnage statistique communautaire officiel pour les boosters modernes à 10 cartes.
             </p>
 
             <div className="space-y-2 text-xs">

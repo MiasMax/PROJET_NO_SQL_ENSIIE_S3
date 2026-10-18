@@ -1042,7 +1042,6 @@ export default function App() {
       {isBoosterOpen && (
         <BoosterOpeningPage
           onClose={() => setIsBoosterOpen(false)}
-          onOpenSell={handleOpenSell}
         />
       )}
 
