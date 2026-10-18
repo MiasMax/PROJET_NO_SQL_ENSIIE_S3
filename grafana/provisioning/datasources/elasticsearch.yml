@@ -14,3 +14,19 @@ datasources:
       esVersion: "8.0.0"
       maxConcurrentShardRequests: 5
     editable: true
+
+  # Same Elasticsearch cluster, pointed at the container-health index written by
+  # the backend probe. Not a new container — just a second index pointer.
+  - name: Elasticsearch-Health
+    type: elasticsearch
+    uid: pokevinted-health
+    access: proxy
+    url: http://elasticsearch:9200
+    isDefault: false
+    jsonData:
+      database: "pokevinted_health"
+      timeField: "@timestamp"
+      version: "8.0.0"
+      esVersion: "8.0.0"
+      maxConcurrentShardRequests: 5
+    editable: true

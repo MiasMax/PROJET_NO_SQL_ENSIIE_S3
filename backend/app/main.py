@@ -22,6 +22,7 @@ from app.domain.exceptions import (
     ListingNotFoundError,
     SelfPurchaseNotAllowedError,
 )
+from app.infrastructure.monitoring.health_monitor import run_health_monitor
 from app.infrastructure.persistence.elastic.client import ElasticClientManager
 from app.infrastructure.persistence.elastic.elastic_search_repository import ElasticSearchRepository
 from app.infrastructure.persistence.mongo.client import MongoClientManager
@@ -83,6 +84,17 @@ async def lifespan(app: FastAPI):
             # Keep a reference so the task is not garbage-collected mid-flight.
             app.state.seed_task = asyncio.create_task(_run_seed())
 
+        # Container health probe: periodically ping every dependency and record
+        # its state into Elasticsearch so Grafana can show an "État des conteneurs"
+        # dashboard. Runs as a background task (no new container, no Prometheus).
+        app.state.health_task = asyncio.create_task(
+            run_health_monitor(
+                MongoClientManager.client,
+                elastic_client,
+                redis_client,
+            )
+        )
+
     except Exception as exc:
         logger.error("Failed to initialize database connections: %s", exc)
 
@@ -90,6 +102,13 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: cleanly close connections
     logger.info("Closing NoSQL connections...")
+    health_task = getattr(app.state, "health_task", None)
+    if health_task is not None:
+        health_task.cancel()
+        try:
+            await health_task
+        except asyncio.CancelledError:
+            pass
     try:
         await ElasticClientManager.close()
         await RedisClientManager.close()

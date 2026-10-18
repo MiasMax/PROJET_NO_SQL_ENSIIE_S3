@@ -9,6 +9,20 @@ from elasticsearch import AsyncElasticsearch
 logger = logging.getLogger(__name__)
 
 LISTINGS_INDEX = "pokevinted_listings"
+HEALTH_INDEX = "pokevinted_health"
+
+HEALTH_MAPPING = {
+    "mappings": {
+        "properties": {
+            "@timestamp": {"type": "date"},
+            "service": {"type": "keyword"},
+            "container": {"type": "keyword"},
+            "status": {"type": "integer"},
+            "status_label": {"type": "keyword"},
+            "latency_ms": {"type": "float"},
+        }
+    }
+}
 
 LISTINGS_MAPPING = {
     "mappings": {
@@ -63,6 +77,11 @@ class ElasticClientManager:
         if not exists:
             await cls.client.indices.create(index=LISTINGS_INDEX, body=LISTINGS_MAPPING)
             logger.info("Elasticsearch index '%s' initialized.", LISTINGS_INDEX)
+
+        health_exists = await cls.client.indices.exists(index=HEALTH_INDEX)
+        if not health_exists:
+            await cls.client.indices.create(index=HEALTH_INDEX, body=HEALTH_MAPPING)
+            logger.info("Elasticsearch index '%s' initialized.", HEALTH_INDEX)
 
     @classmethod
     async def close(cls) -> None:

@@ -1,0 +1,270 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🩺 État des conteneurs (temps réel)",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "MongoDB",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "max", "field": "status" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "service:\"MongoDB\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } }
+          ],
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Elasticsearch",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "max", "field": "status" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "service:\"Elasticsearch\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } }
+          ],
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Redis",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "max", "field": "status" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "service:\"Redis\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } }
+          ],
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Backend API",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "max", "field": "status" }],
+          "bucketAggs": [
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "service:\"Backend API\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } }
+          ],
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 101,
+      "title": "📈 Disponibilité & latence dans le temps",
+      "type": "row"
+    },
+    {
+      "id": 5,
+      "title": "Disponibilité (1 = UP, 0 = DOWN)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "avg", "field": "status" }],
+          "bucketAggs": [
+            { "id": "3", "type": "terms", "field": "service", "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "10" } },
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 15, "showPoints": "never", "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Latence de ping (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "avg", "field": "latency_ms" }],
+          "bucketAggs": [
+            { "id": "3", "type": "terms", "field": "service", "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "10" } },
+            { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+          ],
+          "query": "*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "showPoints": "auto", "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 102,
+      "title": "🧾 Journal des relevés de santé",
+      "type": "row"
+    },
+    {
+      "id": 7,
+      "title": "Derniers relevés (sonde backend)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "type": "elasticsearch", "uid": "pokevinted-health" },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "type": "raw_data", "settings": { "size": "25" } }],
+          "bucketAggs": [],
+          "query": "*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "status_label" },
+            "properties": [
+              { "id": "mappings", "value": [ { "type": "value", "options": { "UP": { "color": "green", "index": 0 }, "DOWN": { "color": "red", "index": 1 } } } ] },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["pokevinted", "monitoring", "conteneurs", "healthcheck"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["5s", "10s", "30s", "1m"] },
+  "timezone": "browser",
+  "title": "PokéVinted — État des conteneurs",
+  "uid": "pokevinted-container-health",
+  "version": 1
+}

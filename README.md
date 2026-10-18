@@ -28,7 +28,9 @@
 3. **Synergie JSON MongoDB + Elasticsearch & Dashboards Grafana** :
    * **Pipeline Document JSON fluide** : le schéma JSON flexible de MongoDB est directement indexé par Elasticsearch sans transformation complexe ni jointure SQL lourde.
    * **Agrégations analytiques natives** : Elasticsearch calcule à la volée le prix moyen par extension, la distribution par état et les ratios actifs/vendus.
-   * **Supervision Grafana (Port 3001)** : un dashboard **« PokéVinted — Analytics NoSQL & Elasticsearch »** auto-provisionné (datasource + dashboard par fichiers dans `grafana/provisioning/`, rien à configurer à la main). 5 panneaux rafraîchis toutes les 5 s : total d'annonces indexées, prix moyen global, répartition ACTIVE/SOLD, prix moyen par extension, et répartition par état d'usure.
+   * **Supervision Grafana (Port 3001)** : deux dashboards auto-provisionnés (datasources + dashboards par fichiers dans `grafana/provisioning/`, rien à configurer à la main).
+     * **« PokéVinted — Analytics NoSQL & Elasticsearch »** — 5 panneaux rafraîchis toutes les 5 s : total d'annonces indexées, prix moyen global, répartition ACTIVE/SOLD, prix moyen par extension, et répartition par état d'usure.
+     * **« PokéVinted — État des conteneurs »** — supervision temps-réel de la santé du stack **sans Prometheus ni conteneur supplémentaire** : une sonde dans le backend ping MongoDB / Elasticsearch / Redis / API toutes les 15 s et indexe le résultat (statut UP/DOWN + latence) dans l'index Elasticsearch `pokevinted_health`. Le dashboard affiche l'état UP/DOWN de chaque service, l'historique de disponibilité, la latence de ping et un journal des relevés. *Limite assumée : on mesure la joignabilité applicative des services (pas le CPU/RAM par conteneur) ; si Elasticsearch tombe, la sonde ne peut plus écrire — le trou dans la courbe signale alors lui-même l'indisponibilité d'ES.*
 
 ---
 
