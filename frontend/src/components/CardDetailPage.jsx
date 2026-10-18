@@ -318,12 +318,8 @@ export default function CardDetailPage({
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const isFavorite = listing
-    ? (favorites.has(listing.card_id) ||
-       favorites.has(listing.id) ||
-       (listing.card_id?.startsWith('sv3pt5-') && favorites.has(listing.card_id.replace('sv3pt5-', 'sv03.5-'))) ||
-       (listing.card_id?.startsWith('sv03.5-') && favorites.has(listing.card_id.replace('sv03.5-', 'sv3pt5-'))))
-    : false;
+  // Favorites are tracked per listing (by listing id), not per card.
+  const isFavorite = Boolean(listing?.id && favorites.has(listing.id));
   const isSold = listing?.status === 'SOLD';
   const isOutOfStock = listing?.status === 'OUT_OF_STOCK' || Boolean(listing?.isCatalogReference) || !listing?.id;
 
@@ -853,7 +849,7 @@ export default function CardDetailPage({
                     {/* Favorite Action Button */}
                     <button
                       type="button"
-                      onClick={() => onToggleFavorite && onToggleFavorite(listing.card_id)}
+                      onClick={() => listing?.id && onToggleFavorite && onToggleFavorite(listing.id)}
                       className={`h-12 px-4 rounded-lg border text-sm font-medium flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
                         isFavorite
                           ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'

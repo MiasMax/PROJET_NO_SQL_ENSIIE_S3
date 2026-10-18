@@ -206,7 +206,7 @@ export default function PokemonCard3D({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onToggleFavorite(listing.card_id);
+              onToggleFavorite(listing.id);
             }}
             title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
             style={{

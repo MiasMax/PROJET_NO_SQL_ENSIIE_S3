@@ -195,7 +195,7 @@ export default function MarketplaceView({
             <span className="hub-title">Marketplace en direct</span>
             <span className="hub-count-pill">
               {showOnlyFavorites
-                ? `${displayedListings.length} ${displayedListings.length > 1 ? 'cartes favorites' : 'carte favorite'}`
+                ? `${displayedListings.length} ${displayedListings.length > 1 ? 'annonces favorites' : 'annonce favorite'}`
                 : `${listings.length} cartes en vente`}
             </span>
             {searchQuery && (
@@ -299,7 +299,7 @@ export default function MarketplaceView({
                 }
               }}
               className={`hub-toggle-btn ${showOnlyFavorites ? 'active-favorites' : ''}`}
-              title="Filtrer uniquement mes cartes favorites"
+              title="Filtrer uniquement mes annonces favorites"
             >
               <Heart
                 size={14}
@@ -443,13 +443,13 @@ export default function MarketplaceView({
             </div>
             <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '8px', color: '#ffffff' }}>
               {favorites.size === 0
-                ? "Vous n'avez aucune carte en favoris pour le moment"
-                : "Aucune de vos cartes favorites ne correspond aux filtres actifs"}
+                ? "Vous n'avez aucune annonce en favoris pour le moment"
+                : "Aucune de vos annonces favorites ne correspond aux filtres actifs"}
             </h3>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '480px', margin: '0 auto 24px', fontSize: '0.95rem', lineHeight: '1.5' }}>
               {favorites.size === 0
-                ? "Cliquez sur l'icône cœur en haut à gauche de n'importe quelle carte pour l'enregistrer dans votre liste de favoris et la retrouver facilement ici."
-                : "Essayez de réinitialiser l'extension ou les critères de recherche pour afficher toutes vos cartes favorites."}
+                ? "Cliquez sur l'icône cœur en haut à gauche de n'importe quelle annonce pour l'enregistrer dans votre liste de favoris et la retrouver facilement ici."
+                : "Essayez de réinitialiser l'extension ou les critères de recherche pour afficher toutes vos annonces favorites."}
             </p>
             <button
               type="button"
@@ -489,7 +489,7 @@ export default function MarketplaceView({
               >
                 <PokemonCard3D
                   listing={item}
-                  isFavorite={isCardInFavorites ? isCardInFavorites(item) : (favorites.has(item.card_id) || favorites.has(item.id))}
+                  isFavorite={isCardInFavorites ? isCardInFavorites(item) : favorites.has(item.id)}
                   onToggleFavorite={handleToggleFavorite}
                   onSelect={(cardItem) => {
                     saveMarketplaceScroll({ listing: cardItem, page: safeCurrentPage });

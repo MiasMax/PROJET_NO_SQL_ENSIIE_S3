@@ -211,20 +211,10 @@ export default function App() {
           }
         }
 
-        const merged = Array.from(new Set([...favList, ...cachedArr]));
-        const expanded = new Set();
-        for (const item of merged) {
-          if (!item) continue;
-          expanded.add(item);
-          if (item.startsWith('sv3pt5-')) {
-            expanded.add(item.replace('sv3pt5-', 'sv03.5-'));
-          } else if (item.startsWith('sv03.5-')) {
-            expanded.add(item.replace('sv03.5-', 'sv3pt5-'));
-          }
-        }
-        setFavorites(expanded);
+        const merged = new Set([...favList, ...cachedArr].filter(Boolean));
+        setFavorites(merged);
         try {
-          localStorage.setItem('pokevinted_cached_favs', JSON.stringify([...expanded]));
+          localStorage.setItem('pokevinted_cached_favs', JSON.stringify([...merged]));
         } catch {}
       }
     } catch (e) {
@@ -289,39 +279,28 @@ export default function App() {
     });
   };
 
-  const handleToggleFavorite = async (cardId) => {
+  const handleToggleFavorite = async (listingId) => {
     if (!currentUser) {
-      showToast("🔒 Veuillez vous connecter pour ajouter des cartes en favoris.");
+      showToast("🔒 Veuillez vous connecter pour ajouter des annonces en favoris.");
       setIsLoginModalOpen(true);
       return;
     }
+    if (!listingId) return;
 
     try {
-      const res = await fetch(`/api/users/favorites/${cardId}?user_id=${currentUser.id}`, { method: 'POST' });
+      const res = await fetch(`/api/users/favorites/${listingId}?user_id=${currentUser.id}`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setFavorites((prev) => {
+          // Favorites track individual listings (by listing id), consistent with the
+          // per-listing trending ranking.
           const next = new Set(prev);
-          const altId = cardId.startsWith('sv3pt5-')
-            ? cardId.replace('sv3pt5-', 'sv03.5-')
-            : cardId.startsWith('sv03.5-')
-            ? cardId.replace('sv03.5-', 'sv3pt5-')
-            : null;
-
-          // The backend favorites every catalog card sharing the same name; mirror
-          // that set locally so all same-name variants toggle together in the UI.
-          const affectedIds = Array.isArray(data.affected_ids) && data.affected_ids.length
-            ? data.affected_ids
-            : [cardId, altId].filter(Boolean);
-
           if (data.is_favorite) {
-            affectedIds.forEach((fid) => next.add(fid));
-            if (altId) next.add(altId);
-            showToast(`❤️ Ajouté à vos favoris`);
+            next.add(listingId);
+            showToast(`❤️ Annonce ajoutée à vos favoris`);
           } else {
-            affectedIds.forEach((fid) => next.delete(fid));
-            if (altId) next.delete(altId);
-            showToast(`💔 Retiré de vos favoris`);
+            next.delete(listingId);
+            showToast(`💔 Annonce retirée de vos favoris`);
           }
           try {
             localStorage.setItem('pokevinted_cached_favs', JSON.stringify([...next]));
@@ -541,16 +520,10 @@ export default function App() {
   };
 
   const isCardInFavorites = useCallback(
-    (cardOrListing) => {
-      if (!cardOrListing || favorites.size === 0) return false;
-      const cid = cardOrListing.card_id || cardOrListing.id;
-      if (!cid) return false;
-      if (favorites.has(cid)) return true;
-      if (cardOrListing.id && favorites.has(cardOrListing.id)) return true;
-      if (cardOrListing.card_id && favorites.has(cardOrListing.card_id)) return true;
-      if (cid.startsWith('sv3pt5-') && favorites.has(cid.replace('sv3pt5-', 'sv03.5-'))) return true;
-      if (cid.startsWith('sv03.5-') && favorites.has(cid.replace('sv03.5-', 'sv3pt5-'))) return true;
-      return false;
+    (listing) => {
+      // Favorites are tracked per listing (by listing id), not per card.
+      if (!listing || favorites.size === 0) return false;
+      return Boolean(listing.id && favorites.has(listing.id));
     },
     [favorites]
   );
@@ -700,7 +673,7 @@ export default function App() {
               type="button"
               onClick={handleNavbarFavoritesClick}
               className={`nav-btn-action ${(location.pathname === '/' && showOnlyFavorites) ? 'active-fav' : ''}`}
-              title="Afficher uniquement mes cartes favorites"
+              title="Afficher uniquement mes annonces favorites"
             >
               <Heart
                 size={14}
