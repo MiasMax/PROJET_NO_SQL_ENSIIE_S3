@@ -46,6 +46,7 @@ export default function CardDetailPage({
   onInitiateBuy,
   onDeleteListing,
   showToast = () => {},
+  catalogCards = [],
 }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -128,20 +129,22 @@ export default function CardDetailPage({
           }
         }
 
-        // 2. Fetch marketplace listings and catalog cards
+        // 2. Fetch marketplace listings; reuse the already-loaded catalog when
+        // available. The catalog is static, so refetching ~2200 cards on every
+        // detail open added a ~2s delay to opening a card / making an offer.
         let allListings = [];
-        let allCards = [];
+        let allCards = catalogCards && catalogCards.length > 0 ? catalogCards : [];
         try {
-          const [listingsRes, cardsRes] = await Promise.all([
-            fetch('/api/listings?limit=1000'),
-            fetch('/api/cards?limit=2500'),
-          ]);
+          const needCards = allCards.length === 0;
+          const requests = [fetch('/api/listings?limit=1000')];
+          if (needCards) requests.push(fetch('/api/cards?limit=2500'));
+          const [listingsRes, cardsRes] = await Promise.all(requests);
 
           if (listingsRes.ok) {
             const data = await listingsRes.json();
             allListings = data.items || [];
           }
-          if (cardsRes.ok) {
+          if (needCards && cardsRes && cardsRes.ok) {
             allCards = (await cardsRes.json()) || [];
           }
         } catch (e) {

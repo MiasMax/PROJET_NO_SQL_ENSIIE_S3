@@ -905,6 +905,7 @@ export default function App() {
               onInitiateBuy={handleQuickBuy}
               onDeleteListing={handleDeleteListing}
               showToast={showToast}
+              catalogCards={catalogCards}
             />
           }
         />
@@ -919,6 +920,7 @@ export default function App() {
               onInitiateBuy={handleQuickBuy}
               onDeleteListing={handleDeleteListing}
               showToast={showToast}
+              catalogCards={catalogCards}
             />
           }
         />
