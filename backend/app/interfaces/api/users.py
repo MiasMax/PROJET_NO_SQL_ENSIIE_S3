@@ -75,10 +75,7 @@ def find_user(identifier: str | None) -> dict[str, Any] | None:
     if clean in USERS_STORE:
         return USERS_STORE[clean]
     for u in USERS_STORE.values():
-        if u["username"].lower() == clean or u["name"].lower() == clean:
-            return u
-    for u in USERS_STORE.values():
-        if u["id"] in clean or clean in u["id"]:
+        if u["username"].lower() == clean or u["name"].lower() == clean or u["id"].lower() == clean:
             return u
     return None
 
@@ -248,7 +245,7 @@ async def register_user(
     user_dict_with_pwd = new_user.to_dict(include_private=True)
     USERS_STORE[user_id] = user_dict_with_pwd
 
-    token = f"sess_{user_id}_{secrets.token_urlsafe(32)}"
+    token = f"sess_{secrets.token_urlsafe(32)}"
     session_data = {**user_dict, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
@@ -430,11 +427,16 @@ async def get_my_orders(
     order_repo: OrderRepository = Depends(get_order_repository),
 ):
     """Fetch order purchase history for current logged-in user."""
-    resolved_name = buyer_name
+    resolved_name = None
+    resolved_id = None
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session:
             resolved_name = session.get("name") or session.get("username")
+            resolved_id = str(session.get("id", "")).strip().lower()
+
+    if not resolved_name and buyer_name:
+        resolved_name = buyer_name
 
     if not resolved_name:
         raise HTTPException(
@@ -447,7 +449,8 @@ async def get_my_orders(
     user_orders = [
         o.to_dict()
         for o in all_orders
-        if clean_target in o.buyer_name.lower() or o.buyer_name.lower() in clean_target
+        if clean_target == o.buyer_name.lower().strip()
+        or (resolved_id and resolved_id == o.buyer_name.lower().strip())
     ]
     return user_orders
 
@@ -460,11 +463,16 @@ async def get_my_listings(
     listing_repo: ListingRepository = Depends(get_listing_repository),
 ):
     """Fetch all marketplace listings (active and sold) created by the current logged-in user."""
-    resolved_name = seller_name
+    resolved_name = None
+    resolved_id = None
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session:
             resolved_name = session.get("name") or session.get("username")
+            resolved_id = str(session.get("id", "")).strip().lower()
+
+    if not resolved_name and seller_name:
+        resolved_name = seller_name
 
     all_listings = await listing_repo.list_listings(limit=1000)
     if not resolved_name:
@@ -474,7 +482,8 @@ async def get_my_listings(
     user_listings = [
         item.to_dict()
         for item in all_listings
-        if clean_target in item.seller_name.lower() or item.seller_name.lower() in clean_target
+        if clean_target == item.seller_name.lower().strip()
+        or (resolved_id and resolved_id == item.seller_name.lower().strip())
     ]
     return user_listings
 
@@ -506,17 +515,26 @@ async def switch_user(
 
 @router.get("/favorites", response_model=list[str])
 async def get_user_favorites(
-    user_id: str = "sacha",
+    user_id: str | None = None,
+    x_session_token: str | None = Header(None),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """Fetch user favorite card IDs stored in a Redis Set (SMEMBERS)."""
-    return await cache_repo.get_favorites(user_id)
+    target_id = "sacha"
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and session.get("id"):
+            target_id = str(session["id"]).strip().lower()
+    elif user_id:
+        target_id = user_id.strip().lower()
+    return await cache_repo.get_favorites(target_id)
 
 
 @router.post("/favorites/{listing_id}")
 async def toggle_favorite(
     listing_id: str,
-    user_id: str = "sacha",
+    user_id: str | None = None,
+    x_session_token: str | None = Header(None),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """
@@ -524,12 +542,20 @@ async def toggle_favorite(
     Set operations (SADD / SREM). Favorites track individual listings, so two offers
     of the same card are favorited independently.
     """
-    favorites = await cache_repo.get_favorites(user_id)
+    target_id = "sacha"
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and session.get("id"):
+            target_id = str(session["id"]).strip().lower()
+    elif user_id:
+        target_id = user_id.strip().lower()
+
+    favorites = await cache_repo.get_favorites(target_id)
     if listing_id in favorites:
-        await cache_repo.remove_favorite(user_id, listing_id)
+        await cache_repo.remove_favorite(target_id, listing_id)
         is_favorite = False
     else:
-        await cache_repo.add_favorite(user_id, listing_id)
+        await cache_repo.add_favorite(target_id, listing_id)
         is_favorite = True
 
     return {

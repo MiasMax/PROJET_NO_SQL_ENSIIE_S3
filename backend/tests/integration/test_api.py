@@ -900,6 +900,111 @@ def test_security_user_pii_sanitization_and_order_access(test_env):
     assert anon_orders.status_code == 401
 
 
+def test_security_substring_exploit_prevention(test_env):
+    """
+    Adversarial test:
+    Verify that an attacker with a single-letter username or substring of a seller's name
+    CANNOT delete or patch the seller's listing, and cannot eavesdrop on their orders.
+    """
+    client = test_env["client"]
+
+    # 1. Sacha posts a listing
+    create_res = client.post(
+        "/api/listings",
+        json={
+            "card_id": "sv3pt5-006",
+            "price": 99.0,
+            "condition": "MINT",
+            "seller_name": "Sacha",
+            "description": "Dracaufeu sous scellé",
+        },
+    )
+    assert create_res.status_code == 201
+    lid = create_res.json()["id"]
+
+    # 2. Attacker registers with a substring of 'Sacha', e.g. 'cha'
+    reg_res = client.post(
+        "/api/users/register",
+        json={
+            "username": "cha",
+            "name": "Cha",
+            "password": "Password123!",
+        },
+    )
+    assert reg_res.status_code == 200
+    cha_token = reg_res.json()["token"]
+
+    # 3. Attacker tries to delete Sacha's listing (Must fail with 403 Forbidden)
+    del_res = client.delete(
+        f"/api/listings/{lid}",
+        headers={"x-session-token": cha_token},
+    )
+    assert del_res.status_code == 403
+
+    # 4. Attacker tries to patch Sacha's listing price (Must fail with 400 Bad Request)
+    patch_res = client.patch(
+        f"/api/listings/{lid}/price",
+        headers={"x-session-token": cha_token},
+        json={"price": 1.0},
+    )
+    assert patch_res.status_code in (400, 403)
+
+    # 5. Attacker tries to modify price without token by supplying seller_name (Must fail with 401 Unauthorized)
+    anon_patch = client.patch(
+        f"/api/listings/{lid}/price",
+        json={"price": 1.0, "seller_name": "Sacha"},
+    )
+    assert anon_patch.status_code == 401
+
+
+def test_security_cart_checkout_session_binding(test_env):
+    """
+    Adversarial test:
+    Verify that when an authenticated user checks out, they cannot drain another user's balance
+    by forging 'buyer_id' in the JSON body.
+    """
+    client = test_env["client"]
+    from app.interfaces.api.users import USERS_STORE
+    USERS_STORE["ondine"]["balance"] = 500.0
+    USERS_STORE["sacha"]["balance"] = 500.0
+
+    # 1. Create a listing by Pierre
+    create_res = client.post(
+        "/api/listings",
+        json={
+            "card_id": "sv3pt5-006",
+            "price": 50.0,
+            "condition": "NEAR_MINT",
+            "seller_name": "Pierre",
+            "description": "Vente test session binding",
+        },
+    )
+    assert create_res.status_code == 201
+    lid = create_res.json()["id"]
+
+    # 2. Ondine logs in
+    ondine_login = client.post("/api/users/login", json={"username": "ondine", "password": ""})
+    ondine_token = ondine_login.json()["token"]
+
+    # 3. Ondine attempts to checkout using Sacha's buyer_id in payload
+    checkout_res = client.post(
+        "/api/listings/checkout",
+        headers={"x-session-token": ondine_token},
+        json={
+            "listing_ids": [lid],
+            "buyer_id": "sacha",
+            "buyer_name": "Sacha",
+        },
+    )
+    assert checkout_res.status_code == 200
+    order_data = checkout_res.json()
+    # The actual buyer must be bound to the session (Ondine), not the forged payload (Sacha)
+    assert order_data["buyer_name"] == "Ondine"
+    assert USERS_STORE["sacha"]["balance"] == 500.0
+    assert USERS_STORE["ondine"]["balance"] == 450.0
+
+
+
 
 
 

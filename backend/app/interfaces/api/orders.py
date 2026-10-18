@@ -42,9 +42,11 @@ async def list_orders(
     if session.get("is_admin"):
         return [o.to_dict() for o in all_orders]
 
-    user_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+    user_name = (session.get("name") or session.get("username") or "").lower().strip()
+    user_id = str(session.get("id", "")).lower().strip()
     return [
         o.to_dict()
         for o in all_orders
-        if user_name in o.buyer_name.lower() or o.buyer_name.lower() in user_name
+        if (user_name and user_name == o.buyer_name.lower().strip())
+        or (user_id and user_id == o.buyer_name.lower().strip())
     ]

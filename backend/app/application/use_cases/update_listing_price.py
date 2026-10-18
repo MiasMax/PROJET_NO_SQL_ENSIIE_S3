@@ -48,11 +48,7 @@ class UpdateListingPriceUseCase:
             raise ValueError("L'identité du vendeur est requise pour modifier le prix d'une annonce.")
         clean_cmd_seller = command.seller_name.strip().lower()
         clean_listing_seller = listing.seller_name.strip().lower()
-        if (
-            clean_cmd_seller != clean_listing_seller
-            and clean_cmd_seller not in clean_listing_seller
-            and clean_listing_seller not in clean_cmd_seller
-        ):
+        if clean_cmd_seller != clean_listing_seller:
             raise ValueError("Seul le vendeur propriétaire de cette annonce peut en modifier le prix.")
 
         # 1. Update Domain entity price

@@ -237,9 +237,10 @@ async def send_message(
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session and not session.get("is_admin"):
-            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            caller_name = (session.get("name") or session.get("username") or "").lower().strip()
+            caller_id = str(session.get("id", "")).lower().strip()
             sender = payload.sender_name.lower().strip()
-            if caller_name != sender and caller_name not in sender and sender not in caller_name:
+            if caller_name != sender and caller_id != sender:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Usurpation d'identité interdite : l'expéditeur doit correspondre à votre compte connecté.",
@@ -311,9 +312,10 @@ async def list_conversations(
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session and not session.get("is_admin"):
-            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            caller_name = (session.get("name") or session.get("username") or "").lower().strip()
+            caller_id = str(session.get("id", "")).lower().strip()
             target = username.lower().strip()
-            if caller_name != target and caller_name not in target and target not in caller_name:
+            if caller_name != target and caller_id != target:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Accès refusé : vous ne pouvez pas consulter les conversations d'un autre utilisateur.",
@@ -449,16 +451,15 @@ async def get_thread(
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
         if session and not session.get("is_admin"):
-            caller_name = (session.get("name") or session.get("username") or session.get("id") or "").lower().strip()
+            caller_name = (session.get("name") or session.get("username") or "").lower().strip()
+            caller_id = str(session.get("id", "")).lower().strip()
             ua = user_a.lower().strip()
             ub = user_b.lower().strip()
             is_participant = (
                 caller_name == ua
-                or caller_name in ua
-                or ua in caller_name
+                or caller_id == ua
                 or caller_name == ub
-                or caller_name in ub
-                or ub in caller_name
+                or caller_id == ub
             )
             if not is_participant:
                 raise HTTPException(

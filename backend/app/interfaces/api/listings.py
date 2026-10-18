@@ -235,23 +235,25 @@ async def purchase_listing(
     buyer_identifier = payload.buyer_id or payload.buyer_name
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            buyer_identifier = session.get("id") or session.get("username") or buyer_identifier
+        if not session:
+            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
+        buyer_identifier = session.get("id") or session.get("username") or session.get("name") or buyer_identifier
 
     from app.interfaces.api.users import find_user
     matched_user = find_user(buyer_identifier)
 
     resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
 
-    # Invariant: Prevent user from buying their own listing
+    # Invariant: Prevent user from buying their own listing (strict identity equality)
     clean_seller = listing.seller_name.strip().lower()
     buyer_names = [
         resolved_buyer_name.strip().lower(),
         payload.buyer_name.strip().lower(),
         (matched_user["username"].strip().lower() if matched_user else ""),
         (matched_user["name"].strip().lower() if matched_user else ""),
+        (str(matched_user["id"]).strip().lower() if matched_user and "id" in matched_user else ""),
     ]
-    if any(b and (b == clean_seller or b in clean_seller or clean_seller in b) for b in buyer_names):
+    if any(b and b == clean_seller for b in buyer_names):
         raise HTTPException(
             status_code=400,
             detail="Vous ne pouvez pas acheter votre propre annonce.",
@@ -352,8 +354,10 @@ async def purchase_listing(
 @router.post("/cart/checkout", response_model=CheckoutCartResponse)
 async def checkout_cart(
     payload: CheckoutCartRequest,
+    x_session_token: str | None = Header(None),
     checkout_uc: CheckoutCartUseCase = Depends(get_checkout_cart_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
     """
@@ -366,8 +370,14 @@ async def checkout_cart(
     if not payload.listing_ids:
         raise HTTPException(status_code=400, detail="Votre panier est vide.")
 
-    # Identify buyer
+    # Identify buyer from session when available to prevent buyer identity forgery
     buyer_identifier = payload.buyer_id or payload.buyer_name
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if not session:
+            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
+        buyer_identifier = session.get("id") or session.get("username") or session.get("name") or buyer_identifier
+
     matched_user = find_user(buyer_identifier)
     resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
 
@@ -388,8 +398,9 @@ async def checkout_cart(
             payload.buyer_name.strip().lower(),
             (matched_user["username"].strip().lower() if matched_user else ""),
             (matched_user["name"].strip().lower() if matched_user else ""),
+            (str(matched_user["id"]).strip().lower() if matched_user and "id" in matched_user else ""),
         ]
-        if any(b and (b == clean_seller or b in clean_seller or clean_seller in b) for b in buyer_names):
+        if any(b and b == clean_seller for b in buyer_names):
             raise HTTPException(
                 status_code=400,
                 detail=f"Vous ne pouvez pas acheter votre propre annonce ({listing.card_name}).",
@@ -501,8 +512,6 @@ async def delete_listing(
     is_owner = (
         (user_name == seller_name)
         or (user_id == seller_name)
-        or (user_name in seller_name)
-        or (seller_name in user_name)
     )
 
     if not (is_admin or is_owner):
@@ -542,22 +551,28 @@ async def update_listing_price(
     if price <= 0:
         raise HTTPException(status_code=400, detail="Le prix doit être strictement positif.")
 
-    resolved_seller_name: str | None = None
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if not session:
-            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
-        if session.get("is_admin"):
-            resolved_seller_name = listing.seller_name
-        else:
-            resolved_seller_name = session.get("name") or session.get("username") or session.get("id")
-    elif payload.seller_name:
-        resolved_seller_name = payload.seller_name
-    else:
+    if not x_session_token:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentification requise pour modifier le prix d'une annonce.",
         )
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée ou invalide.")
+
+    resolved_seller_name: str | None = None
+    if session.get("is_admin"):
+        resolved_seller_name = listing.seller_name
+    else:
+        user_name = (session.get("name") or session.get("username") or "").strip().lower()
+        user_id = str(session.get("id", "")).strip().lower()
+        seller_name = listing.seller_name.strip().lower()
+        if user_name != seller_name and user_id != seller_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Seul le vendeur propriétaire de cette annonce peut en modifier le prix.",
+            )
+        resolved_seller_name = listing.seller_name
 
     try:
         command = UpdateListingPriceCommand(

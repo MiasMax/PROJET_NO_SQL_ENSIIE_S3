@@ -8,6 +8,7 @@ Allows atomic batch purchase of multiple unique card listings from the cart:
 
 from dataclasses import dataclass
 
+from app.domain.entities.listing import Listing
 from app.domain.entities.order import Order
 from app.domain.exceptions import (
     ListingAlreadySoldError,
@@ -68,33 +69,47 @@ class CheckoutCartUseCase:
 
         # 2. Concurrency-safe atomic transition for all listings
         orders: list[Order] = []
+        sold_listings: list[Listing] = []
         total_amount = 0.0
 
-        for listing in listings:
-            updated = await self.listing_repo.mark_as_sold(listing.id, command.buyer_name)
-            if not updated:
-                raise ListingAlreadySoldError(listing.id)
+        try:
+            for listing in listings:
+                updated = await self.listing_repo.mark_as_sold(listing.id, command.buyer_name)
+                if not updated:
+                    raise ListingAlreadySoldError(listing.id)
+                sold_listings.append(updated)
 
-            cond_str = (
-                updated.condition.value
-                if hasattr(updated.condition, "value")
-                else str(updated.condition)
-            )
-            order = Order.create(
-                listing_id=updated.id,
-                card_id=updated.card_id,
-                card_name=updated.card_name,
-                price=updated.price,
-                seller_name=updated.seller_name,
-                buyer_name=command.buyer_name,
-                condition=cond_str,
-                image_url=updated.image_url,
-            )
-            await self.order_repo.save(order)
-            await self.search_repo.index_listing(updated)
+                cond_str = (
+                    updated.condition.value
+                    if hasattr(updated.condition, "value")
+                    else str(updated.condition)
+                )
+                order = Order.create(
+                    listing_id=updated.id,
+                    card_id=updated.card_id,
+                    card_name=updated.card_name,
+                    price=updated.price,
+                    seller_name=updated.seller_name,
+                    buyer_name=command.buyer_name,
+                    condition=cond_str,
+                    image_url=updated.image_url,
+                )
+                await self.order_repo.save(order)
+                await self.search_repo.index_listing(updated)
 
-            orders.append(order)
-            total_amount += updated.price
+                orders.append(order)
+                total_amount += updated.price
+        except Exception:
+            for item in sold_listings:
+                try:
+                    item.status = ListingStatus.ACTIVE
+                    item.buyer_name = None
+                    item.sold_at = None
+                    await self.listing_repo.save(item)
+                    await self.search_repo.index_listing(item)
+                except Exception:
+                    pass
+            raise
 
         total_amount = round(total_amount, 2)
 
