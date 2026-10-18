@@ -16,6 +16,14 @@ class SearchRepository(ABC):
         """Index or update listing in search engine."""
         pass
 
+    async def bulk_index_listings(self, listings: list[Listing]) -> None:
+        """
+        Index many listings at once. The default falls back to indexing one by one;
+        adapters should override this with a single bulk request for efficient seeding.
+        """
+        for listing in listings:
+            await self.index_listing(listing)
+
     @abstractmethod
     async def delete_listing(self, listing_id: str) -> None:
         """Delete listing from search index."""

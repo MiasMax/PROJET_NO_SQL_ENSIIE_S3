@@ -36,12 +36,14 @@ class SeedCatalogUseCase:
         # Save reference cards to MongoDB catalog
         saved_cards_count = await self.card_repo.bulk_save(cards)
 
-        # Seed and index initial listings
+        # Persist initial listings to MongoDB, then index them all into Elasticsearch
+        # in a single bulk request (one refresh) rather than one slow refresh=wait_for
+        # call per document — keeps first-launch seeding fast.
         listings_count = 0
         for listing in initial_listings:
             await self.listing_repo.save(listing)
-            await self.search_repo.index_listing(listing)
             listings_count += 1
+        await self.search_repo.bulk_index_listings(initial_listings)
 
         # Clear listing caches
         await self.cache_repo.delete("cache:marketplace:recent")

@@ -29,6 +29,17 @@ class ElasticSearchRepository(SearchRepository):
             refresh="wait_for",
         )
 
+    async def bulk_index_listings(self, listings: list[Listing]) -> None:
+        """Index all listings in a single Elasticsearch bulk request with one refresh,
+        instead of a per-document refresh=wait_for call (orders of magnitude faster seeds)."""
+        if not listings:
+            return
+        operations: list[dict] = []
+        for listing in listings:
+            operations.append({"index": {"_index": self.index_name, "_id": listing.id}})
+            operations.append(listing.to_dict())
+        await self.client.bulk(operations=operations, refresh=True)
+
     async def delete_listing(self, listing_id: str) -> None:
         await self.client.delete(index=self.index_name, id=listing_id, ignore=[404], refresh="wait_for")
 
