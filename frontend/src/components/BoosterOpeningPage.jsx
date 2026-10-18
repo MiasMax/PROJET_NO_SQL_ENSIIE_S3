@@ -9,7 +9,6 @@ import {
   VolumeX,
   Flame,
   Trophy,
-  Share2,
   Tag,
   Layers,
   ArrowRight,
@@ -1356,22 +1355,6 @@ export default function BoosterOpeningPage({ onClose, onOpenSell }) {
               >
                 <Layers size={15} />
                 <span>Changer d'extension Pokémon</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(
-                      `🔥 PokéVinted : Je viens d'ouvrir un booster ${packData.set_name} d'une valeur de ${packData.total_estimated_value.toFixed(2)} € avec ${packData.hit_count} hits !`
-                    );
-                    alert('Résultats du booster copiés dans votre presse-papier !');
-                  }
-                }}
-                className="px-4 py-3 rounded-xl text-xs font-semibold text-gray-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-colors flex items-center gap-1.5"
-                title="Partager mon tirage"
-              >
-                <Share2 size={13} />
-                <span>Partager</span>
               </button>
             </div>
           </div>

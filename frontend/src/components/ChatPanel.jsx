@@ -212,7 +212,6 @@ function ConvItem({ conv, listingInfo, onClick }) {
         <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white bg-gradient-to-br from-[#007782] to-[#00555e] shadow-md border border-white/10">
           {otherInitial}
         </div>
-        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#121620]" />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -565,14 +564,10 @@ export default function ChatPanel({
                 <div className="w-9 h-9 rounded-full bg-[#007782] text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   {activeConv.other_party?.[0]?.toUpperCase() || '?'}
                 </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#121620]" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-white truncate leading-tight">
                   {activeConv.other_party}
-                </p>
-                <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium">
-                  En ligne • Réponse rapide
                 </p>
               </div>
             </>
