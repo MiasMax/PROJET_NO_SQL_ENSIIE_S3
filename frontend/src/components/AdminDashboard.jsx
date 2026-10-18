@@ -25,7 +25,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
       const [resStats, resOrders, resAggs, resListings] = await Promise.all([
         fetch('/api/admin/stats', { headers: authHeaders() }),
         fetch('/api/orders?limit=10', { headers: authHeaders() }),
-        fetch('/api/admin/aggregations'),
+        fetch('/api/admin/aggregations', { headers: authHeaders() }),
         fetch('/api/listings?limit=100&sort_by=created_at&sort_order=desc'),
       ]);
 

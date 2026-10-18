@@ -3,6 +3,7 @@ Admin and Supervision API Router.
 Provides aggregated NoSQL metrics, Elasticsearch aggregations, and catalog re-seeding.
 """
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -20,6 +21,8 @@ from app.interfaces.dependencies import (
     get_search_repository,
     get_seed_catalog_use_case,
 )
+
+logger = logging.getLogger("pokevinted.admin")
 
 router = APIRouter(prefix="/api/admin", tags=["Admin & Supervision"])
 
@@ -49,16 +52,19 @@ async def get_admin_stats(
 @router.get("/aggregations")
 async def get_elasticsearch_aggregations(
     search_repo=Depends(get_search_repository),
+    _admin: dict[str, Any] = Depends(require_admin),
 ):
     """
     Direct analytical aggregations from Elasticsearch.
     Demonstrates shared JSON document structures driving analytics in Grafana and API views.
+    Protected: requires an authenticated administrator session.
     """
     try:
         aggs = await search_repo.get_aggregations()
         return {"status": "success", "aggregations": aggs}
     except Exception as exc:
-        return {"status": "error", "message": str(exc), "aggregations": {}}
+        logger.warning("Failed to retrieve Elasticsearch aggregations: %s", exc)
+        return {"status": "error", "message": "Erreur lors de la récupération des agrégations.", "aggregations": {}}
 
 
 @router.post("/seed")

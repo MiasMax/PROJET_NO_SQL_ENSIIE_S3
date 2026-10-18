@@ -48,17 +48,26 @@ router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
 @router.post("", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)
 async def create_listing(
     payload: CreateListingRequest,
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
     create_uc: CreateListingUseCase = Depends(get_create_listing_use_case),
 ):
     """
     Publish a new card listing.
     Persists simultaneously into MongoDB, Elasticsearch, and Redis.
+    Anchors seller identity to authenticated session when provided.
     """
+    seller = payload.seller_name
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session:
+            seller = session.get("name") or session.get("username") or seller
+
     command = CreateListingCommand(
         card_id=payload.card_id,
         price=payload.price,
         condition=payload.condition.value,
-        seller_name=payload.seller_name,
+        seller_name=seller,
         description=payload.description,
         custom_image_url=payload.custom_image_url,
     )
@@ -199,6 +208,7 @@ async def get_listing_detail(
 async def purchase_listing(
     listing_id: str,
     payload: PurchaseListingRequest,
+    x_session_token: str | None = Header(None),
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
     cache_repo: CacheRepository = Depends(get_cache_repository),
@@ -208,6 +218,7 @@ async def purchase_listing(
     Execute a card purchase.
     Transitions listing to SOLD across datastores, records immutable order,
     and atomically debits the buyer's account balance.
+    Validates buyer identity from session and checks accepted offer proofs for custom agreed_price.
     """
     from app.interfaces.api.users import credit_user_balance, debit_user_balance
 
@@ -220,8 +231,13 @@ async def purchase_listing(
     if current_status == "SOLD":
         raise HTTPException(status_code=400, detail="Cette annonce a déjà été vendue.")
 
-    # Identify buyer and pre-check balance
+    # Identify buyer from session when available to prevent buyer identity forgery
     buyer_identifier = payload.buyer_id or payload.buyer_name
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session:
+            buyer_identifier = session.get("id") or session.get("username") or buyer_identifier
+
     from app.interfaces.api.users import find_user
     matched_user = find_user(buyer_identifier)
 
@@ -241,11 +257,47 @@ async def purchase_listing(
             detail="Vous ne pouvez pas acheter votre propre annonce.",
         )
 
-    charge_price = (
-        payload.agreed_price
-        if (payload.agreed_price is not None and payload.agreed_price > 0)
-        else listing.price
-    )
+    # Security verification (V4): Do not blindly trust agreed_price from client
+    charge_price = listing.price
+    validated_agreed_price: float | None = None
+    if payload.agreed_price is not None and payload.agreed_price > 0:
+        if payload.agreed_price == listing.price:
+            charge_price = listing.price
+            validated_agreed_price = listing.price
+        else:
+            # Check if an accepted offer exists in messages for this listing
+            is_valid_negotiation = False
+            try:
+                from app.interfaces.api.messages import _IN_MEMORY_MESSAGES, _can_try_mongo, _get_db
+                if _can_try_mongo():
+                    db = _get_db()
+                    accepted = await db["messages"].find_one({
+                        "listing_id": listing_id,
+                        "offer_type": "accept",
+                        "offer_price": payload.agreed_price,
+                    })
+                    if accepted:
+                        is_valid_negotiation = True
+                if not is_valid_negotiation:
+                    for m in _IN_MEMORY_MESSAGES:
+                        if (
+                            m.get("listing_id") == listing_id
+                            and m.get("offer_type") == "accept"
+                            and m.get("offer_price") == payload.agreed_price
+                        ):
+                            is_valid_negotiation = True
+                            break
+            except Exception:
+                pass
+
+            if is_valid_negotiation:
+                charge_price = payload.agreed_price
+                validated_agreed_price = payload.agreed_price
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Prix convenu ({payload.agreed_price:.2f} €) non autorisé : aucune offre acceptée correspondante n'a été validée par le vendeur.",
+                )
 
     if matched_user and matched_user["balance"] < charge_price:
         raise HTTPException(
@@ -258,7 +310,7 @@ async def purchase_listing(
         command = PurchaseListingCommand(
             listing_id=listing_id,
             buyer_name=resolved_buyer_name,
-            agreed_price=payload.agreed_price,
+            agreed_price=validated_agreed_price,
         )
         order = await purchase_uc.execute(command)
     except SelfPurchaseNotAllowedError as e:

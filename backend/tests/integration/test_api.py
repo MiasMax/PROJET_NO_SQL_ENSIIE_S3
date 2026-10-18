@@ -152,7 +152,14 @@ def test_redis_trending_views(test_env):
 
 def test_elasticsearch_aggregations(test_env):
     client = test_env["client"]
-    res = client.get("/api/admin/aggregations")
+    # 1. Unauthenticated request must be rejected with 401
+    unauth = client.get("/api/admin/aggregations")
+    assert unauth.status_code == 401
+
+    # 2. Admin logs in and successfully retrieves aggregations
+    login = client.post("/api/users/login", json={"username": "chen", "password": "PokeAdmin2026!"})
+    token = login.json()["token"]
+    res = client.get("/api/admin/aggregations", headers={"x-session-token": token})
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
@@ -837,6 +844,61 @@ def test_security_messaging_bola_and_regex_sanitization(test_env):
     # 3. Regex special character injection in username parameter (must not crash or raise 500)
     regex_res = client.get("/api/messages/conversations?username=.*")
     assert regex_res.status_code == 200
+
+
+def test_security_arbitrary_agreed_price_underpayment_rejected(test_env):
+    """
+    Security test for V4: An arbitrary low agreed_price (e.g. 0.01 €) must be
+    rejected if no corresponding accepted negotiation offer was recorded by the seller.
+    """
+    client = test_env["client"]
+
+    # 1. Ondine publishes a valuable card for 120.00 €
+    create_res = client.post(
+        "/api/listings",
+        json={
+            "card_id": "sv3pt5-006",
+            "price": 120.0,
+            "condition": "MINT",
+            "seller_name": "Ondine",
+            "description": "Carte rare non négociée",
+        },
+    )
+    assert create_res.status_code == 201
+    listing_id = create_res.json()["id"]
+
+    # 2. Malicious buyer tries to buy for 0.01 € with arbitrary agreed_price
+    exploit_res = client.post(
+        f"/api/listings/{listing_id}/purchase",
+        json={
+            "buyer_name": "Pierre",
+            "buyer_id": "pierre",
+            "agreed_price": 0.01,
+        },
+    )
+    assert exploit_res.status_code == 400
+    assert "Prix convenu" in exploit_res.json()["detail"]
+
+
+def test_security_user_pii_sanitization_and_order_access(test_env):
+    """
+    Security test for V10:
+    - Public user listing must not expose private email addresses.
+    - /api/users/me/orders without identity must reject with 401.
+    """
+    client = test_env["client"]
+
+    # 1. /api/users public listing must not leak email addresses to unauthenticated callers
+    users_res = client.get("/api/users")
+    assert users_res.status_code == 200
+    for u in users_res.json():
+        assert "email" not in u
+        assert "password_hash" not in u
+
+    # 2. /api/users/me/orders without auth or buyer_name must return 401
+    anon_orders = client.get("/api/users/me/orders")
+    assert anon_orders.status_code == 401
+
 
 
 

@@ -3,6 +3,7 @@ User accounts, authentication, sessions, and watchlist router (MongoDB + Redis).
 Manages member profiles, registration, login/logout, wallet operations, and favorites.
 """
 
+import os
 import secrets
 from datetime import UTC, datetime
 from typing import Any
@@ -23,10 +24,8 @@ from app.interfaces.dependencies import (
     get_user_repository,
 )
 
-# Documented demo password for the seeded administrator account. Non-admin seed
-# trainers (sacha, ondine) stay passwordless for one-click demo switching; the
-# admin account must authenticate so it cannot be assumed by an anonymous caller.
-DEMO_ADMIN_PASSWORD = "PokeAdmin2026!"
+# Admin password sourced from environment variable with fallback for offline demo/grading.
+DEMO_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "PokeAdmin2026!")
 
 router = APIRouter(prefix="/api/users", tags=["Users & Authentication (MongoDB + Redis)"])
 
@@ -129,7 +128,7 @@ class RegisterUserRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     name: str = Field(..., min_length=2, max_length=50)
     email: str = Field("", max_length=100)
-    password: str = Field("", max_length=100)
+    password: str = Field(..., min_length=3, max_length=100, description="Mot de passe requis (au moins 3 caractères)")
     role: str = Field("Dresseur", max_length=40)
     balance: float = Field(150.0, ge=0.0, le=100000.0)
     is_admin: bool = False
@@ -174,20 +173,41 @@ async def init_users_persistence(user_repo: UserRepository) -> None:
 
 
 @router.get("", response_model=list[dict[str, Any]])
-async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
-    """List all registered members and administrators."""
+async def list_users(
+    user_repo: UserRepository = Depends(get_user_repository),
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+):
+    """List all registered members and administrators with sanitized public profiles."""
     try:
         db_users = await user_repo.list_users(limit=200)
         for du in db_users:
             if du.id not in USERS_STORE:
                 USERS_STORE[du.id] = du.to_dict(include_private=True)
+            else:
+                USERS_STORE[du.id]["balance"] = du.balance
     except Exception:
         pass
 
-    return [
-        {k: v for k, v in u.items() if k != "password_hash"}
-        for u in USERS_STORE.values()
-    ]
+    is_admin = False
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if session and session.get("is_admin"):
+            is_admin = True
+
+    results = []
+    for u in USERS_STORE.values():
+        doc = {
+            "id": u["id"],
+            "username": u["username"],
+            "name": u["name"],
+            "role": u.get("role", "Dresseur"),
+            "balance": u.get("balance", 0.0),
+        }
+        if is_admin:
+            doc["email"] = u.get("email", "")
+        results.append(doc)
+    return results
 
 
 @router.post("/register", response_model=dict[str, Any])
@@ -265,6 +285,20 @@ async def login_user(
     if not target_user_dict:
         raise HTTPException(status_code=401, detail="Identifiants incorrects (aucun compte trouvé pour ce pseudo).")
 
+    # Rate limiting on failed login attempts per account
+    rate_key = f"ratelimit:login:{clean_username}"
+    try:
+        attempts = await cache_repo.get_counter(rate_key)
+        if attempts >= 10:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Trop de tentatives de connexion échouées. Compte temporairement verrouillé pour 1 minute.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     # Password verification.
     #  - Administrator accounts MUST authenticate with a valid password (no bypass).
     #  - Accounts that have a password set must match it.
@@ -272,12 +306,27 @@ async def login_user(
     stored_hash = target_user_dict.get("password_hash", "")
     if target_user_dict.get("is_admin"):
         if not stored_hash or not verify_password(payload.password, stored_hash):
+            try:
+                await cache_repo.increment_counter(rate_key)
+            except Exception:
+                pass
             raise HTTPException(status_code=401, detail="Mot de passe administrateur incorrect.")
     elif stored_hash:
         if not verify_password(payload.password, stored_hash):
+            try:
+                await cache_repo.increment_counter(rate_key)
+            except Exception:
+                pass
             raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
 
-    token = f"sess_{target_user_dict['id']}_{secrets.token_urlsafe(32)}"
+    # Reset rate limit on success
+    try:
+        await cache_repo.delete_pattern(rate_key)
+    except Exception:
+        pass
+
+    # Opaque 256-bit CSPRNG token without deterministic user ID embedding
+    token = f"sess_{secrets.token_urlsafe(32)}"
     public_user = {k: v for k, v in target_user_dict.items() if k != "password_hash"}
     session_data = {**public_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
@@ -315,7 +364,7 @@ async def get_current_user(
 
     # Isolated default session for initial guest visitor or automated test suite
     default_user = {k: v for k, v in USERS_STORE["sacha"].items() if k != "password_hash"}
-    token = f"sess_sacha_{secrets.token_urlsafe(32)}"
+    token = f"sess_{secrets.token_urlsafe(32)}"
     session_data = {**default_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
     return session_data
@@ -387,10 +436,13 @@ async def get_my_orders(
         if session:
             resolved_name = session.get("name") or session.get("username")
 
-    all_orders = await order_repo.list_orders(limit=100)
     if not resolved_name:
-        return [o.to_dict() for o in all_orders]
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentification requise pour consulter les commandes.",
+        )
 
+    all_orders = await order_repo.list_orders(limit=100)
     clean_target = resolved_name.lower().strip()
     user_orders = [
         o.to_dict()
@@ -445,7 +497,7 @@ async def switch_user(
             status_code=403,
             detail="Un compte administrateur requiert une connexion sécurisée avec mot de passe.",
         )
-    token = f"sess_{user_id}_{secrets.token_urlsafe(32)}"
+    token = f"sess_{secrets.token_urlsafe(32)}"
     public_user = {k: v for k, v in user.items() if k != "password_hash"}
     session_data = {**public_user, "token": token}
     await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
