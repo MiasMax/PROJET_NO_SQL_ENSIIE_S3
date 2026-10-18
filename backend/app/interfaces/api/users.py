@@ -11,11 +11,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.domain.entities.user import User, hash_password, verify_password
-
-# Documented demo password for the seeded administrator account. Non-admin seed
-# trainers (sacha, ondine) stay passwordless for one-click demo switching; the
-# admin account must authenticate so it cannot be assumed by an anonymous caller.
-DEMO_ADMIN_PASSWORD = "PokeAdmin2026!"
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
@@ -27,6 +22,11 @@ from app.interfaces.dependencies import (
     get_order_repository,
     get_user_repository,
 )
+
+# Documented demo password for the seeded administrator account. Non-admin seed
+# trainers (sacha, ondine) stay passwordless for one-click demo switching; the
+# admin account must authenticate so it cannot be assumed by an anonymous caller.
+DEMO_ADMIN_PASSWORD = "PokeAdmin2026!"
 
 router = APIRouter(prefix="/api/users", tags=["Users & Authentication (MongoDB + Redis)"])
 
