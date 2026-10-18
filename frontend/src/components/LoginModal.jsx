@@ -47,9 +47,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, onOpenRegi
     }
   };
 
+  // Non-admin demo trainers stay passwordless; the admin account requires its
+  // documented password (the backend no longer accepts an empty admin password).
+  const DEMO_PASSWORDS = { chen: 'PokeAdmin2026!' };
+
   const handleQuickDemoLogin = async (demoUsername) => {
+    const demoPassword = DEMO_PASSWORDS[demoUsername] || '';
     setUsername(demoUsername);
-    setPassword('');
+    setPassword(demoPassword);
     setLoading(true);
     setError(null);
 
@@ -59,7 +64,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, onOpenRegi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: demoUsername,
-          password: '',
+          password: demoPassword,
         }),
       });
 

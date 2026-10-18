@@ -41,7 +41,9 @@ services:
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
-      - "9200:9200"
+      # Bound strictly to host loopback (127.0.0.1); internal services reach it via
+      # the Docker network. Never exposed on 0.0.0.0.
+      - "127.0.0.1:9200:9200"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     networks:
@@ -93,7 +95,7 @@ services:
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-http://elasticsearch:9200}
       - REDIS_URL=${REDIS_URL:-redis://:ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!@redis:6379/0}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     networks:
       - pokevinted-internal
       - pokevinted-public

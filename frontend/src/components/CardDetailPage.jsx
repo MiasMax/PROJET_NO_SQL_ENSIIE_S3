@@ -1002,7 +1002,8 @@ export default function CardDetailPage({
                     );
                     if (!confirmed) return;
                     try {
-                      const res = await fetch(`/api/admin/listings/${listing.id}`, { method: 'DELETE' });
+                      const token = localStorage.getItem('pokevinted_token');
+                      const res = await fetch(`/api/admin/listings/${listing.id}`, { method: 'DELETE', headers: token ? { 'x-session-token': token } : {} });
                       if (res.ok) {
                         showToast(`Offre "${listing.card_name}" supprimée avec succès par l'administrateur.`);
                         navigate('/');

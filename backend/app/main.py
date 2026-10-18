@@ -124,11 +124,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for frontend communication
+# CORS middleware for frontend communication.
+# A wildcard origin and credentials cannot be combined safely (the browser rejects
+# it and it would expose the API to any site), so credentials are only enabled when
+# an explicit origin allow-list is configured.
+_cors_origins = settings.cors_origins
+_allow_credentials = "*" not in _cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

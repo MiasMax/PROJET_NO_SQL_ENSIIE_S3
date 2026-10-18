@@ -507,8 +507,10 @@ export default function App() {
     if (!confirmed) return;
 
     try {
+      const token = localStorage.getItem('pokevinted_token');
       const res = await fetch(`/api/admin/listings/${listing.id}`, {
         method: 'DELETE',
+        headers: token ? { 'x-session-token': token } : {},
       });
       if (res.ok) {
         setListings((prev) => prev.filter((item) => item.id !== listing.id));

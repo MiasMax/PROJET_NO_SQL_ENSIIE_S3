@@ -93,10 +93,12 @@ Au démarrage, un script d'amorçage (**seed**) peuple automatiquement le catalo
 ### Points d'accès de l'application
 | Service | URL | Identifiants |
 | :--- | :--- | :--- |
-| **Marketplace (Frontend)** | `http://localhost:3000` | Accès libre |
+| **Marketplace (Frontend)** | `http://localhost:3000` | Accès libre · compte admin démo : `chen` / `PokeAdmin2026!` |
 | **Documentation API (Swagger)** | `http://localhost:8000/docs` | Accès libre |
-| **Elasticsearch** | `http://localhost:9200` | Sans mot de passe |
+| **Elasticsearch** | `http://localhost:9200` | Loopback uniquement, sans mot de passe |
 | **Grafana** | `http://localhost:3001` | `admin` / `ChangeMe_Grafana_Admin_Password!` (défaut, surchargeable via `.env`) |
+
+> L'onglet **Admin Dashboard** (supervision NoSQL, ré-amorçage, modération) est réservé aux administrateurs : connectez-vous avec le compte `chen` ci-dessus (bouton « Connexion rapide → Admin »). Les comptes *dresseurs* de démo (`sacha`, `ondine`) restent accessibles en un clic sans mot de passe.
 
 ---
 
@@ -115,7 +117,12 @@ Ce projet intègre les meilleures pratiques de sécurité DevOps pour éliminer 
    * Aucun secret en dur dans le code git : les variables proviennent de `.env` (dans `.gitignore`).
    * `.env.example` sert de modèle pour le déploiement.
    * Les URIs de connexion sont masquées dans les logs applicatifs (`******`) pour éviter les fuites via `docker logs`.
-4. **Contrôle des Ressources (Anti-OOM)** :
+   * **L'API ne renvoie jamais de secret** : les commandes d'inspection de l'Admin Dashboard utilisent des variables shell (`$MONGO_ROOT_PASSWORD`, `$REDIS_PASSWORD`) substituées localement, pas les vraies valeurs (donc rien à récupérer dans l'onglet *Network* du navigateur).
+4. **Contrôle d'accès applicatif** :
+   * Les endpoints d'administration (`/api/admin/stats`, `/api/admin/seed`, suppression d'annonces) exigent une **session administrateur** (`x-session-token` d'un compte `is_admin`), sinon `401/403`.
+   * Les mots de passe utilisateurs sont hachés en **PBKDF2-HMAC-SHA256** (100 000 itérations) ; le compte administrateur exige un mot de passe valide (pas de connexion admin sans authentification).
+   * **CORS** restreint par défaut aux origines du frontend (les identifiants ne sont jamais activés avec un joker `*`).
+5. **Contrôle des Ressources (Anti-OOM)** :
    * Des limites de mémoire (`mem_limit`) sont assignées à chaque conteneur pour garantir la stabilité sur un VPS restreint (2 à 4 Go RAM).
 
 ---
@@ -137,7 +144,7 @@ Pour constater en direct la persistance multi-systèmes lors de la saisie d'un f
 
 ### Étape 2 : Vérification dans les terminaux
 
-Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes (utilisez les mots de passe définis dans votre `.env`, ou copiez-les directement en un clic depuis l'onglet **Admin Dashboard** du site) :
+Ouvrez **3 terminaux distincts** pour interroger chacun des 3 systèmes (utilisez les mots de passe définis dans votre `.env` ; l'onglet **Admin Dashboard** fournit les commandes d'inspection prêtes à copier, avec des variables shell à la place des secrets) :
 
 #### Terminal 1 — Constat de persistance dans **MongoDB**
 ```bash

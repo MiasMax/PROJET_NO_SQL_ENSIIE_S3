@@ -68,15 +68,18 @@ class GetAdminStatsUseCase:
             "elastic_indexed_docs": elastic_indexed_docs,
         }
 
-        # 5. Terminal commands for live inspection
+        # 5. Terminal commands for live inspection.
+        # SECURITY: never embed the real secrets in the API response (it would leak
+        # them to any browser via the network tab). We emit shell variable references
+        # instead — the operator's shell substitutes them from their own environment.
         from app.config import settings
 
         mongo_auth_flag = (
-            f"-u {settings.MONGO_ROOT_USER} -p {settings.MONGO_ROOT_PASSWORD} --authenticationDatabase admin "
+            "-u $MONGO_ROOT_USER -p $MONGO_ROOT_PASSWORD --authenticationDatabase admin "
             if settings.MONGO_ROOT_USER
             else ""
         )
-        redis_auth_flag = f"-a {settings.REDIS_PASSWORD} " if settings.REDIS_PASSWORD else ""
+        redis_auth_flag = "-a $REDIS_PASSWORD " if settings.REDIS_PASSWORD else ""
 
         terminal_commands = [
             {

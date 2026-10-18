@@ -3,15 +3,19 @@ Admin and Supervision API Router.
 Provides aggregated NoSQL metrics, Elasticsearch aggregations, and catalog re-seeding.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.application.dtos.stats_dtos import AdminStatsResponse
 from app.application.use_cases.delete_listing import DeleteListingUseCase
 from app.application.use_cases.get_admin_stats import GetAdminStatsUseCase
 from app.application.use_cases.seed_catalog import SeedCatalogUseCase
+from app.domain.repositories.cache_repository import CacheRepository
 from app.infrastructure.seed.cards_dataset import get_default_catalog_cards, get_initial_marketplace_listings
 from app.interfaces.dependencies import (
     get_admin_stats_use_case,
+    get_cache_repository,
     get_delete_listing_use_case,
     get_search_repository,
     get_seed_catalog_use_case,
@@ -20,9 +24,23 @@ from app.interfaces.dependencies import (
 router = APIRouter(prefix="/api/admin", tags=["Admin & Supervision"])
 
 
+async def require_admin(
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
+) -> dict[str, Any]:
+    """Guard admin-only endpoints: require a valid session whose user is an admin."""
+    if not x_session_token:
+        raise HTTPException(status_code=401, detail="Authentification requise.")
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session or not session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs.")
+    return session
+
+
 @router.get("/stats", response_model=AdminStatsResponse)
 async def get_admin_stats(
     stats_uc: GetAdminStatsUseCase = Depends(get_admin_stats_use_case),
+    _admin: dict = Depends(require_admin),
 ):
     """Real-time financial summaries, datastore health metrics, and CLI check commands."""
     return await stats_uc.execute()
@@ -46,6 +64,7 @@ async def get_elasticsearch_aggregations(
 @router.post("/seed")
 async def trigger_seed(
     seed_uc: SeedCatalogUseCase = Depends(get_seed_catalog_use_case),
+    _admin: dict = Depends(require_admin),
 ):
     """Populate or re-initialize catalog cards and initial marketplace listings."""
     from app.interfaces.api.users import reset_seed_users
@@ -65,6 +84,7 @@ async def trigger_seed(
 async def delete_listing_admin(
     listing_id: str,
     delete_uc: DeleteListingUseCase = Depends(get_delete_listing_use_case),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Moderation action: permanently delete any marketplace listing.

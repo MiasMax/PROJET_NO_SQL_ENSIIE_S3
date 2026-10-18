@@ -10,7 +10,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.domain.entities.user import User
+from app.domain.entities.user import User, hash_password, verify_password
+
+# Documented demo password for the seeded administrator account. Non-admin seed
+# trainers (sacha, ondine) stay passwordless for one-click demo switching; the
+# admin account must authenticate so it cannot be assumed by an anonymous caller.
+DEMO_ADMIN_PASSWORD = "PokeAdmin2026!"
 from app.domain.repositories.cache_repository import CacheRepository
 from app.domain.repositories.listing_repository import ListingRepository
 from app.domain.repositories.order_repository import OrderRepository
@@ -54,7 +59,7 @@ USERS_STORE: dict[str, dict[str, Any]] = {
         "username": "chen",
         "name": "Professeur Chen",
         "email": "admin@pokevinted.fr",
-        "password_hash": "",
+        "password_hash": hash_password(DEMO_ADMIN_PASSWORD),
         "role": "Administrateur",
         "balance": 1500.0,
         "is_admin": True,
@@ -228,10 +233,15 @@ async def login_user(
     if not target_user_dict:
         raise HTTPException(status_code=401, detail="Identifiants incorrects (aucun compte trouvé pour ce pseudo).")
 
-    # Verify password if password hash exists
+    # Password verification.
+    #  - Administrator accounts MUST authenticate with a valid password (no bypass).
+    #  - Accounts that have a password set must match it.
+    #  - Passwordless non-admin seed trainers stay one-click loginable for the demo.
     stored_hash = target_user_dict.get("password_hash", "")
-    if stored_hash and payload.password:
-        from app.domain.entities.user import verify_password
+    if target_user_dict.get("is_admin"):
+        if not stored_hash or not verify_password(payload.password, stored_hash):
+            raise HTTPException(status_code=401, detail="Mot de passe administrateur incorrect.")
+    elif stored_hash:
         if not verify_password(payload.password, stored_hash):
             raise HTTPException(status_code=401, detail="Mot de passe incorrect.")
 
@@ -390,6 +400,13 @@ async def switch_user(
         raise HTTPException(status_code=400, detail="Profil utilisateur inconnu.")
 
     user = USERS_STORE[user_id]
+    # Quick trainer switching is a demo convenience and must never hand out an
+    # admin session: administrator access requires an authenticated login.
+    if user.get("is_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Un compte administrateur requiert une connexion sécurisée avec mot de passe.",
+        )
     ACTIVE_USER_ID = user_id
     token = f"sess_{user_id}_{uuid.uuid4().hex[:8]}"
     public_user = {k: v for k, v in user.items() if k != "password_hash"}

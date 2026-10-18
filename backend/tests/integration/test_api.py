@@ -77,13 +77,25 @@ def test_complete_marketplace_flow(test_env):
     assert cache_repo.counters["stats:active_listings"] == 0
     assert cache_repo.counters["stats:total_sales_count"] == 1
 
-    # 4. Step 4: Admin NoSQL telemetry overview
-    admin_res = client.get("/api/admin/stats")
+    # 4. Step 4: Admin NoSQL telemetry overview (requires an authenticated admin session)
+    unauth = client.get("/api/admin/stats")
+    assert unauth.status_code == 401
+
+    login = client.post("/api/users/login", json={"username": "chen", "password": "PokeAdmin2026!"})
+    assert login.status_code == 200
+    admin_token = login.json()["token"]
+    assert login.json()["is_admin"] is True
+
+    admin_res = client.get("/api/admin/stats", headers={"x-session-token": admin_token})
     assert admin_res.status_code == 200
     admin_data = admin_res.json()
     assert admin_data["summary"]["total_orders_completed"] == 1
     assert admin_data["summary"]["total_sales_volume_eur"] == 48.50
     assert len(admin_data["terminal_commands"]) == 3
+    # Security: the API must never leak real secrets in the inspection commands.
+    joined_cmds = " ".join(c["command"] for c in admin_data["terminal_commands"])
+    assert "ChangeMe" not in joined_cmds
+    assert "$MONGO_ROOT_PASSWORD" in joined_cmds
 
 
 def test_redis_sessions_and_favorites(test_env):

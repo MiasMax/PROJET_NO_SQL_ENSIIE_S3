@@ -350,6 +350,12 @@ def test_env():
     FastAPI TestClient fixture with isolated in-memory DDD repositories.
     Guarantees hermetic test execution with dependency injection overrides.
     """
+    # Reset the module-global anonymous active user so a login in one test (e.g. the
+    # admin) does not leak into the next test's default session.
+    import app.interfaces.api.users as users_api
+
+    users_api.ACTIVE_USER_ID = "sacha"
+
     cards = get_default_catalog_cards()
     card_repo = MockCardRepository(cards)
     listing_repo = MockListingRepository()

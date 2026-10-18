@@ -14,16 +14,24 @@ export default function AdminDashboard({ onBackToMarketplace }) {
   const [seedMessage, setSeedMessage] = useState(null);
   const [showRawJson, setShowRawJson] = useState(false);
 
+  const authHeaders = () => {
+    const token = localStorage.getItem('pokevinted_token');
+    return token ? { 'x-session-token': token } : {};
+  };
+
   const fetchStats = async () => {
     setLoading(true);
     try {
       const [resStats, resOrders, resAggs, resListings] = await Promise.all([
-        fetch('/api/admin/stats'),
+        fetch('/api/admin/stats', { headers: authHeaders() }),
         fetch('/api/orders?limit=10'),
         fetch('/api/admin/aggregations'),
         fetch('/api/listings?limit=100&sort_by=created_at&sort_order=desc'),
       ]);
 
+      if (resStats.status === 401 || resStats.status === 403) {
+        setModerationMessage("Accès refusé : connectez-vous avec le compte administrateur (Prof. Chen) pour consulter la supervision.");
+      }
       if (resStats.ok) {
         setStats(await resStats.json());
       }
@@ -53,7 +61,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
     setSeedLoading(true);
     setSeedMessage(null);
     try {
-      const res = await fetch('/api/admin/seed', { method: 'POST' });
+      const res = await fetch('/api/admin/seed', { method: 'POST', headers: authHeaders() });
       const data = await res.json();
       setSeedMessage("Données et annonces ré-amorcées avec succès !");
       fetchStats();
@@ -72,7 +80,7 @@ export default function AdminDashboard({ onBackToMarketplace }) {
 
     setDeletingId(listing.id);
     try {
-      const res = await fetch(`/api/admin/listings/${listing.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/listings/${listing.id}`, { method: 'DELETE', headers: authHeaders() });
       if (res.ok) {
         setListings((prev) => prev.filter((item) => item.id !== listing.id));
         setModerationMessage(`L'offre "${listing.card_name}" a été définitivement supprimée.`);

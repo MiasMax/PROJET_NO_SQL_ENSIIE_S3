@@ -19,9 +19,14 @@ def hash_password(password: str, salt: str | None = None) -> str:
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
-    """Verify plain password against PBKDF2 hash."""
+    """Verify plain password against PBKDF2 hash.
+
+    An empty stored hash means no password was ever set: it must NOT grant access
+    (returning True here was an authentication-bypass footgun). Callers that want to
+    allow passwordless demo accounts must handle that case explicitly.
+    """
     if not stored_hash:
-        return True
+        return False
     if "$" not in stored_hash:
         return False
     salt, hashed = stored_hash.split("$", 1)
