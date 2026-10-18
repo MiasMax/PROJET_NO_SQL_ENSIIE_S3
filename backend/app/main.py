@@ -3,6 +3,7 @@ PokéVinted FastAPI application entrypoint.
 Initializes NoSQL datastores on startup and manages application lifecycle.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -56,11 +57,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Elasticsearch unavailable during schema init: %s", e)
 
-        # Auto-seed reference catalog on first start when empty
+        # Auto-seed reference catalog on first start when empty.
+        # Run as a background task so the API becomes available (and healthcheck
+        # passes) immediately instead of blocking startup on the slow per-document
+        # Elasticsearch indexing (refresh=wait_for). The catalog populates shortly after.
         card_repo = MongoCardRepository(mongo_db)
         existing_cards_count = await card_repo.count()
         if existing_cards_count == 0:
-            logger.info("Empty catalog detected: auto-seeding cards and marketplace listings...")
+            logger.info("Empty catalog detected: scheduling background seed of cards and listings...")
             listing_repo = MongoListingRepository(mongo_db)
             search_repo = ElasticSearchRepository(elastic_client)
             cache_repo = RedisCacheRepository(redis_client)
@@ -68,11 +72,16 @@ async def lifespan(app: FastAPI):
 
             cards = get_default_catalog_cards()
             listings = get_initial_marketplace_listings()
-            try:
-                await seed_uc.execute(cards, listings)
-                logger.info("Catalog and initial listings seeded successfully.")
-            except Exception as e:
-                logger.warning("Failed to auto-seed catalog: %s", e)
+
+            async def _run_seed() -> None:
+                try:
+                    await seed_uc.execute(cards, listings)
+                    logger.info("Catalog and initial listings seeded successfully.")
+                except Exception as e:
+                    logger.warning("Failed to auto-seed catalog: %s", e)
+
+            # Keep a reference so the task is not garbage-collected mid-flight.
+            app.state.seed_task = asyncio.create_task(_run_seed())
 
     except Exception as exc:
         logger.error("Failed to initialize database connections: %s", exc)
@@ -99,7 +108,7 @@ app = FastAPI(
 # CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

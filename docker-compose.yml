@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   # Public ingress network for frontend Nginx
   pokevinted-public:
@@ -15,8 +13,8 @@ services:
     container_name: pokevinted-mongodb
     restart: unless-stopped
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin_pokevinted}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-ChangeMe_P0k3V1nt3d_M0ng0_P@ssw0rd!}
       - MONGO_INITDB_DATABASE=${MONGO_DB:-pokevinted}
     ports:
       # Bound strictly to host loopback (127.0.0.1) for local CLI inspection
@@ -27,7 +25,7 @@ services:
       - pokevinted-internal
     mem_limit: 512m
     healthcheck:
-      test: ["CMD", "mongosh", "-u", "${MONGO_ROOT_USER}", "-p", "${MONGO_ROOT_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "-u", "${MONGO_ROOT_USER:-admin_pokevinted}", "-p", "${MONGO_ROOT_PASSWORD:-ChangeMe_P0k3V1nt3d_M0ng0_P@ssw0rd!}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +59,7 @@ services:
     image: redis:7-alpine
     container_name: pokevinted-redis
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!}"]
     ports:
       # Bound strictly to host loopback (127.0.0.1) with mandatory password
       - "127.0.0.1:6379:6379"
@@ -71,7 +69,7 @@ services:
       - pokevinted-internal
     mem_limit: 256m
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -88,13 +86,13 @@ services:
       # Bound to loopback for Swagger / OpenAPI docs
       - "127.0.0.1:8000:8000"
     environment:
-      - MONGO_URI=${MONGO_URI}
+      - MONGO_URI=${MONGO_URI:-mongodb://admin_pokevinted:ChangeMe_P0k3V1nt3d_M0ng0_P%40ssw0rd!@mongodb:27017/pokevinted?authSource=admin}
       - MONGO_DB=${MONGO_DB:-pokevinted}
-      - MONGO_ROOT_USER=${MONGO_ROOT_USER}
-      - MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_ROOT_USER=${MONGO_ROOT_USER:-admin_pokevinted}
+      - MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-ChangeMe_P0k3V1nt3d_M0ng0_P@ssw0rd!}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-http://elasticsearch:9200}
-      - REDIS_URL=${REDIS_URL}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=${REDIS_URL:-redis://:ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!@redis:6379/0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-ChangeMe_P0k3V1nt3d_R3d1s_T0k3n!}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
     networks:
       - pokevinted-internal
@@ -140,7 +138,7 @@ services:
       - "${GRAFANA_PORT:-3001}:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-ChangeMe_Grafana_Admin_Password!}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
