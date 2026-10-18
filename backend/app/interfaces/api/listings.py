@@ -60,8 +60,12 @@ async def create_listing(
     seller = payload.seller_name
     if x_session_token:
         session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            seller = session.get("name") or session.get("username") or seller
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expirée ou invalide.",
+            )
+        seller = session.get("name") or session.get("username") or seller
 
     command = CreateListingCommand(
         card_id=payload.card_id,
