@@ -218,6 +218,91 @@ const playBoosterAudio = (type, enabled = true) => {
         osc.start(now + i * 0.06);
         osc.stop(now + i * 0.06 + 0.9);
       });
+    } else if (type === 'warp') {
+      // Rising cosmic warp drive whoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, now);
+      osc.frequency.exponentialRampToValueAtTime(750, now + 0.9);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
+      filter.frequency.exponentialRampToValueAtTime(3500, now + 0.9);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.96);
+    } else if (type === 'supernova') {
+      // Deep sub-bass boom + crystal nova blast
+      const boom = ctx.createOscillator();
+      const boomGain = ctx.createGain();
+      boom.type = 'sine';
+      boom.frequency.setValueAtTime(130, now);
+      boom.frequency.exponentialRampToValueAtTime(32, now + 0.65);
+      boomGain.gain.setValueAtTime(0.85, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      boom.connect(boomGain);
+      boomGain.connect(ctx.destination);
+      boom.start(now);
+      boom.stop(now + 0.72);
+
+      [1200, 1600, 2400, 3200].forEach((freq, idx) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(freq, now + idx * 0.03);
+        g.gain.setValueAtTime(0.18, now + idx * 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.03 + 0.4);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now + idx * 0.03);
+        o.stop(now + idx * 0.03 + 0.42);
+      });
+    } else if (type === 'tease_tick') {
+      // Cinematic sub-thud for Year / Rarity slam
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+      gain.gain.setValueAtTime(0.55, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'slab_rise') {
+      // Ascending acrylic crystal glide
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(680, now + 0.35);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } else if (type === 'cash_jackpot') {
+      // Dual high register chime
+      [1046.5, 1318.51].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        gain.gain.setValueAtTime(0.35, now + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.5);
+      });
     }
   } catch {}
 };
@@ -832,8 +917,212 @@ function BoosterFXCanvas({ tearTrigger, celebrationTrigger, accentColor = '#ffd7
   );
 }
 
+// ─── PSA GRADED SLAB (Authentic Lucite Acrylic Case with Red PSA Header) ────
+function PsaSlab({
+  card,
+  series,
+  tilt = { x: 0, y: 0 },
+  isRevealed = true,
+  onClick,
+  onInspect,
+  isHero = false,
+}) {
+  const rarityCfg = getRarityCfg(card?.pull_rarity);
+  const certNumber = useMemo(() => {
+    if (card?.cert_number) return card.cert_number;
+    const base = Math.abs(
+      (card?.id || 'pkmn')
+        .split('')
+        .reduce((acc, ch) => (acc << 5) - acc + ch.charCodeAt(0), 0)
+    );
+    return (90000000 + (base % 9999999)).toString();
+  }, [card?.id, card?.cert_number]);
+
+  const year = card?.year || series?.release_year || '2023';
+  const gradeText =
+    card?.grade ||
+    (card?.is_hit
+      ? 'GEM MT 10'
+      : card?.market_price && card.market_price > 35
+      ? 'GEM MT 10'
+      : 'MINT 9');
+  const gradeParts = gradeText.split(' ');
+  const gradeLabel = gradeParts.slice(0, -1).join(' ') || 'GEM MT';
+  const gradeNum = gradeParts[gradeParts.length - 1] || '10';
+
+  return (
+    <div
+      onClick={onClick}
+      className={`relative select-none cursor-pointer transition-transform duration-200 group ${
+        isHero ? 'scale-100' : 'scale-90 hover:scale-95'
+      }`}
+      style={{
+        width: '315px',
+        height: '515px',
+        perspective: '1200px',
+      }}
+    >
+      {/* 3D tilt shell */}
+      <div
+        className="w-full h-full relative transition-transform duration-300 ease-out"
+        style={{
+          transform: `rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        {/* Ambient Backlight matching rarity */}
+        <div
+          className="absolute inset-4 rounded-3xl blur-2xl opacity-40 pointer-events-none transition-opacity duration-300"
+          style={{ background: rarityCfg.color }}
+        />
+
+        {/* Acrylic outer slab casing */}
+        <div
+          className="w-full h-full rounded-2xl p-2.5 flex flex-col justify-between relative overflow-hidden"
+          style={{
+            background:
+              'linear-gradient(145deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 30%, rgba(0,0,0,0.55) 100%)',
+            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(255,255,255,0.4)',
+            boxShadow: `0 25px 50px rgba(0,0,0,0.9), inset 0 2px 4px rgba(255,255,255,0.7), inset 0 -2px 4px rgba(0,0,0,0.8), 0 0 35px ${rarityCfg.glow}`,
+          }}
+        >
+          {/* Frosted Lucite Bevel Edge */}
+          <div className="absolute inset-1 rounded-[14px] border border-white/20 pointer-events-none" />
+
+          {/* ── PSA HEADER LABEL ─────────────────────────────────── */}
+          <div className="w-full h-[80px] rounded-lg bg-[#fafafa] border-2 border-red-600 relative overflow-hidden flex flex-col justify-between p-1.5 shadow-md">
+            {/* Top red border bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-red-600" />
+
+            <div className="flex items-start justify-between">
+              {/* Left text column */}
+              <div className="flex flex-col text-[10px] font-black leading-tight text-black tracking-tight uppercase">
+                <span className="truncate max-w-[190px]">
+                  {year} POKÉMON {series?.code || 'SV'} #{card?.number || '001'}
+                </span>
+                <span className="truncate max-w-[190px] font-black text-black">
+                  FA/{card?.name?.toUpperCase() || 'POKÉMON'}
+                </span>
+                <span className="truncate max-w-[190px] text-[8.5px] font-bold text-gray-700">
+                  {card?.pull_rarity?.toUpperCase() || 'COMMON'}
+                </span>
+              </div>
+
+              {/* Right Grade Box */}
+              <div className="border-2 border-red-600 rounded bg-white px-1.5 py-0.5 flex flex-col items-center justify-center min-w-[54px] shadow-xs">
+                <span className="text-[7.5px] font-black text-red-600 leading-none uppercase tracking-tighter">
+                  {gradeLabel}
+                </span>
+                <span className="text-sm font-black text-red-600 leading-tight">
+                  {gradeNum}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Bar: Barcode + PSA Shield Hologram + Cert Number + QR code */}
+            <div className="flex items-center justify-between pt-1 border-t border-gray-300">
+              {/* Scaled Barcode Graphic */}
+              <div
+                className="h-3 w-28 opacity-85"
+                style={{
+                  background:
+                    'repeating-linear-gradient(90deg, #000 0px, #000 1.5px, transparent 1.5px, transparent 3px, #000 3px, #000 5px, transparent 5px, transparent 6px, #000 6px, #000 7.5px)',
+                }}
+              />
+              {/* PSA Silver Holographic Shield */}
+              <div className="px-1.5 py-0.2 rounded bg-gradient-to-r from-slate-200 via-white to-slate-300 border border-slate-400 text-[7px] font-black text-slate-800 flex items-center gap-0.5 shadow-xs">
+                <span className="text-red-600 font-black">PSA</span>
+              </div>
+              {/* Cert Number */}
+              <span className="font-mono text-[9px] font-bold text-gray-800">
+                {certNumber}
+              </span>
+              {/* Mini QR code pattern */}
+              <div className="w-3.5 h-3.5 border border-black p-0.2 flex items-center justify-center">
+                <div className="w-2 h-2 bg-black" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── CARD RECESSED CHAMBER ────────────────────────────── */}
+          <div className="w-full flex-1 mt-2 rounded-xl relative overflow-hidden bg-black/70 border border-white/20 shadow-inner flex items-center justify-center p-2">
+            {/* Corner Holding Tabs (frosted acrylic spacers) */}
+            <div className="absolute top-1 left-1 w-3 h-3 rounded-tl border-t-2 border-l-2 border-white/40 pointer-events-none" />
+            <div className="absolute top-1 right-1 w-3 h-3 rounded-tr border-t-2 border-r-2 border-white/40 pointer-events-none" />
+            <div className="absolute bottom-1 left-1 w-3 h-3 rounded-bl border-b-2 border-l-2 border-white/40 pointer-events-none" />
+            <div className="absolute bottom-1 right-1 w-3 h-3 rounded-br border-b-2 border-r-2 border-white/40 pointer-events-none" />
+
+            {/* Card Artwork or Card Back */}
+            <div className="w-[235px] aspect-[63/88] rounded-lg overflow-hidden relative shadow-2xl">
+              {isRevealed ? (
+                <>
+                  <img
+                    src={card?.image_large || card?.image_small || '/placeholder-card.png'}
+                    alt={card?.name}
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
+                  {/* Holographic foil sweep for special rarities */}
+                  {(card?.is_holo || card?.is_hit || card?.is_reverse) && (
+                    <div
+                      className="absolute inset-0 pointer-events-none opacity-45 mix-blend-color-dodge animate-[rainbowSweep_3.5s_ease_infinite]"
+                      style={{
+                        background:
+                          'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.7) 45%, transparent 70%)',
+                        backgroundSize: '250% 250%',
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <PokemonCardBack />
+              )}
+            </div>
+
+            {/* Dynamic Glass Refraction Glare tracking mouse tilt */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-60 mix-blend-color-dodge transition-opacity"
+              style={{
+                background: `radial-gradient(circle at ${50 + tilt.x * 3}% ${
+                  50 - tilt.y * 3
+                }%, rgba(255,255,255,0.85) 0%, rgba(200,240,255,0.3) 30%, transparent 65%)`,
+              }}
+            />
+
+            {/* Diagonal acrylic surface sheen */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(135deg, transparent 35%, rgba(255,255,255,0.2) 48%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.2) 52%, transparent 65%)',
+                mixBlendMode: 'overlay',
+              }}
+            />
+          </div>
+
+          {/* Quick 3D inspect button */}
+          {onInspect && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onInspect(card);
+              }}
+              className="absolute bottom-4 right-4 p-1.5 rounded-lg bg-black/80 hover:bg-black text-amber-300 border border-white/20 shadow-lg text-[10px] font-bold flex items-center gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Inspecter en 3D"
+            >
+              <Eye size={12} />
+              <span>3D</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 3D Booster Pack Wrapper with Authentic Tear Ritual ─────────────────────
-function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = true }) {
+function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = true, onRipAll }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [tearProgress, setTearProgress] = useState(0);
   const [isDraggingTear, setIsDraggingTear] = useState(false);
@@ -1167,6 +1456,12 @@ export default function BoosterOpeningPage({ onClose }) {
   const [tearTrigger, setTearTrigger] = useState(0);
   const [celebrationTrigger, setCelebrationTrigger] = useState(0);
 
+  // Gacha Angels / Graded Slab state
+  const [isRipAll, setIsRipAll] = useState(false);
+  const [teaseStep, setTeaseStep] = useState(0); // 0: Year, 1: Rarity, 2: Slab Revealed
+  const [summaryViewMode, setSummaryViewMode] = useState('SLABS'); // 'SLABS' | 'GRID'
+  const teaseTimeoutRef = useRef(null);
+
   // 3D Tilt for active card in stack
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
 
@@ -1217,6 +1512,9 @@ export default function BoosterOpeningPage({ onClose }) {
             is_hit: !!card.is_hit,
             is_holo: !!card.is_holo,
             is_reverse: !!card.is_reverse,
+            grade: card.grade || 'GEM MT 10',
+            cert_number: card.cert_number,
+            year: card.year || series?.release_year || '2023',
             count: 1,
             first_pulled_at: new Date().toISOString(),
           });
@@ -1259,20 +1557,25 @@ export default function BoosterOpeningPage({ onClose }) {
         } else {
           onClose?.();
         }
-      } else if ((e.key === ' ' || e.key === 'Enter') && phase === 'REVEAL_STACK') {
+      } else if ((e.key === ' ' || e.key === 'Enter') && phase === 'REVEAL_SLAB') {
         e.preventDefault();
-        handleCardClick();
-      } else if (e.key === 'ArrowRight' && phase === 'REVEAL_STACK') {
+        if (teaseStep < 2) {
+          handleSkipTease();
+        } else {
+          handleNextCard();
+        }
+      } else if (e.key === 'ArrowRight' && phase === 'REVEAL_SLAB') {
         e.preventDefault();
-        handleCardClick();
-      } else if (e.key === 'ArrowLeft' && phase === 'REVEAL_STACK') {
-        e.preventDefault();
-        handlePreviousCard();
+        if (teaseStep < 2) {
+          handleSkipTease();
+        } else {
+          handleNextCard();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase, currentSlotIndex, packData, inspectCard, revealedCardIndices]);
+  }, [phase, currentSlotIndex, packData, inspectCard, teaseStep]);
 
   // Start pack opening process
   const handleSelectSeriesAndOpen = async (series) => {
@@ -1288,6 +1591,31 @@ export default function BoosterOpeningPage({ onClose }) {
       });
       if (!res.ok) throw new Error('Échec de la génération du booster.');
       const data = await res.json();
+      // Enrich cards with authentic PSA slab grading attributes
+      if (Array.isArray(data?.cards)) {
+        data.cards = data.cards.map((card, idx) => {
+          const isHit = !!card.is_hit || card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare';
+          const grade = isHit
+            ? 'GEM MT 10'
+            : card.market_price && card.market_price > 35
+            ? 'GEM MT 10'
+            : (idx * 23) % 100 > 20
+            ? 'GEM MT 10'
+            : 'MINT 9';
+          const base = Math.abs(
+            (card.id || 'card')
+              .split('')
+              .reduce((acc, ch) => (acc << 5) - acc + ch.charCodeAt(0), 0)
+          );
+          const cert = (90000000 + (base % 9999999)).toString();
+          return {
+            ...card,
+            grade,
+            cert_number: cert,
+            year: series.release_year || '2023',
+          };
+        });
+      }
       setPackData(data);
       setPhase('TEAR_PACK');
     } catch (err) {
@@ -1297,83 +1625,28 @@ export default function BoosterOpeningPage({ onClose }) {
     }
   };
 
-  // Perform the physical rip of the pack wrapper
-  const handleTearPack = () => {
+  // Start Gacha Angels rip animation (Cosmic Warp -> Supernova -> Slabs)
+  const handleStartRip = (ripAll = false) => {
     if (isTorn || !packData) return;
-    playBoosterAudio('tear', audioEnabled);
-    setIsShaking(true);
-    setTearTrigger(Date.now());
-    setTimeout(() => {
-      setIsShaking(false);
-      setIsTorn(true);
-      // Automatically add cards to user's collection binder
-      addCardsToCollection(packData.cards, selectedSeries);
-      setTimeout(() => {
-        setPhase('REVEAL_STACK');
-        setCurrentSlotIndex(0);
-        setRevealedCardIndices(new Set());
-      }, 1250);
-    }, 280);
-  };
-
-  // Fast forward directly into reveal stack
-  const handleSkipTear = () => {
-    if (!packData) return;
     setIsTorn(true);
+    setIsRipAll(ripAll);
+    setPhase('COSMIC_WARP');
+    playBoosterAudio('warp', audioEnabled);
+
+    // Supernova explosion & particle burst at 650ms
+    setTimeout(() => {
+      playBoosterAudio('supernova', audioEnabled);
+      setTearTrigger(Date.now());
+    }, 650);
+
+    // Add cards to collection binder
     addCardsToCollection(packData.cards, selectedSeries);
-    setPhase('REVEAL_STACK');
-    setCurrentSlotIndex(0);
-    setRevealedCardIndices(new Set());
-  };
 
-  // Reveal current card on the stack
-  const handleRevealCurrentCard = () => {
-    if (!packData || isCardFlipping) return;
-    const card = packData.cards[currentSlotIndex];
-    if (!card) return;
-
-    if (!revealedCardIndices.has(currentSlotIndex)) {
-      setIsCardFlipping(true);
-
-      // Play audio matching rarity tier & trigger celebration on Hits
-      if (card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare' || card.is_hit) {
+    // After warp completes (~1600ms)
+    setTimeout(() => {
+      if (ripAll) {
         playBoosterAudio('god_pull', audioEnabled);
         setCelebrationTrigger(Date.now());
-        setIsScreenShaking(true);
-        setTimeout(() => setIsScreenShaking(false), 900);
-      } else if (card.is_holo || card.is_reverse) {
-        playBoosterAudio('holo', audioEnabled);
-      } else {
-        playBoosterAudio('flip', audioEnabled);
-      }
-
-      setRevealedCardIndices((prev) => new Set(prev).add(currentSlotIndex));
-      setTimeout(() => setIsCardFlipping(false), 300);
-    }
-  };
-
-  // Card click handler: if facedown, reveal. If already revealed, advance to next card!
-  const handleCardClick = () => {
-    if (!packData) return;
-    if (!revealedCardIndices.has(currentSlotIndex)) {
-      handleRevealCurrentCard();
-    } else {
-      handleNextCard();
-    }
-  };
-
-  // Proceed to next card in the stack
-  const handleNextCard = () => {
-    if (!packData || isCardSliding) return;
-    setIsCardSliding(true);
-    playBoosterAudio('slide', audioEnabled);
-    setTimeout(() => {
-      if (currentSlotIndex < packData.cards.length - 1) {
-        setCurrentSlotIndex((prev) => prev + 1);
-        setCardTilt({ x: 0, y: 0 });
-        setIsPeeking(false);
-      } else {
-        // Reached the end of the 10-card pack! Update session statistics and view summary
         const hitsCount = packData.cards.filter((c) => c.is_hit).length;
         setSessionStats((prev) => ({
           openedCount: prev.openedCount + 1,
@@ -1381,32 +1654,74 @@ export default function BoosterOpeningPage({ onClose }) {
           totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
         }));
         setPhase('SUMMARY_BINDER');
+      } else {
+        setPhase('REVEAL_SLAB');
+        setCurrentSlotIndex(0);
+        startTeaseForCard(0, packData.cards[0]);
       }
-      setIsCardSliding(false);
-    }, 240);
+    }, 1600);
   };
 
-  // Previous card navigation
-  const handlePreviousCard = () => {
-    if (currentSlotIndex > 0) {
-      setCurrentSlotIndex((prev) => prev - 1);
-      setCardTilt({ x: 0, y: 0 });
+  const handleFastForwardWarp = () => {
+    if (isRipAll) {
+      setPhase('SUMMARY_BINDER');
+    } else {
+      setPhase('REVEAL_SLAB');
+      setCurrentSlotIndex(0);
+      startTeaseForCard(0, packData.cards[0]);
     }
   };
 
-  // Skip step-by-step reveal and reveal all cards instantly
-  const handleRevealAllInstantly = () => {
+  // Orchestrate Gacha Angels Year -> Rarity -> PSA Slab tease
+  const startTeaseForCard = (slotIdx, card) => {
+    if (teaseTimeoutRef.current) clearTimeout(teaseTimeoutRef.current);
+    setTeaseStep(0);
+    playBoosterAudio('tease_tick', audioEnabled);
+
+    const t1 = setTimeout(() => {
+      setTeaseStep(1);
+      playBoosterAudio('tease_tick', audioEnabled);
+
+      const t2 = setTimeout(() => {
+        setTeaseStep(2);
+        playBoosterAudio('slab_rise', audioEnabled);
+        if (card && (card.is_hit || (card.market_price && card.market_price > 50))) {
+          setTimeout(() => {
+            playBoosterAudio('cash_jackpot', audioEnabled);
+            setCelebrationTrigger(Date.now());
+          }, 250);
+        }
+      }, 500);
+      teaseTimeoutRef.current = t2;
+    }, 450);
+    teaseTimeoutRef.current = t1;
+  };
+
+  const handleSkipTease = () => {
+    if (teaseTimeoutRef.current) clearTimeout(teaseTimeoutRef.current);
+    setTeaseStep(2);
+    playBoosterAudio('slab_rise', audioEnabled);
+  };
+
+  const handleNextCard = () => {
     if (!packData) return;
-    playBoosterAudio('god_pull', audioEnabled);
-    const allIndices = new Set(packData.cards.map((_, i) => i));
-    setRevealedCardIndices(allIndices);
-    const hitsCount = packData.cards.filter((c) => c.is_hit).length;
-    setSessionStats((prev) => ({
-      openedCount: prev.openedCount + 1,
-      hitsCount: prev.hitsCount + hitsCount,
-      totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
-    }));
-    setPhase('SUMMARY_BINDER');
+    if (currentSlotIndex < packData.cards.length - 1) {
+      const nextIdx = currentSlotIndex + 1;
+      setCurrentSlotIndex(nextIdx);
+      setCardTilt({ x: 0, y: 0 });
+      startTeaseForCard(nextIdx, packData.cards[nextIdx]);
+    } else {
+      // Reached the end of the 10-card pack! Update session statistics and view summary
+      const hitsCount = packData.cards.filter((c) => c.is_hit).length;
+      setSessionStats((prev) => ({
+        openedCount: prev.openedCount + 1,
+        hitsCount: prev.hitsCount + hitsCount,
+        totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
+      }));
+      playBoosterAudio('god_pull', audioEnabled);
+      setCelebrationTrigger(Date.now());
+      setPhase('SUMMARY_BINDER');
+    }
   };
 
   // Bookmark card to personal collection binder
@@ -1519,6 +1834,41 @@ export default function BoosterOpeningPage({ onClose }) {
         @keyframes godRays {
           0%, 100% { opacity: 0.6; transform: scale(1); }
           50% { opacity: 0.95; transform: scale(1.08); }
+        }
+        @keyframes cosmicTunnelSpin {
+          0% { transform: rotate(0deg) scale(0.9); }
+          50% { transform: rotate(180deg) scale(1.4); }
+          100% { transform: rotate(360deg) scale(2.2); }
+        }
+        @keyframes packTumble3D {
+          0% { transform: translate(-50%, -50%) scale(1) rotate(0deg) rotateX(0deg) rotateY(0deg); opacity: 1; }
+          30% { transform: translate(-50%, -50%) scale(0.85) rotate(-18deg) rotateX(25deg) rotateY(90deg); opacity: 1; }
+          60% { transform: translate(-50%, -50%) scale(1.15) rotate(12deg) rotateX(-20deg) rotateY(220deg); opacity: 1; }
+          85% { transform: translate(-50%, -50%) scale(1.35) rotate(-6deg) rotateX(15deg) rotateY(320deg); opacity: 0.9; }
+          100% { transform: translate(-50%, -50%) scale(1.6) rotate(0deg) rotateX(0deg) rotateY(400deg); opacity: 0; }
+        }
+        @keyframes supernovaExpand {
+          0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+          25% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: drop-shadow(0 0 60px #fff); }
+          60% { transform: translate(-50%, -50%) scale(3.5); opacity: 0.9; }
+          100% { transform: translate(-50%, -50%) scale(6.5); opacity: 0; }
+        }
+        @keyframes slabRiseUp {
+          0% { transform: translateY(180px) scale(0.9); opacity: 0; }
+          100% { transform: translateY(0px) scale(1); opacity: 1; }
+        }
+        @keyframes spotlightGlow {
+          0%, 100% { opacity: 0.45; transform: scaleX(1); }
+          50% { opacity: 0.85; transform: scaleX(1.18); }
+        }
+        @keyframes pulseTeaseText {
+          0% { transform: scale(0.85); opacity: 0; filter: blur(4px); }
+          65% { transform: scale(1.08); opacity: 1; filter: blur(0px); }
+          100% { transform: scale(1); opacity: 1; filter: blur(0px); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
@@ -1749,24 +2099,36 @@ export default function BoosterOpeningPage({ onClose }) {
             <BoosterPackFoil
               series={selectedSeries}
               isTorn={isTorn}
-              onTear={handleTearPack}
+              onTear={() => handleStartRip(false)}
               isShaking={isShaking}
               audioEnabled={audioEnabled}
             />
 
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-3 w-full">
+              {/* Single reveal rip button */}
               <button
-                onClick={handleTearPack}
+                onClick={() => handleStartRip(false)}
                 disabled={isTorn}
-                className="px-8 py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_30px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 border border-white/20"
+                className="w-full px-8 py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_30px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 border border-white/20"
               >
                 <Zap size={18} className="text-yellow-300 fill-yellow-300 animate-pulse" />
                 <span>{isTorn ? 'OUVERTURE DU PACK...' : 'DÉCHIRER LE SCELLÉ HOLOGRAPHIQUE'}</span>
               </button>
 
-              <div className="flex items-center gap-4 mt-2">
+              {/* Rip all 10 at once (Directly from Gacha Angels video) */}
+              <button
+                onClick={() => handleStartRip(true)}
+                disabled={isTorn}
+                className="w-full px-6 py-2.5 rounded-2xl text-xs font-black text-amber-300 bg-black/85 hover:bg-black border border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                title="Ouvrir toutes les 10 cartes d'un coup comme dans la vidéo Gacha Angels"
+              >
+                <Sparkles size={14} className="text-amber-400" />
+                <span>✨ RIP ALL 10 AT ONCE (GACHA ANGELS)</span>
+              </button>
+
+              <div className="flex items-center gap-4 mt-1">
                 <button
-                  onClick={handleSkipTear}
+                  onClick={() => handleStartRip(true)}
                   className="text-xs text-amber-400/80 hover:text-amber-300 transition-colors flex items-center gap-1"
                 >
                   <Zap size={12} />
@@ -1785,327 +2147,251 @@ export default function BoosterOpeningPage({ onClose }) {
           </div>
         )}
 
-        {/* ── STAGE 3: REVEAL DECK STACK (CLICK CARD OR ARROWS TO ADVANCE) ───── */}
-        {phase === 'REVEAL_STACK' && packData && currentCard && (
-          <div className="my-auto flex flex-col items-center gap-4 w-full max-w-4xl py-2">
-            {/* Top slot pill & indicator */}
-            <div className="flex items-center justify-between w-full max-w-md px-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold text-gray-400">
-                  CARTE {currentSlotIndex + 1} / 10
-                </span>
-                <span
-                  className="text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm"
-                  style={{
-                    background: `${currentRarityCfg.color}20`,
-                    borderColor: currentRarityCfg.border,
-                    color: currentRarityCfg.color,
-                  }}
-                >
-                  {currentCard.slot_label || currentRarityCfg.label}
-                </span>
-              </div>
+        {/* ── STAGE 2.5: COSMIC WARP & SUPERNOVA (GACHA ANGELS HYPERSPACE) ── */}
+        {phase === 'COSMIC_WARP' && selectedSeries && (
+          <div className="fixed inset-0 z-[400] flex flex-col items-center justify-center overflow-hidden bg-black select-none">
+            {/* Hyperspace Radial Tunnel Rays */}
+            <div
+              className="absolute inset-[-60%] pointer-events-none opacity-85 animate-[cosmicTunnelSpin_3s_linear_infinite]"
+              style={{
+                background:
+                  'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(56,189,248,0.7) 15%, rgba(139,92,246,0.4) 40%, rgba(3,7,18,0.95) 75%)',
+                maskImage:
+                  'repeating-conic-gradient(from 0deg, #000 0deg 8deg, transparent 8deg 16deg)',
+                WebkitMaskImage:
+                  'repeating-conic-gradient(from 0deg, #000 0deg 8deg, transparent 8deg 16deg)',
+              }}
+            />
 
-              {currentCard.is_hit && isCurrentCardRevealed ? (
-                <span className="flex items-center gap-1.5 text-xs font-black text-amber-300 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.4)] animate-bounce">
-                  <Star size={14} fill="currentColor" className="text-amber-400" />
-                  <span>HIT MAJEUR DÉBLOQUÉ !</span>
-                </span>
-              ) : (
-                <button
-                  onMouseDown={() => setIsPeeking(true)}
-                  onMouseUp={() => setIsPeeking(false)}
-                  onTouchStart={() => setIsPeeking(true)}
-                  onTouchEnd={() => setIsPeeking(false)}
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
-                    isPeeking
-                      ? 'bg-amber-400/25 border-amber-400 text-amber-300 shadow-md'
-                      : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                  title="Maintenez pour soulever légèrement la carte et entrevoir sa bordure"
-                >
-                  👁️ Peeker la bordure
-                </button>
-              )}
-            </div>
+            {/* Radiant Center Light Beam */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.35)_0%,transparent_65%)] pointer-events-none" />
 
-            {/* 3D Stack Area with Side Navigation Arrows */}
-            <div className="flex items-center justify-center gap-3 sm:gap-6 w-full relative">
-              {/* Rotating Sunburst God-Rays when a HIT is pulled */}
-              {currentCard.is_hit && isCurrentCardRevealed && (
+            {/* 3D Tumbling Booster Pack */}
+            <div
+              className="absolute left-1/2 top-1/2 pointer-events-none animate-[packTumble3D_1.6s_cubic-bezier(0.2,0.8,0.2,1)_forwards]"
+              style={{ perspective: '1200px' }}
+            >
+              <div className="w-[280px] h-[440px] rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(56,189,248,0.9)] border-2 border-white/60 relative">
+                <img
+                  src={selectedSeries.pack_image}
+                  alt={selectedSeries.name}
+                  className="w-full h-full object-cover"
+                />
+                {/* Ripping Tear Light Line */}
+                <div className="absolute top-12 left-0 right-0 h-2 bg-white shadow-[0_0_20px_#fff] animate-ping" />
+                {/* Prismatic rainbow reflection */}
                 <div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] pointer-events-none rounded-full opacity-65 animate-[sunburstSpin_22s_linear_infinite] z-0"
+                  className="absolute inset-0 pointer-events-none opacity-60 mix-blend-color-dodge animate-pulse"
                   style={{
                     background:
-                      'conic-gradient(from 0deg, transparent 0deg 20deg, rgba(251,191,36,0.35) 20deg 40deg, transparent 40deg 60deg, rgba(251,191,36,0.35) 60deg 80deg, transparent 80deg 100deg, rgba(251,191,36,0.35) 100deg 120deg, transparent 120deg 140deg, rgba(251,191,36,0.35) 140deg 160deg, transparent 160deg 180deg, rgba(251,191,36,0.35) 180deg 200deg, transparent 200deg 220deg, rgba(251,191,36,0.35) 220deg 240deg, transparent 240deg 260deg, rgba(251,191,36,0.35) 260deg 280deg, transparent 280deg 300deg, rgba(251,191,36,0.35) 300deg 320deg, transparent 320deg 340deg, rgba(251,191,36,0.35) 340deg 360deg)',
+                      'linear-gradient(135deg, transparent 20%, rgba(255,255,255,0.9) 50%, transparent 80%)',
                   }}
                 />
-              )}
-
-              {/* Floating Left Arrow (Previous Card) */}
-              <button
-                onClick={handlePreviousCard}
-                disabled={currentSlotIndex === 0}
-                className={`p-3 rounded-2xl border transition-all z-20 ${
-                  currentSlotIndex === 0
-                    ? 'opacity-20 cursor-not-allowed border-white/5 bg-white/[0.02] text-gray-600'
-                    : 'hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl'
-                }`}
-                title="Carte précédente (Flèche gauche)"
-              >
-                <ChevronLeft size={24} />
-              </button>
-
-              {/* The Card Container with Click-to-Flip and Click-to-Next */}
-              <div
-                className="relative cursor-pointer select-none z-10"
-                style={{
-                  width: '295px',
-                  height: '412px',
-                  perspective: '1200px',
-                  transform: isCardSliding
-                    ? 'translateX(125%) rotate(12deg) scale(0.92)'
-                    : isPeeking
-                    ? 'translateY(-32px) rotate(-1.5deg)'
-                    : 'none',
-                  opacity: isCardSliding ? 0 : 1,
-                  transition: isCardSliding
-                    ? 'all 0.24s cubic-bezier(0.4, 0, 0.2, 1)'
-                    : 'transform 0.22s ease-out, opacity 0.2s',
-                }}
-                onClick={handleCardClick}
-                onMouseMove={handleCardMouseMove}
-                onMouseLeave={handleCardMouseLeave}
-              >
-                {/* Stack depth perspective cards underneath showing physical cardstock layers */}
-                {Array.from({ length: Math.min(4, 9 - currentSlotIndex) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="absolute inset-0 rounded-2xl pointer-events-none transition-transform"
-                    style={{
-                      transform: `translate(${(i + 1) * 3}px, ${(i + 1) * 4}px) scale(${
-                        1 - (i + 1) * 0.015
-                      })`,
-                      zIndex: -i - 1,
-                      opacity: 0.9 - i * 0.15,
-                      boxShadow: `0 ${(i + 1) * 4}px ${(i + 1) * 8}px rgba(0,0,0,0.6)`,
-                    }}
-                  >
-                    <div className="w-full h-full rounded-2xl overflow-hidden border-r-2 border-b-2 border-slate-300/40">
-                      <PokemonCardBack />
-                    </div>
-                  </div>
-                ))}
-
-                {/* The Active Top Card */}
-                <div
-                  className={`w-full h-full relative rounded-2xl transition-transform duration-500 ease-out ${
-                    currentCard.is_hit && isCurrentCardRevealed ? 'animate-[hitPulse_2.5s_infinite]' : ''
-                  }`}
-                  style={{
-                    transformStyle: 'preserve-3d',
-                    transform: isCurrentCardRevealed
-                      ? `rotateY(0deg) rotateX(${cardTilt.y}deg) rotateY(${cardTilt.x}deg)`
-                      : 'rotateY(180deg)',
-                    boxShadow:
-                      currentCard.is_hit && isCurrentCardRevealed
-                        ? `0 0 45px ${currentRarityCfg.glow}, 0 25px 50px rgba(0,0,0,0.9)`
-                        : '0 20px 45px rgba(0,0,0,0.75)',
-                  }}
-                >
-                  {/* BACK FACE (Unrevealed Authentic Pokémon Card Back) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      transform: 'rotateY(180deg)',
-                    }}
-                  >
-                    <PokemonCardBack />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/10 transition-colors">
-                      <span className="px-4 py-2.5 rounded-xl bg-black/85 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-2xl animate-pulse flex items-center gap-2">
-                        <Sparkles size={15} className="text-amber-400" />
-                        <span>Cliquer pour révéler ⚡</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* FRONT FACE (Revealed official card artwork) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      border: `3px solid ${currentRarityCfg.color}`,
-                      background: '#0f111a',
-                    }}
-                  >
-                    {/* Card Artwork */}
-                    <img
-                      src={currentCard.image_large || currentCard.image_small || '/placeholder-card.png'}
-                      alt={currentCard.name}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-
-                    {/* Holographic foil sweep for Holo/Reverse */}
-                    {(currentCard.is_holo || currentCard.is_hit || currentCard.is_reverse) && (
-                      <div
-                        className="absolute inset-0 pointer-events-none opacity-45 mix-blend-color-dodge animate-[rainbowSweep_3.5s_ease_infinite]"
-                        style={{
-                          background:
-                            'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.7) 45%, transparent 70%)',
-                          backgroundSize: '250% 250%',
-                        }}
-                      />
-                    )}
-
-                    {/* Dynamic Holographic Glare Layer Tracking Mouse Tilt */}
-                    <div
-                      className="absolute inset-0 pointer-events-none opacity-55 mix-blend-color-dodge transition-opacity"
-                      style={{
-                        background: `radial-gradient(circle at ${50 + cardTilt.x * 2.5}% ${
-                          50 - cardTilt.y * 2.5
-                        }%, rgba(255,255,255,0.75) 0%, rgba(255,200,255,0.3) 30%, transparent 60%)`,
-                      }}
-                    />
-
-                    {/* Top overlay pills */}
-                    <div className="absolute top-2 left-2 flex items-center gap-1 z-20">
-                      <span
-                        className="text-[10px] font-black px-2 py-0.5 rounded-md text-white shadow-md backdrop-blur-md"
-                        style={{
-                          background: currentRarityCfg.bg,
-                          border: `1px solid ${currentRarityCfg.color}80`,
-                        }}
-                      >
-                        {currentCard.pull_rarity || currentCard.rarity}
-                      </span>
-                      {currentCard.is_reverse && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-600/80 text-white border border-white/20">
-                          REVERSE
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Market value badge */}
-                    <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-md bg-black/85 border border-white/20 text-emerald-400 font-black text-xs shadow-md">
-                      {currentCard.market_price ? `${currentCard.market_price.toFixed(2)} €` : '—'}
-                    </div>
-
-                    {/* Bottom title gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black via-black/80 to-transparent">
-                      <p className="text-sm font-black text-white truncate drop-shadow">
-                        {currentCard.name}
-                      </p>
-                      <p className="text-[10px] text-gray-300 flex items-center justify-between mt-0.5">
-                        <span>
-                          N° {currentCard.number} • {currentCard.set_name}
-                        </span>
-                        {currentCard.is_hit && (
-                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
-                            <Flame size={11} /> Chase Card
-                          </span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Advance Cue on Card hover */}
-                    <div className="absolute inset-x-0 bottom-12 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <span className="px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-[10px] font-bold text-amber-300 border border-amber-400/30">
-                        Cliquer sur la carte pour la suivante →
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3D 360° Inspect Button right below the card */}
-                {isCurrentCardRevealed && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setInspectCard(currentCard);
-                    }}
-                    className="absolute -bottom-9 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/85 hover:bg-black text-[11px] font-bold text-amber-300 border border-amber-400/50 shadow-lg flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-                  >
-                    <Eye size={12} />
-                    <span>Inspecter en 3D 360°</span>
-                  </button>
-                )}
               </div>
-
-              {/* Floating Right Arrow (Next Card / Reveal) */}
-              <button
-                onClick={handleCardClick}
-                className="p-3 rounded-2xl border transition-all z-20 hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl"
-                title={
-                  isCurrentCardRevealed
-                    ? 'Carte suivante (Flèche droite ou clic)'
-                    : 'Révéler la carte (Flèche droite ou clic)'
-                }
-              >
-                <ChevronRight size={24} />
-              </button>
             </div>
 
-            {/* Suspense progress indicator & controls */}
-            <div className="flex flex-col items-center gap-3 w-full max-w-md mt-1">
-              {/* Dots tracker */}
-              <div className="flex items-center justify-center gap-1.5 w-full">
-                {packData.cards.map((c, idx) => {
-                  const isCurrent = idx === currentSlotIndex;
-                  const isPast = idx < currentSlotIndex;
-                  const isSlotHit = c.is_hit;
-                  return (
+            {/* Supernova Expansion Sphere */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full pointer-events-none z-30 bg-radial from-white via-cyan-300 to-transparent animate-[supernovaExpand_1.4s_ease-out_0.6s_forwards] opacity-0" />
+
+            {/* Floating Petal Flakes */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-25">
+              {Array.from({ length: 30 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="absolute rounded-full pointer-events-none animate-ping"
+                  style={{
+                    left: `${20 + (idx * 27) % 65}%`,
+                    top: `${20 + (idx * 31) % 65}%`,
+                    width: `${6 + (idx % 8)}px`,
+                    height: `${6 + (idx % 8)}px`,
+                    background: idx % 2 === 0 ? '#ec4899' : '#facc15',
+                    animationDuration: `${0.8 + (idx % 10) * 0.1}s`,
+                    animationDelay: `${idx * 0.04}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Top Skip Button */}
+            <button
+              onClick={handleFastForwardWarp}
+              className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-xl flex items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 z-50"
+            >
+              <Zap size={14} className="text-amber-400" />
+              <span>Passer (Skip)</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── STAGE 3: GACHA ANGELS TEASE & PSA SLAB REVEAL ────────────────── */}
+        {phase === 'REVEAL_SLAB' && packData && currentCard && (
+          <div
+            className="my-auto flex flex-col items-center justify-center w-full max-w-4xl py-2 relative select-none"
+            onClick={() => {
+              if (teaseStep < 2) handleSkipTease();
+            }}
+          >
+            {/* Dynamic Top Spotlight Beam */}
+            <div
+              className="absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[650px] pointer-events-none opacity-45 animate-[spotlightGlow_3s_ease-in-out_infinite]"
+              style={{
+                background:
+                  'radial-gradient(ellipse at 50% 0%, rgba(147,197,253,0.45) 0%, rgba(99,102,241,0.2) 40%, transparent 75%)',
+                clipPath: 'polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%)',
+              }}
+            />
+
+            {/* Top Tease Typography Sequence (Gacha Angels: YEAR -> RARITY -> SLAB) */}
+            <div className="h-28 flex flex-col items-center justify-center text-center z-20">
+              {teaseStep === 0 && (
+                <div className="animate-[pulseTeaseText_0.35s_ease-out]">
+                  <span className="text-[11px] font-black tracking-[0.35em] text-gray-400 uppercase">
+                    YEAR
+                  </span>
+                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-widest mt-0.5 drop-shadow-[0_0_20px_rgba(255,255,255,0.7)] font-mono">
+                    {currentCard.year || selectedSeries?.release_year || '2023'}
+                  </h2>
+                </div>
+              )}
+
+              {teaseStep === 1 && (
+                <div className="animate-[pulseTeaseText_0.35s_ease-out]">
+                  <span className="text-[11px] font-black tracking-[0.35em] text-gray-400 uppercase">
+                    RARITY
+                  </span>
+                  <h2
+                    className="text-3xl sm:text-4xl font-black tracking-wider mt-0.5 uppercase drop-shadow-[0_0_25px_currentColor]"
+                    style={{ color: currentRarityCfg.color }}
+                  >
+                    {currentCard.pull_rarity || 'COMMUNE'}
+                  </h2>
+                </div>
+              )}
+
+              {teaseStep >= 2 && (
+                <div className="animate-[fadeIn_0.3s_ease-out] flex flex-col items-center">
+                  <span className="text-[11px] font-bold tracking-[0.25em] text-gray-400 uppercase font-mono">
+                    YEAR {currentCard.year || selectedSeries?.release_year || '2023'} | GRADE{' '}
+                    <strong className="text-red-500 font-black">
+                      {currentCard.grade || (currentCard.is_hit ? 'GEM-MT 10' : 'MINT 9')}
+                    </strong>
+                  </span>
+                  <h3 className="text-lg font-black text-white mt-0.5 flex items-center gap-2">
+                    <span>{currentCard.name}</span>
+                    {currentCard.is_hit && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                        HIT 🔥
+                      </span>
+                    )}
+                  </h3>
+                </div>
+              )}
+            </div>
+
+            {/* Center PSA Graded Slab Stage with mouse tilt tracking */}
+            <div
+              className="relative z-10 my-1"
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
+                const y = ((e.clientY - rect.top) / rect.height - 0.5) * -20;
+                setCardTilt({ x, y });
+              }}
+              onMouseLeave={() => setCardTilt({ x: 0, y: 0 })}
+            >
+              {/* Slab container with slide-up entrance */}
+              <div
+                className={teaseStep >= 2 ? 'animate-[slabRiseUp_0.5s_cubic-bezier(0.2,0.8,0.2,1)_forwards]' : 'opacity-0 pointer-events-none'}
+              >
+                <PsaSlab
+                  card={currentCard}
+                  series={selectedSeries}
+                  tilt={cardTilt}
+                  isRevealed={true}
+                  isHero={true}
+                  onInspect={() => setInspectCard(currentCard)}
+                />
+              </div>
+
+              {/* When teaseStep < 2: show frosted placeholder rising in silhouette */}
+              {teaseStep < 2 && (
+                <div className="w-[315px] h-[515px] rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center p-4 shadow-2xl animate-pulse">
+                  <Sparkles size={36} className="text-white/40 animate-spin" />
+                  <span className="text-xs font-mono font-bold text-gray-500 mt-3 tracking-widest uppercase">
+                    CERTIFICATION PSA EN COURS...
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Insured Value & Actions (Mirrors Gacha Angels frame 12s) */}
+            <div className="h-28 flex flex-col items-center justify-center z-20 mt-1">
+              {teaseStep >= 2 ? (
+                <div className="flex flex-col items-center gap-2 animate-[fadeIn_0.35s_ease-out]">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                      INSURED VALUE
+                    </span>
+                    <span className="text-3xl font-black text-emerald-400 font-mono drop-shadow-[0_0_15px_rgba(52,211,153,0.9)]">
+                      {currentCard.market_price ? `${currentCard.market_price.toFixed(2)} €` : '12.50 €'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
                     <button
-                      key={idx}
-                      onClick={() => {
-                        setCurrentSlotIndex(idx);
-                        if (!revealedCardIndices.has(idx)) {
-                          handleRevealCurrentCard();
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNextCard();
                       }}
-                      className={`h-2 rounded-full transition-all ${
-                        isCurrent
-                          ? 'w-7 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                          : isPast
-                          ? isSlotHit
-                            ? 'w-3 bg-pink-500'
-                            : 'w-2 bg-emerald-500'
-                          : 'w-2 bg-white/20'
+                      className="px-8 py-2.5 rounded-full font-black text-sm text-black bg-[#7df844] hover:bg-[#8eff5a] shadow-[0_0_20px_rgba(125,248,68,0.7)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                      <span>{currentSlotIndex === 9 ? 'Bilan du Pack 🏆' : 'Next Card →'}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSavePortfolio(currentCard.id);
+                      }}
+                      className={`p-2.5 rounded-full border transition-all ${
+                        savedToPortfolio.has(currentCard.id)
+                          ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)]'
+                          : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
                       }`}
-                      title={`Carte ${idx + 1}`}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 w-full justify-center">
-                {!isCurrentCardRevealed ? (
-                  <button
-                    onClick={handleRevealCurrentCard}
-                    className="flex-1 py-3 px-6 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Zap size={16} />
-                    <span>Révéler la carte (Clic ou Espace)</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleNextCard}
-                    className="flex-1 py-3 px-6 rounded-xl font-black text-sm text-white bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>{currentSlotIndex === 9 ? 'Voir le Bilan du Pack 🏆' : 'Carte Suivante → (ou Clic)'}</span>
-                  </button>
-                )}
-
+                      title="Ajouter au classeur personnel"
+                    >
+                      <Bookmark size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <button
-                  onClick={handleRevealAllInstantly}
-                  className="px-4 py-3 rounded-xl text-xs font-bold text-gray-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-colors"
-                  title="Tout révéler d'un coup"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSkipTease();
+                  }}
+                  className="text-xs text-gray-500 hover:text-white transition-colors flex items-center gap-1.5 py-2 px-4 rounded-full bg-black/60 border border-white/10"
                 >
-                  Tout Révéler ⚡
+                  <Zap size={12} className="text-amber-400" />
+                  <span>Passer l'animation (Skip)</span>
                 </button>
-              </div>
+              )}
+            </div>
+
+            {/* Dots Tracker at Bottom */}
+            <div className="flex items-center justify-center gap-1.5 w-full mt-1">
+              {packData.cards.map((c, idx) => (
+                <div
+                  key={idx}
+                  className={`h-1.5 rounded-full transition-all ${
+                    idx === currentSlotIndex
+                      ? 'w-6 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                      : idx < currentSlotIndex
+                      ? 'w-2 bg-emerald-700'
+                      : 'w-1.5 bg-white/20'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -2154,14 +2440,71 @@ export default function BoosterOpeningPage({ onClose }) {
                   {packData.total_estimated_value.toFixed(2)} €
                 </span>
                 <span className="text-[11px] font-bold text-gray-400 mt-0.5">
-                  10 cartes authentiques • Sortie de booster (MINT)
+                  10 cartes certifiées PSA • MINT / GEM-MT 10
                 </span>
               </div>
             </div>
 
-            {/* 10-Card Collector Binder Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 w-full">
-              {packData.cards.map((card, idx) => {
+            {/* View Mode Toggle: Slabs vs Grid */}
+            <div className="flex items-center justify-between w-full px-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSummaryViewMode('SLABS')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${
+                    summaryViewMode === 'SLABS'
+                      ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+                  }`}
+                >
+                  <Trophy size={14} />
+                  <span>Vue Slabs PSA Graded (Gacha Angels)</span>
+                </button>
+
+                <button
+                  onClick={() => setSummaryViewMode('GRID')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${
+                    summaryViewMode === 'GRID'
+                      ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]'
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+                  }`}
+                >
+                  <Layers size={14} />
+                  <span>Vue Classeur Grille</span>
+                </button>
+              </div>
+              <span className="text-xs text-gray-500 hidden sm:block">
+                10 cartes certifiées PSA GEM-MT 10 / MINT 9
+              </span>
+            </div>
+
+            {summaryViewMode === 'SLABS' ? (
+              /* Horizontal Carousel of all 10 PSA Slabs (Matching frame 88s of video) */
+              <div className="w-full overflow-x-auto py-6 px-2 flex items-center gap-6 scrollbar-thin scrollbar-thumb-white/20 snap-x">
+                {packData.cards.map((card, idx) => (
+                  <div
+                    key={`${card.id}-${idx}`}
+                    className="shrink-0 flex flex-col items-center gap-2 snap-center group"
+                  >
+                    <PsaSlab
+                      card={card}
+                      series={selectedSeries}
+                      isHero={false}
+                      onInspect={() => setInspectCard(card)}
+                    />
+                    <div className="flex flex-col items-center mt-1">
+                      <span className="text-[10px] font-black uppercase text-gray-400">
+                        {card.grade || 'GEM MT 10'}
+                      </span>
+                      <span className="text-sm font-black text-emerald-400 font-mono drop-shadow">
+                        Valued {card.market_price ? `${card.market_price.toFixed(2)} €` : '15.00 €'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 w-full">
+                {packData.cards.map((card, idx) => {
                 const cfg = getRarityCfg(card.pull_rarity);
                 const isSaved = savedToPortfolio.has(card.id);
                 return (
@@ -2260,6 +2603,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 );
               })}
             </div>
+          )}
 
             {/* Bottom action bar */}
             <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
