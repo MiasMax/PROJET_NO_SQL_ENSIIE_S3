@@ -1039,6 +1039,60 @@ def test_security_cart_checkout_session_binding(test_env):
     assert USERS_STORE["ondine"]["balance"] == 450.0
 
 
+def test_registration_privilege_escalation_blocked(test_env):
+    """
+    Security test: Verify that an unauthenticated user cannot grant themselves
+    administrator privileges without the secret master password.
+    """
+    client = test_env["client"]
+
+    # 1. Unprivileged user attempts to register as admin with arbitrary password -> 403
+    hacker_res = client.post(
+        "/api/users/register",
+        json={
+            "username": "rogue_user",
+            "name": "Rogue Trainer",
+            "password": "wrong_password",
+            "is_admin": True,
+        },
+    )
+    assert hacker_res.status_code == 403
+    assert "mot de passe administrateur" in hacker_res.json()["detail"].lower()
+
+    # 2. Legitimate admin setup with valid admin secret -> 200
+    valid_admin_res = client.post(
+        "/api/users/register",
+        json={
+            "username": "new_admin",
+            "name": "Professeur Orme",
+            "password": "PokeAdmin2026!",
+            "is_admin": True,
+        },
+    )
+    assert valid_admin_res.status_code == 200
+    assert valid_admin_res.json()["is_admin"] is True
+
+
+def test_registration_balance_validation_caps(test_env):
+    """
+    Security test: Verify that initial balances cannot be set arbitrarily high.
+    """
+    client = test_env["client"]
+
+    # Attempting to register with 50,000 € must be rejected by Pydantic validation (le=1000.0)
+    res = client.post(
+        "/api/users/register",
+        json={
+            "username": "money_exploiter",
+            "name": "Exploiter",
+            "password": "pwd",
+            "balance": 50000.0,
+        },
+    )
+    assert res.status_code == 422
+
+
+
 
 
 

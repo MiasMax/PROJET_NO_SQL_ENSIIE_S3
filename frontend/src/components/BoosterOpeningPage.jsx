@@ -79,7 +79,7 @@ const saveCollectionToStorage = (cards) => {
   } catch {}
 };
 
-// ─── Pure Web Audio API Sound Synthesizer ──────────────────────────────────
+// ─── Pure Web Audio API Sound Synthesizer (Ultra-Realistic TCG Audio) ────────
 const playBoosterAudio = (type, enabled = true) => {
   if (!enabled || typeof window === 'undefined') return;
   try {
@@ -89,72 +89,137 @@ const playBoosterAudio = (type, enabled = true) => {
     const now = ctx.currentTime;
 
     if (type === 'tear') {
-      // Crisp metallic foil tearing sound
-      const bufferSize = Math.floor(ctx.sampleRate * 0.45);
+      // 1. Initial crisp metallic foil tear snap & friction
+      const bufferSize = Math.floor(ctx.sampleRate * 0.55);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
+      const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
+        const env =
+          Math.exp(-i / (ctx.sampleRate * 0.15)) +
+          (i > ctx.sampleRate * 0.1
+            ? 0.35 * Math.exp(-(i - ctx.sampleRate * 0.1) / (ctx.sampleRate * 0.12))
+            : 0);
+        data[i] = (Math.random() * 2 - 1) * env;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const bpf = ctx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.setValueAtTime(3200, now);
+      bpf.frequency.exponentialRampToValueAtTime(1400, now + 0.45);
+      bpf.Q.setValueAtTime(2.5, now);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.65, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      noise.connect(bpf);
+      bpf.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+
+      // 2. Low-frequency foil tear friction rumble
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+      oscGain.gain.setValueAtTime(0.35, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.36);
+    } else if (type === 'crinkle') {
+      // Short metallic cellophane plastic rustle (on hover / drag)
+      const bufferSize = Math.floor(ctx.sampleRate * 0.08);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
       const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(2200, now);
-      filter.Q.setValueAtTime(3.2, now);
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(4500, now);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.45, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
       noise.start(now);
-    } else if (type === 'flip') {
-      // Clean tactile card glide swoosh
+    } else if (type === 'slide') {
+      // Soft card glide whoosh (drawing card from foil sleeve)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(680, now + 0.12);
-      gain.gain.setValueAtTime(0.22, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc.frequency.setValueAtTime(450, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.15);
+      osc.stop(now + 0.19);
+    } else if (type === 'flip') {
+      // Clean tactile card snap / flip whoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(740, now + 0.11);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
     } else if (type === 'holo') {
-      // High-pitched crystalline shimmer
-      [900, 1350, 1800].forEach((freq, idx) => {
+      // Shimmering celestial harmonic crystal chords
+      [880, 1174.66, 1396.91, 1760].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-        gain.gain.setValueAtTime(0.2, now + idx * 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.45);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.045);
+        gain.gain.setValueAtTime(0.22, now + idx * 0.045);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.55);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + idx * 0.05);
-        osc.stop(now + idx * 0.05 + 0.5);
+        osc.start(now + idx * 0.045);
+        osc.stop(now + idx * 0.045 + 0.6);
       });
     } else if (type === 'god_pull') {
-      // Grand celebratory fanfare arpeggio
-      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
+      // 1. Sub-bass cinematic boom
+      const bass = ctx.createOscillator();
+      const bassGain = ctx.createGain();
+      bass.type = 'sine';
+      bass.frequency.setValueAtTime(95, now);
+      bass.frequency.exponentialRampToValueAtTime(30, now + 0.45);
+      bassGain.gain.setValueAtTime(0.65, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+      bass.connect(bassGain);
+      bassGain.connect(ctx.destination);
+      bass.start(now);
+      bass.stop(now + 0.5);
+
+      // 2. Celebratory Golden Fanfare Arpeggio
+      const notes = [261.63, 329.63, 392.0, 523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + i * 0.07);
-        gain.gain.setValueAtTime(0.28, now + i * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.7);
+        osc.type = i > 5 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.06);
+        gain.gain.setValueAtTime(0.3, now + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.85);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + i * 0.07);
-        osc.stop(now + i * 0.07 + 0.75);
+        osc.start(now + i * 0.06);
+        osc.stop(now + i * 0.06 + 0.9);
       });
     }
-  } catch {
-    // Audio Context might require prior interaction
-  }
+  } catch {}
 };
 
 // ─── Rarity Configuration & Styling ─────────────────────────────────────────
@@ -586,36 +651,289 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
   );
 }
 
+// ─── High-Performance Canvas Particle System (Stardust, Foil Shards & Confetti) ──
+function BoosterFXCanvas({ tearTrigger, celebrationTrigger, accentColor = '#ffd700' }) {
+  const canvasRef = useRef(null);
+  const particlesRef = useRef([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Initial ambient stardust
+    const list = particlesRef.current;
+    if (list.length === 0) {
+      for (let i = 0; i < 30; i++) {
+        list.push({
+          type: 'stardust',
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: -0.2 - Math.random() * 0.4,
+          size: 1 + Math.random() * 2.2,
+          alpha: 0.15 + Math.random() * 0.55,
+          color: Math.random() > 0.4 ? '#facc15' : '#c7d2fe',
+          pulseSpeed: 0.01 + Math.random() * 0.02,
+        });
+      }
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const parts = particlesRef.current;
+
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.type === 'stardust') {
+          p.alpha += Math.sin(Date.now() * p.pulseSpeed) * 0.008;
+          if (p.y < -10) p.y = canvas.height + 10;
+          if (p.x < -10) p.x = canvas.width + 10;
+          if (p.x > canvas.width + 10) p.x = -10;
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0.1, Math.min(0.85, p.alpha));
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else if (p.type === 'foil' || p.type === 'confetti') {
+          p.vy += p.gravity || 0.18;
+          p.vx *= 0.985;
+          p.rot += p.vRot;
+          p.life -= p.decay || 0.014;
+
+          if (p.life <= 0 || p.y > canvas.height + 25) {
+            parts.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.scale(Math.cos(p.rot * 1.8), 1);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.max(0, p.life);
+
+          if (p.isStar) {
+            ctx.beginPath();
+            for (let s = 0; s < 5; s++) {
+              ctx.lineTo(
+                Math.cos(((18 + s * 72) * Math.PI) / 180) * p.size,
+                -Math.sin(((18 + s * 72) * Math.PI) / 180) * p.size
+              );
+              ctx.lineTo(
+                Math.cos(((54 + s * 72) * Math.PI) / 180) * (p.size * 0.45),
+                -Math.sin(((54 + s * 72) * Math.PI) / 180) * (p.size * 0.45)
+              );
+            }
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            ctx.fillRect(-p.size / 2, -p.size2 / 2, p.size, p.size2);
+          }
+          ctx.restore();
+        }
+      }
+      animId = requestAnimationFrame(render);
+    };
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  // Listen for pack tear trigger -> burst metallic foil shards
+  useEffect(() => {
+    if (!tearTrigger) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height * 0.36;
+    const colors = ['#f59e0b', '#fbbf24', '#fef08a', '#e2e8f0', '#ffffff', accentColor, '#ec4899', '#38bdf8'];
+
+    for (let i = 0; i < 60; i++) {
+      const angle = Math.random() * Math.PI + Math.PI; // Upwards fan
+      const speed = 4 + Math.random() * 13;
+      particlesRef.current.push({
+        type: 'foil',
+        x: centerX + (Math.random() - 0.5) * 220,
+        y: centerY + (Math.random() - 0.5) * 25,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 5,
+        vy: Math.sin(angle) * speed - 2.5,
+        gravity: 0.22,
+        size: 5 + Math.random() * 9,
+        size2: 3 + Math.random() * 7,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.35,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+        decay: 0.012 + Math.random() * 0.015,
+        isStar: Math.random() > 0.6,
+      });
+    }
+  }, [tearTrigger, accentColor]);
+
+  // Listen for celebratory card pull trigger -> full fireworks confetti
+  useEffect(() => {
+    if (!celebrationTrigger) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#facc15', '#ffffff'];
+
+    for (let c = 0; c < 100; c++) {
+      const fromLeft = c % 2 === 0;
+      const originX = fromLeft ? canvas.width * 0.15 : canvas.width * 0.85;
+      const originY = canvas.height * 0.65;
+      const angle = fromLeft
+        ? -Math.PI / 4 + (Math.random() - 0.5) * 0.55
+        : (-3 * Math.PI) / 4 + (Math.random() - 0.5) * 0.55;
+      const speed = 10 + Math.random() * 15;
+
+      particlesRef.current.push({
+        type: 'confetti',
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: 0.24,
+        size: 7 + Math.random() * 9,
+        size2: 4 + Math.random() * 8,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.28,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+        decay: 0.008 + Math.random() * 0.008,
+        isStar: Math.random() > 0.5,
+      });
+    }
+  }, [celebrationTrigger]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-[350]"
+      style={{ width: '100vw', height: '100vh' }}
+    />
+  );
+}
+
 // ─── 3D Booster Pack Wrapper with Authentic Tear Ritual ─────────────────────
-function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
+function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = true }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [tearProgress, setTearProgress] = useState(0);
+  const [isDraggingTear, setIsDraggingTear] = useState(false);
+  const dragStartRef = useRef(0);
   const foilRef = useRef(null);
 
   const handleMouseMove = (e) => {
     if (!foilRef.current || isTorn) return;
     const rect = foilRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -20;
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -22;
     setTilt({ x, y });
+
+    if (isDraggingTear) {
+      const currentX = e.clientX - rect.left;
+      const delta = currentX - dragStartRef.current;
+      const progress = Math.max(0, Math.min(1, delta / (rect.width * 0.72)));
+      setTearProgress(progress);
+      playBoosterAudio('crinkle', audioEnabled);
+
+      if (progress >= 0.72) {
+        setIsDraggingTear(false);
+        setTearProgress(1);
+        onTear();
+      }
+    }
   };
 
-  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    if (isDraggingTear) {
+      setIsDraggingTear(false);
+      setTearProgress(0);
+    }
+  };
+
+  const handleTearStart = (e) => {
+    if (isTorn) return;
+    e.stopPropagation();
+    const rect = foilRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    dragStartRef.current = clientX - rect.left;
+    setIsDraggingTear(true);
+    playBoosterAudio('crinkle', audioEnabled);
+  };
+
+  const handleTearEnd = () => {
+    if (isDraggingTear) {
+      if (tearProgress >= 0.65) {
+        onTear();
+      } else {
+        setTearProgress(0);
+      }
+      setIsDraggingTear(false);
+    }
+  };
+
   const packImg = series?.pack_image || `/boosters/${series?.id}.jpg`;
+
+  // Top serrated teeth clip-path
+  const topTeethClip =
+    'polygon(0% 0%, 2% 5px, 4% 0%, 6% 5px, 8% 0%, 10% 5px, 12% 0%, 14% 5px, 16% 0%, 18% 5px, 20% 0%, 22% 5px, 24% 0%, 26% 5px, 28% 0%, 30% 5px, 32% 0%, 34% 5px, 36% 0%, 38% 5px, 40% 0%, 42% 5px, 44% 0%, 46% 5px, 48% 0%, 50% 5px, 52% 0%, 54% 5px, 56% 0%, 58% 5px, 60% 0%, 62% 5px, 64% 0%, 66% 5px, 68% 0%, 70% 5px, 72% 0%, 74% 5px, 76% 0%, 78% 5px, 80% 0%, 82% 5px, 84% 0%, 86% 5px, 88% 0%, 90% 5px, 92% 0%, 94% 5px, 96% 0%, 98% 5px, 100% 0%, 100% 100%, 0% 100%)';
+
+  // Bottom serrated teeth clip-path
+  const bottomTeethClip =
+    'polygon(0% 0%, 100% 0%, 100% 100%, 98% calc(100% - 5px), 96% 100%, 94% calc(100% - 5px), 92% 100%, 90% calc(100% - 5px), 88% 100%, 86% calc(100% - 5px), 84% 100%, 82% calc(100% - 5px), 80% 100%, 78% calc(100% - 5px), 76% 100%, 74% calc(100% - 5px), 72% 100%, 70% calc(100% - 5px), 68% 100%, 66% calc(100% - 5px), 64% 100%, 62% calc(100% - 5px), 60% 100%, 58% calc(100% - 5px), 56% 100%, 54% calc(100% - 5px), 52% 100%, 50% calc(100% - 5px), 48% 100%, 46% calc(100% - 5px), 44% 100%, 42% calc(100% - 5px), 40% 100%, 38% calc(100% - 5px), 36% 100%, 34% calc(100% - 5px), 32% 100%, 30% calc(100% - 5px), 28% 100%, 26% calc(100% - 5px), 24% 100%, 22% calc(100% - 5px), 20% 100%, 18% calc(100% - 5px), 16% 100%, 14% calc(100% - 5px), 12% 100%, 10% calc(100% - 5px), 8% 100%, 6% calc(100% - 5px), 4% 100%, 2% calc(100% - 5px), 0% 100%)';
 
   return (
     <div
       ref={foilRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onMouseUp={handleTearEnd}
+      onTouchMove={(e) => {
+        if (!foilRef.current || isTorn || !isDraggingTear) return;
+        const rect = foilRef.current.getBoundingClientRect();
+        const clientX = e.touches[0].clientX;
+        const delta = clientX - rect.left - dragStartRef.current;
+        const progress = Math.max(0, Math.min(1, delta / (rect.width * 0.72)));
+        setTearProgress(progress);
+        playBoosterAudio('crinkle', audioEnabled);
+        if (progress >= 0.72) {
+          setIsDraggingTear(false);
+          setTearProgress(1);
+          onTear();
+        }
+      }}
+      onTouchEnd={handleTearEnd}
       className={`relative select-none cursor-pointer group transition-transform duration-200 ${
         isShaking ? 'animate-[shake_0.2s_infinite]' : ''
       }`}
       style={{
-        width: '300px',
-        height: '460px',
+        width: '320px',
+        height: '500px',
         perspective: '1200px',
       }}
-      onClick={onTear}
+      onClick={() => {
+        if (!isTorn) onTear();
+      }}
     >
       {/* 3D tilt container */}
       <div
@@ -625,95 +943,198 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
           transformStyle: 'preserve-3d',
         }}
       >
-        {/* Atmospheric backlight matching series theme */}
+        {/* Dynamic Studio Overhead Spotlight Cone */}
         <div
-          className="absolute inset-4 rounded-3xl blur-3xl opacity-50 group-hover:opacity-80 transition-opacity pointer-events-none"
+          className="absolute -top-28 left-1/2 -translate-x-1/2 w-72 h-36 rounded-full blur-3xl opacity-35 pointer-events-none"
           style={{ background: series.accent_color }}
         />
 
-        {/* CARDS EMERGING OUT OF THE FOIL (Exact 63/88 aspect ratio, perfectly centered) */}
+        {/* Ambient Backlight matching series theme */}
         <div
-          className={`absolute inset-x-8 top-12 z-10 transition-all duration-700 ease-out pointer-events-none flex flex-col items-center ${
-            isTorn ? 'translate-y-[-70px] opacity-100 scale-100' : 'translate-y-8 opacity-0 scale-95'
+          className="absolute inset-2 rounded-3xl blur-3xl opacity-50 group-hover:opacity-85 transition-opacity pointer-events-none"
+          style={{ background: series.accent_color }}
+        />
+
+        {/* Ground Contact Shadow on Studio Table */}
+        <div
+          className="absolute -bottom-8 left-6 right-6 h-10 rounded-[100%] blur-xl opacity-80 pointer-events-none transition-transform duration-300"
+          style={{
+            background: 'radial-gradient(ellipse, rgba(0,0,0,0.95) 0%, transparent 75%)',
+            transform: `scale(${1 - tilt.y * 0.01}) translateX(${tilt.x * 0.8}px)`,
+          }}
+        />
+
+        {/* CARDS EMERGING OUT OF THE OPEN FOIL SLEEVE */}
+        <div
+          className={`absolute inset-x-8 top-10 z-10 transition-all duration-800 ease-out pointer-events-none flex flex-col items-center ${
+            isTorn ? 'translate-y-[-85px] opacity-100 scale-100' : 'translate-y-12 opacity-0 scale-95'
           }`}
           style={{
-            filter: 'drop-shadow(0 0 25px rgba(251,191,36,0.9))',
+            filter: 'drop-shadow(0 0 30px rgba(251,191,36,0.95))',
           }}
         >
-          <div className="w-[230px] aspect-[63/88] rounded-2xl overflow-hidden ring-2 ring-amber-400/80 shadow-2xl">
+          <div className="w-[240px] aspect-[63/88] rounded-2xl overflow-hidden ring-2 ring-amber-400/90 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
             <PokemonCardBack />
           </div>
-          {/* Prismatic flare beam */}
+          {/* Prismatic flare beam explosion */}
           <div
-            className="absolute -inset-4 rounded-3xl animate-ping opacity-75 pointer-events-none"
+            className="absolute -inset-6 rounded-3xl animate-ping opacity-85 pointer-events-none"
             style={{
-              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(251,191,36,0.5) 45%, transparent 75%)',
+              background:
+                'radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(251,191,36,0.6) 40%, transparent 75%)',
             }}
           />
         </div>
 
-        {/* Physical Booster Pack Wrapper Container */}
+        {/* PHYSICAL BOOSTER PACK WRAPPER CONTAINER */}
         <div
-          className="w-full h-full relative overflow-hidden rounded-2xl"
+          className="w-full h-full relative overflow-visible rounded-2xl"
           style={{
-            filter: `drop-shadow(0 25px 35px rgba(0,0,0,0.9)) drop-shadow(0 0 25px ${series.accent_color}50)`,
+            filter: `drop-shadow(0 25px 40px rgba(0,0,0,0.95)) drop-shadow(0 0 25px ${series.accent_color}60)`,
           }}
         >
-          {/* Top Foil Crimp (The serrated sealed hanger strip that rips away) */}
+          {/* ── TOP FOIL CRIMP SEAL (Severs and flutters away in 3D on tear) ── */}
           <div
-            className="absolute inset-0 z-30 transition-all duration-700 ease-out pointer-events-none"
+            className="absolute inset-x-0 top-0 h-[17%] z-30 transition-all duration-800 ease-out pointer-events-none overflow-hidden"
             style={{
-              clipPath: 'polygon(0% 0%, 100% 0%, 100% 16%, 85% 18%, 70% 15%, 50% 19%, 30% 16%, 15% 20%, 0% 17%)',
-              transform: isTorn ? 'translateY(-140px) rotate(-16deg) scale(0.85)' : 'translateY(0) rotate(0deg)',
+              clipPath: topTeethClip,
+              transform: isTorn
+                ? 'translateY(-165px) rotate(-22deg) rotateX(45deg) scale(0.85)'
+                : 'translateY(0) rotate(0deg)',
               opacity: isTorn ? 0 : 1,
             }}
           >
+            {/* Top portion of authentic booster packaging */}
             <img
               src={packImg}
               alt={series.name}
-              className="w-full h-full object-cover"
+              className="w-full h-[500px] object-cover object-top absolute top-0 left-0"
               loading="eager"
             />
-            {/* Shimmer on top crimp */}
+            {/* Metallic vertical crimping ridges */}
             <div
               className="absolute inset-0"
               style={{
-                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% 15%, rgba(255,255,255,0.6) 0%, transparent 60%)`,
+                background:
+                  'repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0px, rgba(255,255,255,0.15) 2px, rgba(0,0,0,0.3) 4px, rgba(255,255,255,0.35) 6px)',
                 mixBlendMode: 'overlay',
               }}
             />
-          </div>
-
-          {/* Lower Booster Foil Sleeve (Slides downward slightly when ripped) */}
-          <div
-            className="absolute inset-0 z-20 transition-all duration-700 ease-out"
-            style={{
-              clipPath: 'polygon(0% 17%, 15% 20%, 30% 16%, 50% 19%, 70% 15%, 85% 18%, 100% 16%, 100% 100%, 0% 100%)',
-              transform: isTorn ? 'translateY(28px)' : 'translateY(0)',
-            }}
-          >
-            <img
-              src={packImg}
-              alt={series.name}
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
-            {/* Metallic holographic foil glare following mouse tilt */}
+            {/* Euro-Slot Hanger Hole in center of top seal */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-14 h-3.5 rounded-full bg-slate-950/80 border border-white/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none flex items-center justify-center">
+              <div className="w-10 h-1.5 rounded-full bg-black/60" />
+            </div>
+            {/* Holographic light shimmer */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% ${50 - tilt.y * 2.5}%, rgba(255,255,255,0.45) 0%, rgba(255,220,150,0.2) 35%, transparent 65%)`,
+                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% 20%, rgba(255,255,255,0.7) 0%, transparent 60%)`,
+                mixBlendMode: 'color-dodge',
+              }}
+            />
+          </div>
+
+          {/* ── INTERACTIVE TEAR CUT LINE / STRIP (PULL-TAB & LASER) ────────── */}
+          {!isTorn && (
+            <div
+              className="absolute top-[16.5%] inset-x-0 h-8 z-40 flex items-center justify-between px-3 cursor-ew-resize group/tear"
+              onMouseDown={handleTearStart}
+              onTouchStart={handleTearStart}
+              title="Glissez de gauche à droite pour déchirer le booster"
+            >
+              {/* Dashed Tear Perforation */}
+              <div className="absolute inset-x-4 h-[2px] border-b-2 border-dashed border-amber-300/80 shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
+
+              {/* Real-time laser burn progress line */}
+              {tearProgress > 0 && (
+                <div
+                  className="absolute left-4 h-[3px] bg-gradient-to-r from-yellow-300 via-rose-500 to-amber-400 shadow-[0_0_15px_#f59e0b] rounded-full transition-all"
+                  style={{ width: `${tearProgress * 85}%` }}
+                />
+              )}
+
+              {/* Left Pull-Tab Notch */}
+              <div
+                className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-rose-600 border border-white/40 shadow-[0_0_12px_rgba(251,191,36,0.8)] flex items-center justify-center z-10 transition-transform group-hover/tear:scale-110 active:scale-95"
+                style={{
+                  transform: `translateX(${tearProgress * 210}px)`,
+                }}
+              >
+                <Zap size={14} className="text-white fill-white animate-pulse" />
+              </div>
+
+              {/* Right Cut Arrow Indicator */}
+              <div className="text-[10px] font-black tracking-wider text-amber-300 bg-black/85 px-2.5 py-0.5 rounded-full border border-amber-400/50 shadow-md flex items-center gap-1 z-10">
+                <span>{isDraggingTear ? `${Math.round(tearProgress * 100)}%` : 'GLISSER →'}</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── LOWER FOIL SLEEVE (Body holding the 10-card deck with 3D bevel) ── */}
+          <div
+            className="absolute inset-x-0 top-[17%] bottom-0 z-20 transition-all duration-700 ease-out overflow-hidden rounded-b-2xl"
+            style={{
+              clipPath: bottomTeethClip,
+              transform: isTorn ? 'translateY(28px)' : 'translateY(0)',
+              boxShadow: 'inset 0 0 25px rgba(255,255,255,0.22), inset 0 0 45px rgba(0,0,0,0.7)',
+            }}
+          >
+            {/* Authentic Packaging Artwork */}
+            <img
+              src={packImg}
+              alt={series.name}
+              className="w-full h-[500px] object-cover absolute top-[-85px] left-0"
+              loading="eager"
+            />
+
+            {/* 3D Pillow Bulge (10 cards inside create a rounded center bevel) */}
+            <div
+              className="absolute inset-x-4 top-2 bottom-8 rounded-2xl pointer-events-none"
+              style={{
+                boxShadow:
+                  'inset 0 0 25px rgba(255,255,255,0.25), inset 0 0 40px rgba(0,0,0,0.65), 0 0 20px rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            />
+
+            {/* Cellophane Foil Diagonal Wrinkle Glare */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(135deg, transparent 38%, rgba(255,255,255,0.3) 48%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0.3) 52%, transparent 62%)',
+                mixBlendMode: 'overlay',
+              }}
+            />
+
+            {/* Dynamic Holographic Foil Glare Tracking Mouse Tilt */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at ${50 + tilt.x * 2.2}% ${
+                  50 - tilt.y * 2.2
+                }%, rgba(255,255,255,0.65) 0%, rgba(255,220,180,0.35) 25%, rgba(180,220,255,0.2) 45%, transparent 70%)`,
+                mixBlendMode: 'color-dodge',
+              }}
+            />
+
+            {/* Bottom Crimp Metallic Ridges */}
+            <div
+              className="absolute inset-x-0 bottom-0 h-10 pointer-events-none"
+              style={{
+                background:
+                  'repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0px, rgba(255,255,255,0.15) 2px, rgba(0,0,0,0.3) 4px, rgba(255,255,255,0.35) 6px)',
                 mixBlendMode: 'overlay',
               }}
             />
           </div>
 
-          {/* Tear notch / pull cue ribbon when intact */}
+          {/* Floating Instructions Ribbon when intact */}
           {!isTorn && (
-            <div className="absolute top-12 left-4 right-4 z-40 text-center pointer-events-none animate-pulse">
-              <span className="px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider text-white bg-black/90 border border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] inline-flex items-center gap-1.5">
-                <Zap size={14} className="text-amber-400" />
-                <span>Cliquer pour déchirer le booster ⚡</span>
+            <div className="absolute bottom-6 inset-x-4 z-40 text-center pointer-events-none">
+              <span className="px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider text-white bg-black/90 backdrop-blur-md border border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.7)] inline-flex items-center gap-2 animate-bounce">
+                <Sparkles size={14} className="text-amber-400" />
+                <span>Glisser ou cliquer pour ouvrir ⚡</span>
               </span>
             </div>
           )}
@@ -737,9 +1158,14 @@ export default function BoosterOpeningPage({ onClose }) {
   const [currentSlotIndex, setCurrentSlotIndex] = useState(0); // 0 to 9
   const [revealedCardIndices, setRevealedCardIndices] = useState(new Set());
   const [isCardFlipping, setIsCardFlipping] = useState(false);
+  const [isPeeking, setIsPeeking] = useState(false);
+  const [isCardSliding, setIsCardSliding] = useState(false);
+  const [isScreenShaking, setIsScreenShaking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isTorn, setIsTorn] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [tearTrigger, setTearTrigger] = useState(0);
+  const [celebrationTrigger, setCelebrationTrigger] = useState(0);
 
   // 3D Tilt for active card in stack
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
@@ -876,6 +1302,7 @@ export default function BoosterOpeningPage({ onClose }) {
     if (isTorn || !packData) return;
     playBoosterAudio('tear', audioEnabled);
     setIsShaking(true);
+    setTearTrigger(Date.now());
     setTimeout(() => {
       setIsShaking(false);
       setIsTorn(true);
@@ -885,8 +1312,8 @@ export default function BoosterOpeningPage({ onClose }) {
         setPhase('REVEAL_STACK');
         setCurrentSlotIndex(0);
         setRevealedCardIndices(new Set());
-      }, 1100);
-    }, 300);
+      }, 1250);
+    }, 280);
   };
 
   // Fast forward directly into reveal stack
@@ -908,10 +1335,13 @@ export default function BoosterOpeningPage({ onClose }) {
     if (!revealedCardIndices.has(currentSlotIndex)) {
       setIsCardFlipping(true);
 
-      // Play audio matching rarity tier
-      if (card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare') {
+      // Play audio matching rarity tier & trigger celebration on Hits
+      if (card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare' || card.is_hit) {
         playBoosterAudio('god_pull', audioEnabled);
-      } else if (card.is_holo || card.is_reverse || card.is_hit) {
+        setCelebrationTrigger(Date.now());
+        setIsScreenShaking(true);
+        setTimeout(() => setIsScreenShaking(false), 900);
+      } else if (card.is_holo || card.is_reverse) {
         playBoosterAudio('holo', audioEnabled);
       } else {
         playBoosterAudio('flip', audioEnabled);
@@ -934,20 +1364,26 @@ export default function BoosterOpeningPage({ onClose }) {
 
   // Proceed to next card in the stack
   const handleNextCard = () => {
-    if (!packData) return;
-    if (currentSlotIndex < packData.cards.length - 1) {
-      setCurrentSlotIndex((prev) => prev + 1);
-      setCardTilt({ x: 0, y: 0 });
-    } else {
-      // Reached the end of the 10-card pack! Update session statistics and view summary
-      const hitsCount = packData.cards.filter((c) => c.is_hit).length;
-      setSessionStats((prev) => ({
-        openedCount: prev.openedCount + 1,
-        hitsCount: prev.hitsCount + hitsCount,
-        totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
-      }));
-      setPhase('SUMMARY_BINDER');
-    }
+    if (!packData || isCardSliding) return;
+    setIsCardSliding(true);
+    playBoosterAudio('slide', audioEnabled);
+    setTimeout(() => {
+      if (currentSlotIndex < packData.cards.length - 1) {
+        setCurrentSlotIndex((prev) => prev + 1);
+        setCardTilt({ x: 0, y: 0 });
+        setIsPeeking(false);
+      } else {
+        // Reached the end of the 10-card pack! Update session statistics and view summary
+        const hitsCount = packData.cards.filter((c) => c.is_hit).length;
+        setSessionStats((prev) => ({
+          openedCount: prev.openedCount + 1,
+          hitsCount: prev.hitsCount + hitsCount,
+          totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
+        }));
+        setPhase('SUMMARY_BINDER');
+      }
+      setIsCardSliding(false);
+    }, 240);
   };
 
   // Previous card navigation
@@ -1033,7 +1469,9 @@ export default function BoosterOpeningPage({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col justify-start overflow-hidden"
+      className={`fixed inset-0 z-[300] flex flex-col justify-start overflow-hidden ${
+        isScreenShaking ? 'animate-[cameraShake_0.6s_ease-in-out]' : ''
+      }`}
       style={{
         background: 'radial-gradient(ellipse at 50% 20%, #151828 0%, #0c0e18 60%, #06070c 100%)',
       }}
@@ -1058,7 +1496,38 @@ export default function BoosterOpeningPage({ onClose }) {
           0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(251,191,36,0.5)); }
           50% { transform: scale(1.02); filter: drop-shadow(0 0 35px rgba(251,191,36,0.9)); }
         }
+        @keyframes sunburstSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes cameraShake {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          10% { transform: translate(-6px, -4px) scale(1.02); }
+          20% { transform: translate(6px, 4px) scale(1.01); }
+          30% { transform: translate(-5px, 2px); }
+          40% { transform: translate(5px, -2px); }
+          50% { transform: translate(-3px, -1px); }
+          60% { transform: translate(3px, 1px); }
+          70% { transform: translate(-2px, 0); }
+          80% { transform: translate(2px, 0); }
+          90% { transform: translate(-1px, 0); }
+        }
+        @keyframes floatGently {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-8px) rotate(0.5deg); }
+        }
+        @keyframes godRays {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 0.95; transform: scale(1.08); }
+        }
       `}</style>
+
+      {/* ── 60 FPS Canvas Particle Engine (Ambient Stardust, Foil Shards & Confetti) ── */}
+      <BoosterFXCanvas
+        tearTrigger={tearTrigger}
+        celebrationTrigger={celebrationTrigger}
+        accentColor={selectedSeries?.accent_color || '#ffd700'}
+      />
 
       {/* ── Top Bar / Header ──────────────────────────────────────────────── */}
       <header className="shrink-0 w-full px-4 sm:px-6 py-3 flex items-center justify-between border-b border-white/[0.08] bg-black/80 backdrop-blur-md z-40">
@@ -1282,15 +1751,16 @@ export default function BoosterOpeningPage({ onClose }) {
               isTorn={isTorn}
               onTear={handleTearPack}
               isShaking={isShaking}
+              audioEnabled={audioEnabled}
             />
 
             <div className="flex flex-col items-center gap-2">
               <button
                 onClick={handleTearPack}
                 disabled={isTorn}
-                className="px-8 py-3 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-white/20"
+                className="px-8 py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_30px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 border border-white/20"
               >
-                <Zap size={16} className="text-yellow-300 animate-pulse" />
+                <Zap size={18} className="text-yellow-300 fill-yellow-300 animate-pulse" />
                 <span>{isTorn ? 'OUVERTURE DU PACK...' : 'DÉCHIRER LE SCELLÉ HOLOGRAPHIQUE'}</span>
               </button>
 
@@ -1317,7 +1787,7 @@ export default function BoosterOpeningPage({ onClose }) {
 
         {/* ── STAGE 3: REVEAL DECK STACK (CLICK CARD OR ARROWS TO ADVANCE) ───── */}
         {phase === 'REVEAL_STACK' && packData && currentCard && (
-          <div className="my-auto flex flex-col items-center gap-5 w-full max-w-4xl py-2">
+          <div className="my-auto flex flex-col items-center gap-4 w-full max-w-4xl py-2">
             {/* Top slot pill & indicator */}
             <div className="flex items-center justify-between w-full max-w-md px-2">
               <div className="flex items-center gap-2">
@@ -1336,21 +1806,47 @@ export default function BoosterOpeningPage({ onClose }) {
                 </span>
               </div>
 
-              {currentCard.is_hit && isCurrentCardRevealed && (
-                <span className="flex items-center gap-1 text-xs font-black text-amber-400 animate-bounce">
-                  <Star size={14} fill="currentColor" />
-                  <span>HIT DÉBLOQUÉ !</span>
+              {currentCard.is_hit && isCurrentCardRevealed ? (
+                <span className="flex items-center gap-1.5 text-xs font-black text-amber-300 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.4)] animate-bounce">
+                  <Star size={14} fill="currentColor" className="text-amber-400" />
+                  <span>HIT MAJEUR DÉBLOQUÉ !</span>
                 </span>
+              ) : (
+                <button
+                  onMouseDown={() => setIsPeeking(true)}
+                  onMouseUp={() => setIsPeeking(false)}
+                  onTouchStart={() => setIsPeeking(true)}
+                  onTouchEnd={() => setIsPeeking(false)}
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
+                    isPeeking
+                      ? 'bg-amber-400/25 border-amber-400 text-amber-300 shadow-md'
+                      : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                  title="Maintenez pour soulever légèrement la carte et entrevoir sa bordure"
+                >
+                  👁️ Peeker la bordure
+                </button>
               )}
             </div>
 
             {/* 3D Stack Area with Side Navigation Arrows */}
-            <div className="flex items-center justify-center gap-3 sm:gap-6 w-full">
+            <div className="flex items-center justify-center gap-3 sm:gap-6 w-full relative">
+              {/* Rotating Sunburst God-Rays when a HIT is pulled */}
+              {currentCard.is_hit && isCurrentCardRevealed && (
+                <div
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] pointer-events-none rounded-full opacity-65 animate-[sunburstSpin_22s_linear_infinite] z-0"
+                  style={{
+                    background:
+                      'conic-gradient(from 0deg, transparent 0deg 20deg, rgba(251,191,36,0.35) 20deg 40deg, transparent 40deg 60deg, rgba(251,191,36,0.35) 60deg 80deg, transparent 80deg 100deg, rgba(251,191,36,0.35) 100deg 120deg, transparent 120deg 140deg, rgba(251,191,36,0.35) 140deg 160deg, transparent 160deg 180deg, rgba(251,191,36,0.35) 180deg 200deg, transparent 200deg 220deg, rgba(251,191,36,0.35) 220deg 240deg, transparent 240deg 260deg, rgba(251,191,36,0.35) 260deg 280deg, transparent 280deg 300deg, rgba(251,191,36,0.35) 300deg 320deg, transparent 320deg 340deg, rgba(251,191,36,0.35) 340deg 360deg)',
+                  }}
+                />
+              )}
+
               {/* Floating Left Arrow (Previous Card) */}
               <button
                 onClick={handlePreviousCard}
                 disabled={currentSlotIndex === 0}
-                className={`p-3 rounded-2xl border transition-all ${
+                className={`p-3 rounded-2xl border transition-all z-20 ${
                   currentSlotIndex === 0
                     ? 'opacity-20 cursor-not-allowed border-white/5 bg-white/[0.02] text-gray-600'
                     : 'hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl'
@@ -1362,35 +1858,49 @@ export default function BoosterOpeningPage({ onClose }) {
 
               {/* The Card Container with Click-to-Flip and Click-to-Next */}
               <div
-                className="relative cursor-pointer select-none"
+                className="relative cursor-pointer select-none z-10"
                 style={{
-                  width: '290px',
-                  height: '406px',
+                  width: '295px',
+                  height: '412px',
                   perspective: '1200px',
+                  transform: isCardSliding
+                    ? 'translateX(125%) rotate(12deg) scale(0.92)'
+                    : isPeeking
+                    ? 'translateY(-32px) rotate(-1.5deg)'
+                    : 'none',
+                  opacity: isCardSliding ? 0 : 1,
+                  transition: isCardSliding
+                    ? 'all 0.24s cubic-bezier(0.4, 0, 0.2, 1)'
+                    : 'transform 0.22s ease-out, opacity 0.2s',
                 }}
                 onClick={handleCardClick}
                 onMouseMove={handleCardMouseMove}
                 onMouseLeave={handleCardMouseLeave}
               >
-                {/* Stack depth perspective cards underneath with authentic Pokémon back */}
-                {Array.from({ length: Math.min(3, 9 - currentSlotIndex) }).map((_, i) => (
+                {/* Stack depth perspective cards underneath showing physical cardstock layers */}
+                {Array.from({ length: Math.min(4, 9 - currentSlotIndex) }).map((_, i) => (
                   <div
                     key={i}
                     className="absolute inset-0 rounded-2xl pointer-events-none transition-transform"
                     style={{
-                      transform: `translateY(${(i + 1) * 4}px) scale(${1 - (i + 1) * 0.02})`,
+                      transform: `translate(${(i + 1) * 3}px, ${(i + 1) * 4}px) scale(${
+                        1 - (i + 1) * 0.015
+                      })`,
                       zIndex: -i - 1,
-                      opacity: 0.85 - i * 0.2,
+                      opacity: 0.9 - i * 0.15,
+                      boxShadow: `0 ${(i + 1) * 4}px ${(i + 1) * 8}px rgba(0,0,0,0.6)`,
                     }}
                   >
-                    <PokemonCardBack />
+                    <div className="w-full h-full rounded-2xl overflow-hidden border-r-2 border-b-2 border-slate-300/40">
+                      <PokemonCardBack />
+                    </div>
                   </div>
                 ))}
 
                 {/* The Active Top Card */}
                 <div
                   className={`w-full h-full relative rounded-2xl transition-transform duration-500 ease-out ${
-                    currentCard.is_hit && isCurrentCardRevealed ? 'animate-[hitPulse_2s_infinite]' : ''
+                    currentCard.is_hit && isCurrentCardRevealed ? 'animate-[hitPulse_2.5s_infinite]' : ''
                   }`}
                   style={{
                     transformStyle: 'preserve-3d',
@@ -1399,8 +1909,8 @@ export default function BoosterOpeningPage({ onClose }) {
                       : 'rotateY(180deg)',
                     boxShadow:
                       currentCard.is_hit && isCurrentCardRevealed
-                        ? `0 0 35px ${currentRarityCfg.glow}, 0 20px 40px rgba(0,0,0,0.8)`
-                        : '0 15px 35px rgba(0,0,0,0.7)',
+                        ? `0 0 45px ${currentRarityCfg.glow}, 0 25px 50px rgba(0,0,0,0.9)`
+                        : '0 20px 45px rgba(0,0,0,0.75)',
                   }}
                 >
                   {/* BACK FACE (Unrevealed Authentic Pokémon Card Back) */}
@@ -1412,9 +1922,9 @@ export default function BoosterOpeningPage({ onClose }) {
                     }}
                   >
                     <PokemonCardBack />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/0 transition-colors">
-                      <span className="px-4 py-2 rounded-xl bg-black/85 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-xl animate-pulse flex items-center gap-1.5">
-                        <Sparkles size={14} className="text-amber-400" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/10 transition-colors">
+                      <span className="px-4 py-2.5 rounded-xl bg-black/85 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-2xl animate-pulse flex items-center gap-2">
+                        <Sparkles size={15} className="text-amber-400" />
                         <span>Cliquer pour révéler ⚡</span>
                       </span>
                     </div>
@@ -1438,17 +1948,26 @@ export default function BoosterOpeningPage({ onClose }) {
                     />
 
                     {/* Holographic foil sweep for Holo/Reverse */}
-                    {currentCard.is_holo && (
+                    {(currentCard.is_holo || currentCard.is_hit || currentCard.is_reverse) && (
                       <div
-                        className="absolute inset-0 pointer-events-none opacity-40 mix-blend-color-dodge"
+                        className="absolute inset-0 pointer-events-none opacity-45 mix-blend-color-dodge animate-[rainbowSweep_3.5s_ease_infinite]"
                         style={{
                           background:
                             'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.7) 45%, transparent 70%)',
                           backgroundSize: '250% 250%',
-                          animation: 'rainbowSweep 3s ease infinite',
                         }}
                       />
                     )}
+
+                    {/* Dynamic Holographic Glare Layer Tracking Mouse Tilt */}
+                    <div
+                      className="absolute inset-0 pointer-events-none opacity-55 mix-blend-color-dodge transition-opacity"
+                      style={{
+                        background: `radial-gradient(circle at ${50 + cardTilt.x * 2.5}% ${
+                          50 - cardTilt.y * 2.5
+                        }%, rgba(255,255,255,0.75) 0%, rgba(255,200,255,0.3) 30%, transparent 60%)`,
+                      }}
+                    />
 
                     {/* Top overlay pills */}
                     <div className="absolute top-2 left-2 flex items-center gap-1 z-20">
@@ -1469,7 +1988,7 @@ export default function BoosterOpeningPage({ onClose }) {
                     </div>
 
                     {/* Market value badge */}
-                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/80 border border-white/20 text-emerald-400 font-black text-xs shadow-md">
+                    <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-md bg-black/85 border border-white/20 text-emerald-400 font-black text-xs shadow-md">
                       {currentCard.market_price ? `${currentCard.market_price.toFixed(2)} €` : '—'}
                     </div>
 
@@ -1498,13 +2017,31 @@ export default function BoosterOpeningPage({ onClose }) {
                     </div>
                   </div>
                 </div>
+
+                {/* 3D 360° Inspect Button right below the card */}
+                {isCurrentCardRevealed && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInspectCard(currentCard);
+                    }}
+                    className="absolute -bottom-9 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/85 hover:bg-black text-[11px] font-bold text-amber-300 border border-amber-400/50 shadow-lg flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+                  >
+                    <Eye size={12} />
+                    <span>Inspecter en 3D 360°</span>
+                  </button>
+                )}
               </div>
 
               {/* Floating Right Arrow (Next Card / Reveal) */}
               <button
                 onClick={handleCardClick}
-                className="p-3 rounded-2xl border transition-all hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl"
-                title={isCurrentCardRevealed ? 'Carte suivante (Flèche droite ou clic)' : 'Révéler la carte (Flèche droite ou clic)'}
+                className="p-3 rounded-2xl border transition-all z-20 hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl"
+                title={
+                  isCurrentCardRevealed
+                    ? 'Carte suivante (Flèche droite ou clic)'
+                    : 'Révéler la carte (Flèche droite ou clic)'
+                }
               >
                 <ChevronRight size={24} />
               </button>

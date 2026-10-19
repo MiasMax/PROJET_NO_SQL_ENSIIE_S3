@@ -1,6 +1,6 @@
 # 🎴 PokéVinted — Marketplace Pokémon Multi-NoSQL
 
-> **Projet NoSQL — ENSIIE S3**  
+> **Projet NoSQL — ENSIIE S3**
 > Une marketplace de cartes Pokémon haute performance inspirée de *Vinted* et *Cardmarket*, architecturée selon les principes du **Domain-Driven Design (DDD)** et orchestrée sous **Docker Compose**.  
 > Persistance conjointe et cohérente sur **MongoDB**, **Elasticsearch** et **Redis**, avec supervision temps-réel via **Grafana**.
 
@@ -82,8 +82,11 @@ flowchart LR
 git clone <URL_DU_REPO_GITHUB>
 cd PROJET_NO_SQL_ENSIIE_S3
 
-# 2. Start full orchestration
+# 2. Start full orchestration (Linux, macOS, Windows Docker Desktop)
 docker compose up --build
+
+# (Alternative sur Windows si Docker est installé dans WSL2) :
+# wsl docker compose up --build
 ```
 
 > ℹ️ **Aucune configuration requise** : le `docker-compose.yml` embarque des valeurs par défaut sûres, donc `docker compose up` fonctionne immédiatement après le clone, sans créer de `.env`. Pour la production (VPS), copiez `.env.example` vers `.env` et personnalisez les mots de passe — ils écraseront alors les valeurs par défaut.

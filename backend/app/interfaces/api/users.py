@@ -127,8 +127,9 @@ class RegisterUserRequest(BaseModel):
     email: str = Field("", max_length=100)
     password: str = Field(..., min_length=3, max_length=100, description="Mot de passe requis (au moins 3 caractères)")
     role: str = Field("Dresseur", max_length=40)
-    balance: float = Field(150.0, ge=0.0, le=100000.0)
+    balance: float = Field(150.0, ge=0.0, le=1000.0)
     is_admin: bool = False
+    admin_secret: str | None = Field(None, max_length=100, description="Secret administrateur requis si is_admin=True")
 
 
 class LoginUserRequest(BaseModel):
@@ -224,14 +225,27 @@ async def register_user(
     if existing_in_repo:
         raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
 
+    # Defense against Privilege Escalation:
+    # Creating an administrator account requires valid administrator credentials.
+    is_admin = bool(payload.is_admin)
+    if is_admin:
+        secret_provided = payload.admin_secret or payload.password
+        if not secret_provided or secret_provided != DEMO_ADMIN_PASSWORD:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="La création d'un compte administrateur requiert le mot de passe administrateur sécurisé.",
+            )
+
+    capped_balance = min(max(0.0, float(payload.balance)), 1000.0)
+
     new_user = User.create(
         username=payload.username,
         name=payload.name,
         email=payload.email or f"{user_id}@pokevinted.fr",
         password=payload.password,
-        role=payload.role,
-        balance=payload.balance,
-        is_admin=payload.is_admin,
+        role=payload.role if not is_admin else "Administrateur",
+        balance=capped_balance,
+        is_admin=is_admin,
         user_id=user_id,
     )
 

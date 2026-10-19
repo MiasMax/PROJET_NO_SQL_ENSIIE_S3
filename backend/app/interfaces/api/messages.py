@@ -35,7 +35,7 @@ _REDIS_HEALTHY: bool | None = None
 _LAST_MONGO_CHECK: float = 0.0
 _LAST_REDIS_CHECK: float = 0.0
 CIRCUIT_COOLDOWN_SECONDS: float = 30.0
-OPERATION_TIMEOUT_SECONDS: float = 0.25
+OPERATION_TIMEOUT_SECONDS: float = 3.0
 
 
 def set_offline_demo_mode(enabled: bool) -> None:

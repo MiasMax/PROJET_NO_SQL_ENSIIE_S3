@@ -271,8 +271,17 @@ async def purchase_listing(
             charge_price = listing.price
             validated_agreed_price = listing.price
         else:
-            # Check if an accepted offer exists in messages for this listing
+            # Check if an accepted offer exists in messages for this listing and includes this buyer
             is_valid_negotiation = False
+            buyer_aliases = {
+                b.lower().strip() for b in [
+                    resolved_buyer_name,
+                    payload.buyer_name,
+                    (matched_user["username"] if matched_user else ""),
+                    (matched_user["name"] if matched_user else ""),
+                    (str(matched_user["id"]) if matched_user else ""),
+                ] if b
+            }
             try:
                 from app.interfaces.api.messages import _IN_MEMORY_MESSAGES, _can_try_mongo, _get_db
                 if _can_try_mongo():
@@ -283,7 +292,10 @@ async def purchase_listing(
                         "offer_price": payload.agreed_price,
                     })
                     if accepted:
-                        is_valid_negotiation = True
+                        p_sender = str(accepted.get("sender_name", "")).lower().strip()
+                        p_recipient = str(accepted.get("recipient_name", "")).lower().strip()
+                        if p_sender in buyer_aliases or p_recipient in buyer_aliases:
+                            is_valid_negotiation = True
                 if not is_valid_negotiation:
                     for m in _IN_MEMORY_MESSAGES:
                         if (
@@ -291,8 +303,11 @@ async def purchase_listing(
                             and m.get("offer_type") == "accept"
                             and m.get("offer_price") == payload.agreed_price
                         ):
-                            is_valid_negotiation = True
-                            break
+                            p_sender = str(m.get("sender_name", "")).lower().strip()
+                            p_recipient = str(m.get("recipient_name", "")).lower().strip()
+                            if p_sender in buyer_aliases or p_recipient in buyer_aliases:
+                                is_valid_negotiation = True
+                                break
             except Exception:
                 pass
 
