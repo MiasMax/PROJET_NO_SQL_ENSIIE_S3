@@ -3,6 +3,17 @@ Integration tests for FastAPI endpoints with dependency injection overrides.
 Exercises the full lifecycle: Catalog -> Listing Publication -> Search -> Purchase -> Admin Stats.
 """
 
+# Shared password for accounts registered by the tests; passwordless seed trainers ignore it.
+TEST_PASSWORD = "TestPassword123!"
+
+
+def _session_headers(client, name: str) -> dict[str, str]:
+    """Log in as `name` (registering the account first if needed) and return the session header."""
+    username = name.lower()
+    client.post("/api/users/register", json={"username": username, "name": name, "password": TEST_PASSWORD})
+    res = client.post("/api/users/login", json={"username": username, "password": TEST_PASSWORD})
+    assert res.status_code == 200, res.text
+    return {"x-session-token": res.json()["token"]}
 
 
 def test_health_check(test_env):
@@ -40,7 +51,7 @@ def test_complete_marketplace_flow(test_env):
         "seller_name": "Sacha",
         "description": "Dracaufeu 151 en parfait état avec toploader.",
     }
-    create_res = client.post("/api/listings", json=create_payload)
+    create_res = client.post("/api/listings", json=create_payload, headers=_session_headers(client, "Sacha"))
     assert create_res.status_code == 201
     listing_data = create_res.json()
     listing_id = listing_data["id"]
@@ -60,13 +71,19 @@ def test_complete_marketplace_flow(test_env):
     assert any(i["id"] == listing_id for i in search_items)
 
     # 3. Step 3a: Attempt self-purchase (must fail with 400 Bad Request)
-    self_buy_res = client.post(f"/api/listings/{listing_id}/purchase", json={"buyer_name": "Sacha"})
+    self_buy_res = client.post(
+        f"/api/listings/{listing_id}/purchase",
+        json={"buyer_name": "Sacha"},
+        headers=_session_headers(client, "Sacha"),
+    )
     assert self_buy_res.status_code == 400
     assert "propre annonce" in self_buy_res.json()["detail"]
 
     # 3. Step 3b: Purchase execution by another trainer
     buy_payload = {"buyer_name": "Regis"}
-    buy_res = client.post(f"/api/listings/{listing_id}/purchase", json=buy_payload)
+    buy_res = client.post(
+        f"/api/listings/{listing_id}/purchase", json=buy_payload, headers=_session_headers(client, "Regis")
+    )
     assert buy_res.status_code == 200
     order_data = buy_res.json()
     assert order_data["price"] == 48.50
@@ -112,17 +129,18 @@ def test_redis_sessions_and_favorites(test_env):
     switch_res = client.post("/api/users/switch", json={"user_id": "ondine"})
     assert switch_res.status_code == 200
     ondine = switch_res.json()
+    ondine_headers = {"x-session-token": ondine["token"]}
     assert ondine["id"] == "ondine"
     assert ondine["balance"] == 480.0
 
     # Add card to favorites set in Redis (SADD)
-    fav_res = client.post("/api/users/favorites/sv3pt5-006?user_id=ondine")
+    fav_res = client.post("/api/users/favorites/sv3pt5-006", headers=ondine_headers)
     assert fav_res.status_code == 200
     assert fav_res.json()["is_favorite"] is True
     assert "sv3pt5-006" in cache_repo.favorites.get("ondine", set())
 
     # Retrieve favorites (SMEMBERS)
-    get_favs = client.get("/api/users/favorites?user_id=ondine")
+    get_favs = client.get("/api/users/favorites", headers=ondine_headers)
     assert get_favs.status_code == 200
     assert "sv3pt5-006" in get_favs.json()
 
@@ -134,6 +152,7 @@ def test_redis_trending_views(test_env):
     create = client.post(
         "/api/listings",
         json={"card_id": "sv3pt5-006", "price": 42.0, "condition": "NEAR_MINT", "seller_name": "Pierre"},
+        headers=_session_headers(client, "Pierre"),
     )
     assert create.status_code == 201
     listing_id = create.json()["id"]
@@ -249,6 +268,7 @@ def test_duplicate_purchase_prevention(test_env):
             "seller_name": "Sacha",
             "description": "Carte Dracaufeu sous sleeve",
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert create_res.status_code == 201
     listing_id = create_res.json()["id"]
@@ -257,6 +277,7 @@ def test_duplicate_purchase_prevention(test_env):
     buy1 = client.post(
         f"/api/listings/{listing_id}/purchase",
         json={"buyer_name": "Ondine", "buyer_id": "ondine"},
+        headers=_session_headers(client, "Ondine"),
     )
     assert buy1.status_code == 200
 
@@ -264,6 +285,7 @@ def test_duplicate_purchase_prevention(test_env):
     buy2 = client.post(
         f"/api/listings/{listing_id}/purchase",
         json={"buyer_name": "Pierre", "buyer_id": "pierre"},
+        headers=_session_headers(client, "Pierre"),
     )
     assert buy2.status_code == 400
     assert "déjà été vendue" in buy2.json()["detail"] or "already been sold" in buy2.json()["detail"].lower()
@@ -279,6 +301,7 @@ def test_trending_caps_at_limit_and_ranks_by_views(test_env):
         res = client.post(
             "/api/listings",
             json={"card_id": "sv3pt5-006", "price": 10.0 + i, "condition": "NEAR_MINT", "seller_name": f"Seller{i}"},
+            headers=_session_headers(client, f"Seller{i}"),
         )
         assert res.status_code == 201
         lid = res.json()["id"]
@@ -319,6 +342,7 @@ def test_trending_views_atomic_ranking(test_env):
     create = client.post(
         "/api/listings",
         json={"card_id": "sv3pt5-006", "price": 99.0, "condition": "NEAR_MINT", "seller_name": "Blue"},
+        headers=_session_headers(client, "Blue"),
     )
     assert create.status_code == 201
     listing_id = create.json()["id"]
@@ -343,6 +367,7 @@ def test_sold_listing_removed_from_trending(test_env):
     create = client.post(
         "/api/listings",
         json={"card_id": "sv3pt5-006", "price": 30.0, "condition": "NEAR_MINT", "seller_name": "Ondine"},
+        headers=_session_headers(client, "Ondine"),
     )
     assert create.status_code == 201
     listing_id = create.json()["id"]
@@ -355,7 +380,9 @@ def test_sold_listing_removed_from_trending(test_env):
     assert any(c["id"] == listing_id for c in before)
 
     # Purchase it
-    buy = client.post(f"/api/listings/{listing_id}/purchase", json={"buyer_name": "Regis"})
+    buy = client.post(
+        f"/api/listings/{listing_id}/purchase", json={"buyer_name": "Regis"}, headers=_session_headers(client, "Regis")
+    )
     assert buy.status_code == 200
 
     # Gone after sale
@@ -377,11 +404,12 @@ def test_get_my_listings_endpoint(test_env):
             "seller_name": "Pierre_Argenta",
             "description": "Dracaufeu ex authentique en vente.",
         },
+        headers=_session_headers(client, "Pierre_Argenta"),
     )
     assert create_res.status_code == 201
 
     # 2. Query user's listings
-    res = client.get("/api/users/me/listings?seller_name=Pierre_Argenta")
+    res = client.get("/api/users/me/listings", headers=_session_headers(client, "Pierre_Argenta"))
     assert res.status_code == 200
     listings = res.json()
     assert isinstance(listings, list)
@@ -502,6 +530,8 @@ def test_price_history_endpoint(test_env):
 def test_messaging_flow(test_env):
     """Verify sending message, negotiation offer, thread retrieval and conversation list."""
     client = test_env["client"]
+    sacha_headers = _session_headers(client, "Sacha")
+    ondine_headers = _session_headers(client, "Ondine")
 
     # 1. Send initial chat message
     send_res = client.post(
@@ -512,6 +542,7 @@ def test_messaging_flow(test_env):
             "recipient_name": "Ondine",
             "content": "Bonjour ! La carte est toujours disponible ?",
         },
+        headers=sacha_headers,
     )
     assert send_res.status_code == 201
     assert "id" in send_res.json()
@@ -527,12 +558,14 @@ def test_messaging_flow(test_env):
             "offer_price": 35.0,
             "offer_type": "offer",
         },
+        headers=sacha_headers,
     )
     assert offer_res.status_code == 201
 
     # 3. Retrieve conversation thread
     thread_res = client.get(
-        "/api/messages/thread?listing_id=test-list-1&user_a=Ondine&user_b=Sacha"
+        "/api/messages/thread?listing_id=test-list-1&user_a=Ondine&user_b=Sacha",
+        headers=ondine_headers,
     )
     assert thread_res.status_code == 200
     messages = thread_res.json()["messages"]
@@ -540,7 +573,7 @@ def test_messaging_flow(test_env):
     assert any(m["offer_type"] == "offer" and m["offer_price"] == 35.0 for m in messages)
 
     # 4. List conversations for recipient
-    convs_res = client.get("/api/messages/conversations?username=Ondine")
+    convs_res = client.get("/api/messages/conversations?username=Ondine", headers=ondine_headers)
     assert convs_res.status_code == 200
     convs = convs_res.json()
     assert len(convs) >= 1
@@ -551,7 +584,7 @@ def test_messaging_unread_count(test_env):
     """Verify unread count endpoint returns non-negative integer for user."""
     client = test_env["client"]
 
-    res = client.get("/api/messages/unread-count?username=Sacha")
+    res = client.get("/api/messages/unread-count?username=Sacha", headers=_session_headers(client, "Sacha"))
     assert res.status_code == 200
     data = res.json()
     assert data["username"] == "Sacha"
@@ -582,6 +615,7 @@ def test_negotiated_offer_acceptance_and_purchase_flow(test_env):
             "seller_name": "Ondine",
             "image_url": "https://images.pokemontcg.io/sv3pt5/130_hires.png",
         },
+        headers=_session_headers(client, "Ondine"),
     )
     assert create_res.status_code == 201
     listing_id = create_res.json()["id"]
@@ -597,6 +631,7 @@ def test_negotiated_offer_acceptance_and_purchase_flow(test_env):
             "offer_price": 40.0,
             "offer_type": "offer",
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert offer_res.status_code == 201
     assert "id" in offer_res.json()
@@ -612,13 +647,15 @@ def test_negotiated_offer_acceptance_and_purchase_flow(test_env):
             "offer_price": 40.0,
             "offer_type": "accept",
         },
+        headers=_session_headers(client, "Ondine"),
     )
     assert accept_res.status_code == 201
     assert "id" in accept_res.json()
 
     # Verify conversation thread contains the accepted offer
     thread_res = client.get(
-        f"/api/messages/thread?listing_id={listing_id}&user_a=Sacha&user_b=Ondine"
+        f"/api/messages/thread?listing_id={listing_id}&user_a=Sacha&user_b=Ondine",
+        headers=_session_headers(client, "Sacha"),
     )
     assert thread_res.status_code == 200
     msgs = thread_res.json()["messages"]
@@ -637,6 +674,7 @@ def test_negotiated_offer_acceptance_and_purchase_flow(test_env):
             "buyer_id": "sacha",
             "agreed_price": 40.0,
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert purchase_res.status_code == 200
     order = purchase_res.json()
@@ -661,6 +699,7 @@ def test_negotiated_offer_acceptance_and_purchase_flow(test_env):
     dup_res = client.post(
         f"/api/listings/{listing_id}/purchase",
         json={"buyer_name": "Pierre", "buyer_id": "pierre", "agreed_price": 40.0},
+        headers=_session_headers(client, "Pierre"),
     )
     assert dup_res.status_code == 400
 
@@ -687,6 +726,7 @@ def test_cart_batch_checkout_multiple_cards(test_env):
             "seller_name": "Ondine",
             "image_url": "https://images.pokemontcg.io/sv3pt5/1_hires.png",
         },
+        headers=_session_headers(client, "Ondine"),
     )
     assert res1.status_code == 201
     lid1 = res1.json()["id"]
@@ -701,6 +741,7 @@ def test_cart_batch_checkout_multiple_cards(test_env):
             "seller_name": "Ondine",
             "image_url": "https://images.pokemontcg.io/sv3pt5/2_hires.png",
         },
+        headers=_session_headers(client, "Ondine"),
     )
     assert res2.status_code == 201
     lid2 = res2.json()["id"]
@@ -718,6 +759,7 @@ def test_cart_batch_checkout_multiple_cards(test_env):
             "buyer_name": "Sacha",
             "buyer_id": "sacha",
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert checkout_res.status_code == 200
     data = checkout_res.json()
@@ -748,6 +790,7 @@ def test_cart_batch_checkout_multiple_cards(test_env):
             "buyer_name": "Pierre",
             "buyer_id": "pierre",
         },
+        headers=_session_headers(client, "Pierre"),
     )
     assert fail_res.status_code == 400
 
@@ -765,6 +808,7 @@ def test_security_listing_mutations_bola_prevention(test_env):
             "seller_name": "Sacha",
             "description": "Dracaufeu pour test BOLA",
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert create_res.status_code == 201
     listing_id = create_res.json()["id"]
@@ -877,7 +921,9 @@ def test_security_messaging_bola_and_regex_sanitization(test_env):
     assert "consulter les conversations d'un autre utilisateur" in eavesdrop_convs.json()["detail"]
 
     # 3. Regex special character injection in username parameter (must not crash or raise 500)
-    regex_res = client.get("/api/messages/conversations?username=.*")
+    admin_login = client.post("/api/users/login", json={"username": "chen", "password": "PokeAdmin2026!"})
+    admin_headers = {"x-session-token": admin_login.json()["token"]}
+    regex_res = client.get("/api/messages/conversations?username=.*", headers=admin_headers)
     assert regex_res.status_code == 200
 
 
@@ -898,6 +944,7 @@ def test_security_arbitrary_agreed_price_underpayment_rejected(test_env):
             "seller_name": "Ondine",
             "description": "Carte rare non négociée",
         },
+        headers=_session_headers(client, "Ondine"),
     )
     assert create_res.status_code == 201
     listing_id = create_res.json()["id"]
@@ -910,6 +957,7 @@ def test_security_arbitrary_agreed_price_underpayment_rejected(test_env):
             "buyer_id": "pierre",
             "agreed_price": 0.01,
         },
+        headers=_session_headers(client, "Pierre"),
     )
     assert exploit_res.status_code == 400
     assert "Prix convenu" in exploit_res.json()["detail"]
@@ -953,6 +1001,7 @@ def test_security_substring_exploit_prevention(test_env):
             "seller_name": "Sacha",
             "description": "Dracaufeu sous scellé",
         },
+        headers=_session_headers(client, "Sacha"),
     )
     assert create_res.status_code == 201
     lid = create_res.json()["id"]
@@ -1013,6 +1062,7 @@ def test_security_cart_checkout_session_binding(test_env):
             "seller_name": "Pierre",
             "description": "Vente test session binding",
         },
+        headers=_session_headers(client, "Pierre"),
     )
     assert create_res.status_code == 201
     lid = create_res.json()["id"]
@@ -1092,10 +1142,71 @@ def test_registration_balance_validation_caps(test_env):
     assert res.status_code == 422
 
 
+def test_security_identity_routes_require_session(test_env):
+    """
+    Without a session token, identity-bound routes must answer 401 instead of
+    trusting the buyer / sender / user named in the request.
+    """
+    client = test_env["client"]
+
+    create_res = client.post(
+        "/api/listings",
+        json={"card_id": "sv3pt5-006", "price": 25.0, "condition": "NEAR_MINT", "seller_name": "Ondine"},
+        headers=_session_headers(client, "Ondine"),
+    )
+    assert create_res.status_code == 201
+    lid = create_res.json()["id"]
+
+    anonymous_calls = [
+        client.post(
+            "/api/listings",
+            json={"card_id": "sv3pt5-006", "price": 5.0, "condition": "MINT", "seller_name": "Ondine"},
+        ),
+        client.post(f"/api/listings/{lid}/purchase", json={"buyer_name": "Sacha", "buyer_id": "sacha"}),
+        client.post("/api/listings/checkout", json={"listing_ids": [lid], "buyer_id": "sacha"}),
+        client.post(
+            "/api/messages",
+            json={"listing_id": lid, "sender_name": "Ondine", "recipient_name": "Sacha", "content": "Salut"},
+        ),
+        client.get(f"/api/messages/thread?listing_id={lid}&user_a=Ondine&user_b=Sacha"),
+        client.get("/api/messages/conversations?username=Ondine"),
+        client.get("/api/messages/unread-count?username=Ondine"),
+        client.get("/api/users/me/orders?buyer_name=Sacha"),
+        client.get("/api/users/me/listings?seller_name=Ondine"),
+        client.get("/api/users/favorites?user_id=ondine"),
+        client.post(f"/api/users/favorites/{lid}?user_id=ondine"),
+    ]
+    for res in anonymous_calls:
+        assert res.status_code == 401, (res.request.method, str(res.request.url), res.status_code)
+
+    # None of the anonymous attempts sold the listing
+    assert test_env["listing_repo"].listings[lid].status == "ACTIVE"
 
 
+def test_security_listing_seller_bound_to_session(test_env):
+    """A listing's seller is the session user, whatever seller_name the payload claims."""
+    client = test_env["client"]
+    res = client.post(
+        "/api/listings",
+        json={"card_id": "sv3pt5-006", "price": 25.0, "condition": "NEAR_MINT", "seller_name": "Ondine"},
+        headers=_session_headers(client, "Sacha"),
+    )
+    assert res.status_code == 201
+    assert res.json()["seller_name"] == "Sacha"
 
 
+def test_security_favorites_bound_to_session(test_env):
+    """The user_id query parameter cannot redirect a favorite toggle to another account."""
+    client = test_env["client"]
+    cache_repo = test_env["cache_repo"]
+    res = client.post("/api/users/favorites/lst-42?user_id=ondine", headers=_session_headers(client, "Sacha"))
+    assert res.status_code == 200
+    assert "lst-42" in cache_repo.favorites.get("sacha", set())
+    assert "lst-42" not in cache_repo.favorites.get("ondine", set())
 
 
-
+def test_security_listing_mutations_check_session_before_lookup(test_env):
+    """Anonymous price edits and deletions get 401 even for unknown ids (no existence oracle)."""
+    client = test_env["client"]
+    assert client.patch("/api/listings/does-not-exist/price", json={"price": 1.0}).status_code == 401
+    assert client.delete("/api/listings/does-not-exist").status_code == 401

@@ -3,7 +3,9 @@ FastAPI dependency injection wiring.
 Instantiates database adapters and passes them to domain use cases.
 """
 
-from fastapi import Depends
+from typing import Any
+
+from fastapi import Depends, Header, HTTPException, status
 
 from app.application.use_cases.checkout_cart import CheckoutCartUseCase
 from app.application.use_cases.create_listing import CreateListingUseCase
@@ -59,6 +61,19 @@ def get_user_repository(db=Depends(get_mongo_db)) -> MongoUserRepository:
 
 def get_cache_repository(redis_client=Depends(get_redis_client)) -> RedisCacheRepository:
     return RedisCacheRepository(redis_client)
+
+
+async def require_session(
+    x_session_token: str | None = Header(None),
+    cache_repo: RedisCacheRepository = Depends(get_cache_repository),
+) -> dict[str, Any]:
+    """Resolve the caller's identity from their Redis session; never from the request body."""
+    if not x_session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise.")
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session or not session.get("id"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée ou invalide.")
+    return session
 
 
 def get_create_listing_use_case(

@@ -202,7 +202,9 @@ export default function App() {
 
   const loadUserFavorites = async (userId) => {
     try {
-      const res = await fetch(`/api/users/favorites?user_id=${userId}`);
+      const token = localStorage.getItem('pokevinted_token');
+      const authHeaders = token ? { 'x-session-token': token } : {};
+      const res = await fetch('/api/users/favorites', { headers: authHeaders });
       if (res.ok) {
         const favList = await res.json();
         let cachedArr = [];
@@ -214,7 +216,7 @@ export default function App() {
         // If backend Redis was flushed/restarted but browser still has favorites, re-sync to backend
         if (favList.length === 0 && cachedArr.length > 0) {
           for (const fid of cachedArr) {
-            fetch(`/api/users/favorites/${fid}?user_id=${userId}`, { method: 'POST' }).catch(() => {});
+            fetch(`/api/users/favorites/${fid}`, { method: 'POST', headers: authHeaders }).catch(() => {});
           }
         }
 
@@ -295,7 +297,11 @@ export default function App() {
     if (!listingId) return;
 
     try {
-      const res = await fetch(`/api/users/favorites/${listingId}?user_id=${currentUser.id}`, { method: 'POST' });
+      const token = localStorage.getItem('pokevinted_token');
+      const res = await fetch(`/api/users/favorites/${listingId}`, {
+        method: 'POST',
+        headers: token ? { 'x-session-token': token } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setFavorites((prev) => {
