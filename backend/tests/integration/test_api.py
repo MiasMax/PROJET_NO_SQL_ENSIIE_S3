@@ -119,11 +119,9 @@ def test_redis_sessions_and_favorites(test_env):
     client = test_env["client"]
     cache_repo = test_env["cache_repo"]
 
-    # Default session check
+    # No implicit session: an anonymous visitor is not logged in
     me_res = client.get("/api/users/me")
-    assert me_res.status_code == 200
-    user = me_res.json()
-    assert user["id"] == "sacha"
+    assert me_res.status_code == 401
 
     # Switch session to Ondine
     switch_res = client.post("/api/users/switch", json={"user_id": "ondine"})

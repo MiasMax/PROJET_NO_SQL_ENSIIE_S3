@@ -362,24 +362,23 @@ async def get_current_user(
     cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """Retrieve current logged-in user profile from Redis session."""
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            user_id = session.get("id")
-            if user_id in USERS_STORE:
-                session["balance"] = USERS_STORE[user_id]["balance"]
-            return session
+    if not x_session_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Aucune session active.",
+        )
+
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expirée ou invalide.",
         )
 
-    # Isolated default session for initial guest visitor or automated test suite
-    default_user = {k: v for k, v in USERS_STORE["sacha"].items() if k != "password_hash"}
-    token = f"sess_{secrets.token_urlsafe(32)}"
-    session_data = {**default_user, "token": token}
-    await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
-    return session_data
+    user_id = session.get("id")
+    if user_id in USERS_STORE:
+        session["balance"] = USERS_STORE[user_id]["balance"]
+    return session
 
 
 @router.post("/wallet/recharge")

@@ -157,20 +157,9 @@ export default function App() {
     try {
       const token = localStorage.getItem('pokevinted_token');
       if (!token) {
-        const res = await fetch('/api/users/me');
-        if (res.ok) {
-          const user = await res.json();
-          setCurrentUser(user);
-          if (user.token) {
-            localStorage.setItem('pokevinted_token', user.token);
-          }
-          try {
-            localStorage.setItem('pokevinted_cached_user', JSON.stringify(user));
-          } catch {}
-          if (user.id) {
-            loadUserFavorites(user.id);
-          }
-        }
+        // No session: stay logged out until the user signs in explicitly
+        localStorage.removeItem('pokevinted_cached_user');
+        setCurrentUser(null);
         return;
       }
 
