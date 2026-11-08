@@ -714,7 +714,7 @@ export default function App() {
           </div>
 
           {/* Visual Separator */}
-          <div className="h-5 w-px bg-white/10 hidden sm:block mx-0.5" />
+          <div className="h-5 w-px bg-white/10 hidden xl:block mx-0.5" />
 
           {/* Cluster 2: User Account */}
           {currentUser ? (
@@ -845,7 +845,7 @@ export default function App() {
           )}
 
           {/* Visual Separator */}
-          <div className="h-5 w-px bg-white/10 hidden sm:block mx-0.5" />
+          <div className="h-5 w-px bg-white/10 hidden xl:block mx-0.5" />
 
           {/* Cluster 3: Primary Action (Vendre) */}
           <button

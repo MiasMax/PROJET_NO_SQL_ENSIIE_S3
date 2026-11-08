@@ -1829,17 +1829,17 @@ export default function BoosterOpeningPage({ onClose, currentUser }) {
       />
 
       {/* ── Top Bar / Header ──────────────────────────────────────────────── */}
-      <header className="shrink-0 w-full px-4 sm:px-6 py-3 flex items-center justify-between border-b border-white/[0.08] bg-black/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-3">
+      <header className="shrink-0 w-full px-3 sm:px-6 py-3 flex items-center justify-between gap-2 border-b border-white/[0.08] bg-black/80 backdrop-blur-md z-40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center shadow-lg border border-white/20 shrink-0">
             <Sparkles size={18} className="text-white drop-shadow" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
+              <h1 className="text-[11px] leading-tight sm:text-base font-black text-white uppercase tracking-wider">
                 PokéVinted Booster Studio Virtuel
               </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+              <span className="hidden sm:inline text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                 TCG SIMULATOR
               </span>
             </div>
@@ -1850,11 +1850,11 @@ export default function BoosterOpeningPage({ onClose, currentUser }) {
         </div>
 
         {/* Global session counter & controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Virtual Binder Access Button */}
           <button
             onClick={() => setPhase(phase === 'BINDER_COLLECTION' ? 'SELECT_SERIES' : 'BINDER_COLLECTION')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-lg ${
+            className={`flex items-center gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-lg ${
               phase === 'BINDER_COLLECTION'
                 ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]'
                 : 'bg-white/10 hover:bg-white/15 text-white border-white/15'
@@ -1862,7 +1862,7 @@ export default function BoosterOpeningPage({ onClose, currentUser }) {
             title="Consulter votre classeur de cartes virtuelles"
           >
             <BookOpen size={15} />
-            <span>Mon Classeur Virtuel</span>
+            <span className="hidden sm:inline">Mon Classeur Virtuel</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-black/40 text-amber-300">
               {collectionMetrics.totalCount}
             </span>
@@ -1899,7 +1899,7 @@ export default function BoosterOpeningPage({ onClose, currentUser }) {
       </header>
 
       {/* ── Main Dynamic Stage (Scroll starts at the top, NEVER clipped by header) ── */}
-      <main className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto relative scroll-smooth">
+      <main className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto overflow-x-hidden relative scroll-smooth">
         {/* Error notification */}
         {error && (
           <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-900/40 border border-red-500/40 text-red-200 text-xs font-bold flex items-center gap-2">
