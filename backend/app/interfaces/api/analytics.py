@@ -7,7 +7,8 @@ import random
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from pymongo import UpdateOne
 
 from app.config import settings
 from app.domain.repositories.cache_repository import CacheRepository
@@ -18,6 +19,7 @@ from app.interfaces.dependencies import (
     get_card_repository,
     get_listing_repository,
     get_order_repository,
+    require_session,
 )
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics & Market Data"])
@@ -611,6 +613,8 @@ async def open_booster_pack(
     set_name: str | None = Query(None, description="Force a specific expansion set by name"),
     set_id: str | None = Query(None, description="Force a specific expansion set by code (e.g. sv03.5)"),
     card_repo=Depends(get_card_repository),
+    x_session_token: str | None = Header(None),
+    cache_repo: CacheRepository = Depends(get_cache_repository),
 ) -> dict[str, Any]:
     """
     Simulate opening an authentic 10-card Pokémon TCG booster pack according to
@@ -622,7 +626,16 @@ async def open_booster_pack(
       - Slot 8: Reverse Holo 1 (Common or Uncommon in reverse foil)
       - Slot 9: Reverse Holo 2 / Wildcard (Reverse Rare, Illustration Rare, Ace Spec, or Shiny)
       - Slot 10: Climax Rare / Guaranteed Holo Slot (Rare Holo ~67%, Double Rare ex ~20%, Full Art ~8%, SAR ~3.5%, Gold ~1.5%)
+
+    When a session token is provided, the pulled cards are persisted in the
+    member's binder ('booster_collection' MongoDB collection).
     """
+    session: dict[str, Any] | None = None
+    if x_session_token:
+        session = await cache_repo.get_user_session(x_session_token)
+        if not session or not session.get("id"):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée ou invalide.")
+
     all_cards = await card_repo.list_cards(limit=5000)
 
     if not all_cards:
@@ -875,6 +888,9 @@ async def open_booster_pack(
     hits = [c for c in pack_cards if c.get("is_hit")]
     best_hit = max(hits, key=lambda c: c.get("market_price", 0)) if hits else None
 
+    if session:
+        await _save_pulls_to_binder(str(session["id"]), pack_cards, selected_series_info)
+
     return {
         "cards": pack_cards,
         "pack_count": len(pack_cards),
@@ -886,3 +902,63 @@ async def open_booster_pack(
         "set_id": effective_set_id,
         "series_info": selected_series_info,
     }
+
+
+# ---------------------------------------------------------------------------
+# Booster Binder — per-member collection of pulled cards (MongoDB)
+# ---------------------------------------------------------------------------
+
+BINDER_COLLECTION = "booster_collection"
+
+_BINDER_CARD_FIELDS = (
+    "name", "number", "set_id", "set_name", "image_small", "image_large",
+    "pull_rarity", "market_price", "is_hit", "is_holo", "is_reverse",
+)
+
+
+def _binder_collection():
+    db = MongoClientManager.connect(settings.MONGO_URI, settings.MONGO_DB)
+    return db[BINDER_COLLECTION]
+
+
+async def _save_pulls_to_binder(user_id: str, pack_cards: list[dict[str, Any]], series: dict[str, Any] | None) -> None:
+    """Upsert one document per (member, card), incrementing the copy count on duplicates."""
+    now = datetime.now(UTC).isoformat()
+    year = str((series or {}).get("release_year") or "2023")
+    counts: dict[str, int] = {}
+    latest: dict[str, dict[str, Any]] = {}
+    for card in pack_cards:
+        counts[card["id"]] = counts.get(card["id"], 0) + 1
+        latest[card["id"]] = card
+
+    operations = []
+    for card_id, card in latest.items():
+        snapshot = {field: card.get(field) for field in _BINDER_CARD_FIELDS}
+        snapshot["set_id"] = snapshot["set_id"] or (series or {}).get("id")
+        snapshot["set_name"] = snapshot["set_name"] or (series or {}).get("name")
+        operations.append(UpdateOne(
+            {"_id": f"{user_id}:{card_id}"},
+            {
+                "$set": {**snapshot, "last_pulled_at": now},
+                "$inc": {"count": counts[card_id]},
+                "$setOnInsert": {"user_id": user_id, "card_id": card_id, "year": year, "first_pulled_at": now},
+            },
+            upsert=True,
+        ))
+    if operations:
+        await _binder_collection().bulk_write(operations, ordered=False)
+
+
+@router.get("/boosters/collection", response_model=list[dict[str, Any]])
+async def get_booster_collection(session: dict[str, Any] = Depends(require_session)) -> list[dict[str, Any]]:
+    """Return every card the logged-in member has pulled from boosters."""
+    cursor = _binder_collection().find({"user_id": str(session["id"])}).sort("last_pulled_at", -1)
+    docs = await cursor.to_list(length=None)
+    return [{**{k: v for k, v in doc.items() if k not in ("_id", "card_id", "user_id")}, "id": doc["card_id"]} for doc in docs]
+
+
+@router.delete("/boosters/collection")
+async def clear_booster_collection(session: dict[str, Any] = Depends(require_session)) -> dict[str, Any]:
+    """Empty the logged-in member's binder."""
+    result = await _binder_collection().delete_many({"user_id": str(session["id"])})
+    return {"deleted": result.deleted_count}

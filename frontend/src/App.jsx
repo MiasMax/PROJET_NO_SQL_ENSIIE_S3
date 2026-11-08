@@ -654,10 +654,10 @@ export default function App() {
               type="button"
               onClick={() => setIsBoosterOpen(true)}
               className="nav-btn-action"
-              title="Ouvrir un booster Pokémon (simulation avec vrais taux)"
+              title="Ouvrir un booster virtuel (simulation avec vrais taux, cartes non vendables)"
             >
               <Package size={14} className="text-slate-400" />
-              <span>Booster</span>
+              <span>Booster Virtuel</span>
             </button>
 
             {/* Messages Button */}
@@ -1037,6 +1037,7 @@ export default function App() {
       {isBoosterOpen && (
         <BoosterOpeningPage
           onClose={() => setIsBoosterOpen(false)}
+          currentUser={currentUser}
         />
       )}
 

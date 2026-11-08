@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Sparkles,
   Star,
@@ -700,7 +700,7 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-400">Mode</span>
-              <span className="font-bold text-violet-300">Simulation de Collection</span>
+              <span className="font-bold text-violet-300">Carte Virtuelle • Simulation</span>
             </div>
           </div>
 
@@ -723,7 +723,7 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
               }`}
             >
               {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-              <span>{isSaved ? 'Enregistrée dans mon classeur' : 'Conserver dans mon classeur'}</span>
+              <span>{isSaved ? 'Enregistrée dans mon classeur virtuel' : 'Conserver dans mon classeur virtuel'}</span>
             </button>
           </div>
 
@@ -1032,7 +1032,7 @@ function PsaSlab({
               />
               {/* PSA Silver Holographic Shield */}
               <div className="px-1.5 py-0.2 rounded bg-gradient-to-r from-slate-200 via-white to-slate-300 border border-slate-400 text-[7px] font-black text-slate-800 flex items-center gap-0.5 shadow-xs">
-                <span className="text-red-600 font-black">PSA</span>
+                <span className="text-red-600 font-black">PSA VIRTUEL</span>
               </div>
               {/* Cert Number */}
               <span className="font-mono text-[9px] font-bold text-gray-800">
@@ -1124,9 +1124,6 @@ function PsaSlab({
 // ─── 3D Booster Pack Wrapper with Authentic Tear Ritual ─────────────────────
 function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = true, onRipAll }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [tearProgress, setTearProgress] = useState(0);
-  const [isDraggingTear, setIsDraggingTear] = useState(false);
-  const dragStartRef = useRef(0);
   const foilRef = useRef(null);
 
   const handleMouseMove = (e) => {
@@ -1135,51 +1132,9 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
     const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
     const y = ((e.clientY - rect.top) / rect.height - 0.5) * -22;
     setTilt({ x, y });
-
-    if (isDraggingTear) {
-      const currentX = e.clientX - rect.left;
-      const delta = currentX - dragStartRef.current;
-      const progress = Math.max(0, Math.min(1, delta / (rect.width * 0.72)));
-      setTearProgress(progress);
-      playBoosterAudio('crinkle', audioEnabled);
-
-      if (progress >= 0.72) {
-        setIsDraggingTear(false);
-        setTearProgress(1);
-        onTear();
-      }
-    }
   };
 
-  const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-    if (isDraggingTear) {
-      setIsDraggingTear(false);
-      setTearProgress(0);
-    }
-  };
-
-  const handleTearStart = (e) => {
-    if (isTorn) return;
-    e.stopPropagation();
-    const rect = foilRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    dragStartRef.current = clientX - rect.left;
-    setIsDraggingTear(true);
-    playBoosterAudio('crinkle', audioEnabled);
-  };
-
-  const handleTearEnd = () => {
-    if (isDraggingTear) {
-      if (tearProgress >= 0.65) {
-        onTear();
-      } else {
-        setTearProgress(0);
-      }
-      setIsDraggingTear(false);
-    }
-  };
+  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
 
   const packImg = series?.pack_image || `/boosters/${series?.id}.jpg`;
 
@@ -1196,22 +1151,6 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
       ref={foilRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      onMouseUp={handleTearEnd}
-      onTouchMove={(e) => {
-        if (!foilRef.current || isTorn || !isDraggingTear) return;
-        const rect = foilRef.current.getBoundingClientRect();
-        const clientX = e.touches[0].clientX;
-        const delta = clientX - rect.left - dragStartRef.current;
-        const progress = Math.max(0, Math.min(1, delta / (rect.width * 0.72)));
-        setTearProgress(progress);
-        playBoosterAudio('crinkle', audioEnabled);
-        if (progress >= 0.72) {
-          setIsDraggingTear(false);
-          setTearProgress(1);
-          onTear();
-        }
-      }}
-      onTouchEnd={handleTearEnd}
       className={`relative select-none cursor-pointer group transition-transform duration-200 ${
         isShaking ? 'animate-[shake_0.2s_infinite]' : ''
       }`}
@@ -1255,7 +1194,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
 
         {/* CARDS EMERGING OUT OF THE OPEN FOIL SLEEVE */}
         <div
-          className={`absolute inset-x-8 top-10 z-10 transition-all duration-800 ease-out pointer-events-none flex flex-col items-center ${
+          className={`absolute inset-x-8 top-10 z-10 transition-all duration-[800ms] ease-out pointer-events-none flex flex-col items-center ${
             isTorn ? 'translate-y-[-85px] opacity-100 scale-100' : 'translate-y-12 opacity-0 scale-95'
           }`}
           style={{
@@ -1284,7 +1223,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
         >
           {/* ── TOP FOIL CRIMP SEAL (Severs and flutters away in 3D on tear) ── */}
           <div
-            className="absolute inset-x-0 top-0 h-[17%] z-30 transition-all duration-800 ease-out pointer-events-none overflow-hidden"
+            className="absolute inset-x-0 top-0 h-[17%] z-30 transition-all duration-[800ms] ease-out pointer-events-none overflow-hidden"
             style={{
               clipPath: topTeethClip,
               transform: isTorn
@@ -1323,40 +1262,9 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
             />
           </div>
 
-          {/* ── INTERACTIVE TEAR CUT LINE / STRIP (PULL-TAB & LASER) ────────── */}
+          {/* ── TEAR PERFORATION LINE (decorative) ─────────────────────────── */}
           {!isTorn && (
-            <div
-              className="absolute top-[16.5%] inset-x-0 h-8 z-40 flex items-center justify-between px-3 cursor-ew-resize group/tear"
-              onMouseDown={handleTearStart}
-              onTouchStart={handleTearStart}
-              title="Glissez de gauche à droite pour déchirer le booster"
-            >
-              {/* Dashed Tear Perforation */}
-              <div className="absolute inset-x-4 h-[2px] border-b-2 border-dashed border-amber-300/80 shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
-
-              {/* Real-time laser burn progress line */}
-              {tearProgress > 0 && (
-                <div
-                  className="absolute left-4 h-[3px] bg-gradient-to-r from-yellow-300 via-rose-500 to-amber-400 shadow-[0_0_15px_#f59e0b] rounded-full transition-all"
-                  style={{ width: `${tearProgress * 85}%` }}
-                />
-              )}
-
-              {/* Left Pull-Tab Notch */}
-              <div
-                className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-rose-600 border border-white/40 shadow-[0_0_12px_rgba(251,191,36,0.8)] flex items-center justify-center z-10 transition-transform group-hover/tear:scale-110 active:scale-95"
-                style={{
-                  transform: `translateX(${tearProgress * 210}px)`,
-                }}
-              >
-                <Zap size={14} className="text-white fill-white animate-pulse" />
-              </div>
-
-              {/* Right Cut Arrow Indicator */}
-              <div className="text-[10px] font-black tracking-wider text-amber-300 bg-black/85 px-2.5 py-0.5 rounded-full border border-amber-400/50 shadow-md flex items-center gap-1 z-10">
-                <span>{isDraggingTear ? `${Math.round(tearProgress * 100)}%` : 'GLISSER →'}</span>
-              </div>
-            </div>
+            <div className="absolute top-[16.5%] inset-x-4 h-[2px] z-40 border-b-2 border-dashed border-amber-300/80 shadow-[0_0_8px_rgba(251,191,36,0.9)] pointer-events-none" />
           )}
 
           {/* ── LOWER FOIL SLEEVE (Body holding the 10-card deck with 3D bevel) ── */}
@@ -1423,7 +1331,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
             <div className="absolute bottom-6 inset-x-4 z-40 text-center pointer-events-none">
               <span className="px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider text-white bg-black/90 backdrop-blur-md border border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.7)] inline-flex items-center gap-2 animate-bounce">
                 <Sparkles size={14} className="text-amber-400" />
-                <span>Glisser ou cliquer pour ouvrir ⚡</span>
+                <span>Cliquer pour ouvrir ⚡</span>
               </span>
             </div>
           )}
@@ -1434,7 +1342,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = tru
 }
 
 // ─── Main Booster Studio Component ──────────────────────────────────────────
-export default function BoosterOpeningPage({ onClose }) {
+export default function BoosterOpeningPage({ onClose, currentUser }) {
   // Phase: 'SELECT_SERIES' | 'TEAR_PACK' | 'REVEAL_STACK' | 'SUMMARY_BINDER' | 'BINDER_COLLECTION'
   const [phase, setPhase] = useState('SELECT_SERIES');
   const [seriesList, setSeriesList] = useState(FALLBACK_SERIES);
@@ -1460,13 +1368,15 @@ export default function BoosterOpeningPage({ onClose }) {
   const [isRipAll, setIsRipAll] = useState(false);
   const [teaseStep, setTeaseStep] = useState(0); // 0: Year, 1: Rarity, 2: Slab Revealed
   const [summaryViewMode, setSummaryViewMode] = useState('SLABS'); // 'SLABS' | 'GRID'
-  const teaseTimeoutRef = useRef(null);
+  const animTimersRef = useRef([]);
+  const ripStartedRef = useRef(false);
 
   // 3D Tilt for active card in stack
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
 
-  // Virtual Binder Collection State (loaded from localStorage)
-  const [collection, setCollection] = useState(() => loadCollectionFromStorage());
+  // Virtual Binder Collection State: MongoDB for logged-in members, localStorage for guests
+  const isLoggedIn = !!currentUser;
+  const [collection, setCollection] = useState(() => (isLoggedIn ? [] : loadCollectionFromStorage()));
   const [binderSearch, setBinderSearch] = useState('');
   const [binderSeriesFilter, setBinderSeriesFilter] = useState('ALL');
   const [binderRarityFilter, setBinderRarityFilter] = useState('ALL');
@@ -1520,10 +1430,33 @@ export default function BoosterOpeningPage({ onClose }) {
           });
         }
       });
-      saveCollectionToStorage(copy);
+      if (!isLoggedIn) saveCollectionToStorage(copy);
       return copy;
     });
   };
+
+  // Load the member's full binder from the backend (cards are persisted server-side on pack open)
+  const fetchServerCollection = useCallback(async () => {
+    const token = localStorage.getItem('pokevinted_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/analytics/boosters/collection', {
+        headers: { 'x-session-token': token },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setCollection(data);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchServerCollection();
+    else setCollection(loadCollectionFromStorage());
+  }, [isLoggedIn, fetchServerCollection]);
+
+  useEffect(() => {
+    if (isLoggedIn && phase === 'BINDER_COLLECTION') fetchServerCollection();
+  }, [isLoggedIn, phase, fetchServerCollection]);
 
   // Fetch available series from backend API
   useEffect(() => {
@@ -1584,12 +1517,16 @@ export default function BoosterOpeningPage({ onClose }) {
     setError(null);
     setPackData(null);
     setIsTorn(false);
+    clearAnimTimers();
+    ripStartedRef.current = false;
 
     try {
+      const token = isLoggedIn ? localStorage.getItem('pokevinted_token') : null;
       const res = await fetch(`/api/analytics/boosters/open?set_id=${encodeURIComponent(series.id)}`, {
         method: 'POST',
+        headers: token ? { 'x-session-token': token } : {},
       });
-      if (!res.ok) throw new Error('Échec de la génération du booster.');
+      if (!res.ok) throw new Error('Échec de la génération du booster virtuel.');
       const data = await res.json();
       // Enrich cards with authentic PSA slab grading attributes
       if (Array.isArray(data?.cards)) {
@@ -1625,16 +1562,33 @@ export default function BoosterOpeningPage({ onClose }) {
     }
   };
 
+  // Every pending animation timer is tracked so a skip / close can cancel it
+  const scheduleAnim = (fn, ms) => {
+    const id = setTimeout(() => {
+      animTimersRef.current = animTimersRef.current.filter((t) => t !== id);
+      fn();
+    }, ms);
+    animTimersRef.current.push(id);
+  };
+
+  const clearAnimTimers = () => {
+    animTimersRef.current.forEach(clearTimeout);
+    animTimersRef.current = [];
+  };
+
+  useEffect(() => clearAnimTimers, []);
+
   // Start Gacha Angels rip animation (Cosmic Warp -> Supernova -> Slabs)
   const handleStartRip = (ripAll = false) => {
-    if (isTorn || !packData) return;
+    if (ripStartedRef.current || isTorn || !packData) return;
+    ripStartedRef.current = true;
     setIsTorn(true);
     setIsRipAll(ripAll);
     setPhase('COSMIC_WARP');
     playBoosterAudio('warp', audioEnabled);
 
     // Supernova explosion & particle burst at 650ms
-    setTimeout(() => {
+    scheduleAnim(() => {
       playBoosterAudio('supernova', audioEnabled);
       setTearTrigger(Date.now());
     }, 650);
@@ -1643,64 +1597,63 @@ export default function BoosterOpeningPage({ onClose }) {
     addCardsToCollection(packData.cards, selectedSeries);
 
     // After warp completes (~1600ms)
-    setTimeout(() => {
-      if (ripAll) {
-        playBoosterAudio('god_pull', audioEnabled);
-        setCelebrationTrigger(Date.now());
-        const hitsCount = packData.cards.filter((c) => c.is_hit).length;
-        setSessionStats((prev) => ({
-          openedCount: prev.openedCount + 1,
-          hitsCount: prev.hitsCount + hitsCount,
-          totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
-        }));
-        setPhase('SUMMARY_BINDER');
-      } else {
-        setPhase('REVEAL_SLAB');
-        setCurrentSlotIndex(0);
-        startTeaseForCard(0, packData.cards[0]);
-      }
-    }, 1600);
+    scheduleAnim(() => finishWarp(ripAll), 1600);
   };
 
-  const handleFastForwardWarp = () => {
-    if (isRipAll) {
+  const recordPackInSessionStats = () => {
+    const hitsCount = packData.cards.filter((c) => c.is_hit).length;
+    setSessionStats((prev) => ({
+      openedCount: prev.openedCount + 1,
+      hitsCount: prev.hitsCount + hitsCount,
+      totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
+    }));
+  };
+
+  const finishWarp = (ripAll) => {
+    clearAnimTimers();
+    if (ripAll) {
+      playBoosterAudio('god_pull', audioEnabled);
+      setCelebrationTrigger(Date.now());
+      recordPackInSessionStats();
       setPhase('SUMMARY_BINDER');
     } else {
       setPhase('REVEAL_SLAB');
       setCurrentSlotIndex(0);
-      startTeaseForCard(0, packData.cards[0]);
+      setCardTilt({ x: 0, y: 0 });
+      startTeaseForCard(packData.cards[0]);
+    }
+  };
+
+  const handleFastForwardWarp = () => finishWarp(isRipAll);
+
+  const revealSlab = (card) => {
+    setTeaseStep(2);
+    playBoosterAudio('slab_rise', audioEnabled);
+    if (card && (card.is_hit || (card.market_price && card.market_price > 50))) {
+      scheduleAnim(() => {
+        playBoosterAudio('cash_jackpot', audioEnabled);
+        setCelebrationTrigger(Date.now());
+      }, 250);
     }
   };
 
   // Orchestrate Gacha Angels Year -> Rarity -> PSA Slab tease
-  const startTeaseForCard = (slotIdx, card) => {
-    if (teaseTimeoutRef.current) clearTimeout(teaseTimeoutRef.current);
+  const startTeaseForCard = (card) => {
+    clearAnimTimers();
     setTeaseStep(0);
     playBoosterAudio('tease_tick', audioEnabled);
 
-    const t1 = setTimeout(() => {
+    scheduleAnim(() => {
       setTeaseStep(1);
       playBoosterAudio('tease_tick', audioEnabled);
-
-      const t2 = setTimeout(() => {
-        setTeaseStep(2);
-        playBoosterAudio('slab_rise', audioEnabled);
-        if (card && (card.is_hit || (card.market_price && card.market_price > 50))) {
-          setTimeout(() => {
-            playBoosterAudio('cash_jackpot', audioEnabled);
-            setCelebrationTrigger(Date.now());
-          }, 250);
-        }
-      }, 500);
-      teaseTimeoutRef.current = t2;
+      scheduleAnim(() => revealSlab(card), 500);
     }, 450);
-    teaseTimeoutRef.current = t1;
   };
 
   const handleSkipTease = () => {
-    if (teaseTimeoutRef.current) clearTimeout(teaseTimeoutRef.current);
-    setTeaseStep(2);
-    playBoosterAudio('slab_rise', audioEnabled);
+    if (teaseStep >= 2) return;
+    clearAnimTimers();
+    revealSlab(currentCard);
   };
 
   const handleNextCard = () => {
@@ -1709,15 +1662,11 @@ export default function BoosterOpeningPage({ onClose }) {
       const nextIdx = currentSlotIndex + 1;
       setCurrentSlotIndex(nextIdx);
       setCardTilt({ x: 0, y: 0 });
-      startTeaseForCard(nextIdx, packData.cards[nextIdx]);
+      startTeaseForCard(packData.cards[nextIdx]);
     } else {
       // Reached the end of the 10-card pack! Update session statistics and view summary
-      const hitsCount = packData.cards.filter((c) => c.is_hit).length;
-      setSessionStats((prev) => ({
-        openedCount: prev.openedCount + 1,
-        hitsCount: prev.hitsCount + hitsCount,
-        totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
-      }));
+      clearAnimTimers();
+      recordPackInSessionStats();
       playBoosterAudio('god_pull', audioEnabled);
       setCelebrationTrigger(Date.now());
       setPhase('SUMMARY_BINDER');
@@ -1888,14 +1837,14 @@ export default function BoosterOpeningPage({ onClose }) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
-                PokéVinted Booster Studio
+                PokéVinted Booster Studio Virtuel
               </h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                 TCG SIMULATOR
               </span>
             </div>
             <p className="text-[11px] text-gray-400 hidden sm:block">
-              Ouverture de boosters & simulation de collection • 100% Fun
+              Ouverture de boosters virtuels & simulation de collection • 100% Fun
             </p>
           </div>
         </div>
@@ -1913,7 +1862,7 @@ export default function BoosterOpeningPage({ onClose }) {
             title="Consulter votre classeur de cartes virtuelles"
           >
             <BookOpen size={15} />
-            <span>Mon Classeur</span>
+            <span>Mon Classeur Virtuel</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-black/40 text-amber-300">
               {collectionMetrics.totalCount}
             </span>
@@ -1964,13 +1913,13 @@ export default function BoosterOpeningPage({ onClose }) {
           <div className="w-full max-w-6xl flex flex-col items-center gap-6 py-2 pb-12">
             <div className="text-center max-w-xl">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">
-                Mode Découverte & Simulation Gratuite
+                Mode Découverte • Boosters Virtuels Gratuits
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-white mt-2">
-                Choisissez votre Booster Pokémon
+                Choisissez votre Booster Virtuel
               </h2>
               <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                Ouvrez des packs virtuels pour le plaisir de collectionner, admirez les illustrations et enrichissez votre classeur personnel.
+                Ouvrez des packs virtuels pour le plaisir de collectionner, admirez les illustrations et enrichissez votre classeur virtuel.
               </p>
             </div>
 
@@ -2088,10 +2037,10 @@ export default function BoosterOpeningPage({ onClose }) {
                 Étape 2 • Le Rituel de Déchirement
               </span>
               <h2 className="text-2xl font-black text-white mt-2">
-                Déchirez le scellé de votre booster
+                Déchirez le scellé de votre booster virtuel
               </h2>
               <p className="text-xs text-gray-400 mt-1">
-                Booster officiel <span className="text-white font-bold">{selectedSeries.name}</span> • 10 cartes sous scellé
+                Booster virtuel <span className="text-white font-bold">{selectedSeries.name}</span> • 10 cartes virtuelles sous scellé
               </p>
             </div>
 
@@ -2127,14 +2076,6 @@ export default function BoosterOpeningPage({ onClose }) {
               </button>
 
               <div className="flex items-center gap-4 mt-1">
-                <button
-                  onClick={() => handleStartRip(true)}
-                  className="text-xs text-amber-400/80 hover:text-amber-300 transition-colors flex items-center gap-1"
-                >
-                  <Zap size={12} />
-                  <span>Passer l'animation</span>
-                </button>
-                <span className="text-gray-600">•</span>
                 <button
                   onClick={() => setPhase('SELECT_SERIES')}
                   className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
@@ -2191,7 +2132,9 @@ export default function BoosterOpeningPage({ onClose }) {
             </div>
 
             {/* Supernova Expansion Sphere */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full pointer-events-none z-30 bg-radial from-white via-cyan-300 to-transparent animate-[supernovaExpand_1.4s_ease-out_0.6s_forwards] opacity-0" />
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full pointer-events-none z-30 animate-[supernovaExpand_1.4s_ease-out_0.6s_forwards] opacity-0"
+              style={{ background: 'radial-gradient(circle, #ffffff 0%, #67e8f9 45%, transparent 70%)' }}
+            />
 
             {/* Floating Petal Flakes */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden z-25">
@@ -2242,7 +2185,7 @@ export default function BoosterOpeningPage({ onClose }) {
             />
 
             {/* Top Tease Typography Sequence (Gacha Angels: YEAR -> RARITY -> SLAB) */}
-            <div className="h-28 flex flex-col items-center justify-center text-center z-20">
+            <div className="h-20 flex flex-col items-center justify-center text-center z-20">
               {teaseStep === 0 && (
                 <div className="animate-[pulseTeaseText_0.35s_ease-out]">
                   <span className="text-[11px] font-black tracking-[0.35em] text-gray-400 uppercase">
@@ -2290,7 +2233,7 @@ export default function BoosterOpeningPage({ onClose }) {
 
             {/* Center PSA Graded Slab Stage with mouse tilt tracking */}
             <div
-              className="relative z-10 my-1"
+              className="relative z-10 my-1 [@media(max-height:880px)]:[zoom:0.85]"
               onMouseMove={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
@@ -2313,12 +2256,12 @@ export default function BoosterOpeningPage({ onClose }) {
                 />
               </div>
 
-              {/* When teaseStep < 2: show frosted placeholder rising in silhouette */}
+              {/* When teaseStep < 2: frosted placeholder laid over the (still hidden) slab footprint */}
               {teaseStep < 2 && (
-                <div className="w-[315px] h-[515px] rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center p-4 shadow-2xl animate-pulse">
+                <div className="absolute inset-0 rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center p-4 shadow-2xl animate-pulse">
                   <Sparkles size={36} className="text-white/40 animate-spin" />
                   <span className="text-xs font-mono font-bold text-gray-500 mt-3 tracking-widest uppercase">
-                    CERTIFICATION PSA EN COURS...
+                    CERTIFICATION PSA VIRTUELLE EN COURS...
                   </span>
                 </div>
               )}
@@ -2358,7 +2301,7 @@ export default function BoosterOpeningPage({ onClose }) {
                           ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)]'
                           : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
                       }`}
-                      title="Ajouter au classeur personnel"
+                      title="Ajouter au classeur virtuel"
                     >
                       <Bookmark size={16} />
                     </button>
@@ -2411,7 +2354,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   </span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-white mt-1">
-                  Bilan de votre Booster Pokémon
+                  Bilan de votre Booster Virtuel
                 </h2>
                 {packData.best_hit ? (
                   <p className="text-xs md:text-sm text-amber-300 flex items-center gap-1.5 mt-1">
@@ -2427,20 +2370,20 @@ export default function BoosterOpeningPage({ onClose }) {
                   </p>
                 )}
                 <p className="text-[11px] text-gray-400 mt-2 italic">
-                  Ces cartes ont été automatiquement ajoutées à votre classeur personnel ! (Simulation 100% fun, non vendables).
+                  Ces cartes ont été automatiquement ajoutées à votre classeur virtuel ! (Cartes virtuelles, simulation 100% fun, non vendables).
                 </p>
               </div>
 
               {/* Total Pack Valuation */}
               <div className="relative z-10 flex flex-col items-center md:items-end">
                 <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-                  Valeur totale indicative du pack
+                  Valeur indicative du pack virtuel
                 </span>
                 <span className="text-3xl md:text-4xl font-black text-emerald-400 drop-shadow">
                   {packData.total_estimated_value.toFixed(2)} €
                 </span>
                 <span className="text-[11px] font-bold text-gray-400 mt-0.5">
-                  10 cartes certifiées PSA • MINT / GEM-MT 10
+                  10 cartes virtuelles • slabs PSA simulés
                 </span>
               </div>
             </div>
@@ -2457,7 +2400,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   }`}
                 >
                   <Trophy size={14} />
-                  <span>Vue Slabs PSA Graded (Gacha Angels)</span>
+                  <span>Vue Slabs PSA Virtuels (Gacha Angels)</span>
                 </button>
 
                 <button
@@ -2473,7 +2416,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 </button>
               </div>
               <span className="text-xs text-gray-500 hidden sm:block">
-                10 cartes certifiées PSA GEM-MT 10 / MINT 9
+                10 cartes virtuelles • slabs PSA simulés GEM-MT 10 / MINT 9
               </span>
             </div>
 
@@ -2613,7 +2556,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 className="px-6 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-red-600 shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
               >
                 <RefreshCw size={15} />
-                <span>Ouvrir un autre booster ({selectedSeries.name})</span>
+                <span>Ouvrir un autre booster virtuel ({selectedSeries.name})</span>
               </button>
 
               <button
@@ -2621,7 +2564,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 className="px-5 py-3 rounded-xl font-bold text-sm text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-2"
               >
                 <BookOpen size={15} />
-                <span>Consulter mon Classeur ({collectionMetrics.totalCount} cartes)</span>
+                <span>Consulter mon Classeur Virtuel ({collectionMetrics.totalCount} cartes virtuelles)</span>
               </button>
 
               <button
@@ -2649,17 +2592,17 @@ export default function BoosterOpeningPage({ onClose }) {
                   <span className="text-xs text-gray-400">Simulation de Collection</span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-white mt-1">
-                  Ma Collection de Cartes Pokémon
+                  Ma Collection Virtuelle de Cartes Pokémon
                 </h2>
                 <p className="text-xs md:text-sm text-gray-300 mt-1 max-w-xl">
-                  Toutes les cartes tirées lors de vos ouvertures de boosters sont automatiquement archivées dans ce classeur.
+                  Toutes les cartes tirées lors de vos ouvertures de boosters sont automatiquement archivées dans ce classeur virtuel. Ces cartes ne sont pas vendables sur la marketplace.
                 </p>
               </div>
 
               {/* Binder Metrics Cards */}
               <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
-                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Total Cartes</span>
+                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cartes Virtuelles</span>
                   <span className="text-lg font-black text-white">{collectionMetrics.totalCount}</span>
                 </div>
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
@@ -2671,7 +2614,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   <span className="text-lg font-black text-amber-400">{collectionMetrics.hitsCount}</span>
                 </div>
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
-                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cote Estimée</span>
+                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cote Virtuelle</span>
                   <span className="text-lg font-black text-emerald-400">{collectionMetrics.totalValue.toFixed(2)} €</span>
                 </div>
               </div>
@@ -2736,7 +2679,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 <h3 className="text-base font-bold text-white">Aucune carte dans cette vue</h3>
                 <p className="text-xs text-gray-400 mt-1 max-w-sm">
                   {collection.length === 0
-                    ? 'Votre classeur est vide pour l\'instant ! Ouvrez votre premier booster pour commencer votre collection.'
+                    ? 'Votre classeur virtuel est vide pour l\'instant ! Ouvrez votre premier booster virtuel pour commencer votre collection.'
                     : 'Aucune carte ne correspond à vos critères de recherche.'}
                 </p>
                 <button
@@ -2744,7 +2687,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   className="mt-4 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={14} />
-                  <span>Ouvrir un Booster</span>
+                  <span>Ouvrir un Booster Virtuel</span>
                 </button>
               </div>
             ) : (
@@ -2840,7 +2783,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   className="px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={14} />
-                  <span>Ouvrir un nouveau booster</span>
+                  <span>Ouvrir un nouveau booster virtuel</span>
                 </button>
 
                 {packData && (
@@ -2861,13 +2804,21 @@ export default function BoosterOpeningPage({ onClose }) {
                     );
                     if (ok) {
                       setCollection([]);
-                      saveCollectionToStorage([]);
+                      if (isLoggedIn) {
+                        const token = localStorage.getItem('pokevinted_token');
+                        fetch('/api/analytics/boosters/collection', {
+                          method: 'DELETE',
+                          headers: token ? { 'x-session-token': token } : {},
+                        }).catch(() => {});
+                      } else {
+                        saveCollectionToStorage([]);
+                      }
                     }
                   }}
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-950/60 border border-red-500/20 transition-colors flex items-center gap-1.5"
                 >
                   <Trash2 size={13} />
-                  <span>Vider mon classeur</span>
+                  <span>Vider mon classeur virtuel</span>
                 </button>
               )}
             </div>
