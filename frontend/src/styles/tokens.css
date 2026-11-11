@@ -1,0 +1,136 @@
+/* ==========================================================
+   POKÉVINTED — POKÉDEX COLLECTOR OS TOKENS (Jour & Nuit)
+   Layer 1: Primitives -> Layer 2: Semantic -> Layer 3: Component
+   ========================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Layer 1: Raw Palette Primitives */
+  --raw-canvas: #ECEFF4;
+  --raw-surface: #FFFFFF;
+  --raw-surface-alt: #E2E7F0;
+  --raw-surface-muted: #F4F6FA;
+
+  --raw-ink-900: #111827;
+  --raw-ink-700: #374151;
+  --raw-ink-600: #4B5563;
+
+  --raw-border-300: #C2C9D6;
+  --raw-border-400: #8893A6;
+
+  --raw-vermilion-600: #DC2626;
+  --raw-vermilion-700: #B91C1C;
+  --raw-vermilion-50: #FEF2F2;
+
+  --raw-cobalt-700: #1D4ED8;
+  --raw-cobalt-800: #1E40AF;
+  --raw-cobalt-50: #EFF6FF;
+
+  --raw-emerald-800: #166534;
+  --raw-emerald-100: #DCFCE7;
+  --raw-emerald-300: #86EFAC;
+
+  --raw-amber-800: #92400E;
+  --raw-amber-100: #FEF3C7;
+  --raw-amber-300: #FCD34D;
+
+  --raw-crimson-700: #B91C1C;
+  --raw-crimson-100: #FEE2E2;
+  --raw-crimson-300: #FCA5A5;
+
+  --pokedex-lens: #0284C7;
+
+  /* Layer 2: Semantic Tokens (Light Pokédex Mode) */
+  --bg-canvas: var(--raw-canvas);
+  --bg-surface: var(--raw-surface);
+  --bg-surface-alt: var(--raw-surface-alt);
+  --bg-surface-muted: var(--raw-surface-muted);
+
+  --text-primary: var(--raw-ink-900);
+  --text-secondary: var(--raw-ink-700);
+  --text-muted: var(--raw-ink-600);
+
+  --border-default: var(--raw-border-300);
+  --border-strong: var(--raw-border-400);
+
+  --accent-primary: var(--raw-vermilion-600);
+  --accent-primary-hover: var(--raw-vermilion-700);
+  --accent-on-primary: #FFFFFF;
+  --accent-primary-soft: var(--raw-vermilion-50);
+
+  --accent-secondary: var(--raw-cobalt-700);
+  --accent-secondary-hover: var(--raw-cobalt-800);
+  --accent-on-secondary: #FFFFFF;
+  --accent-secondary-soft: var(--raw-cobalt-50);
+
+  --status-success: var(--raw-emerald-800);
+  --status-success-bg: var(--raw-emerald-100);
+  --status-success-border: var(--raw-emerald-300);
+
+  --status-warning: var(--raw-amber-800);
+  --status-warning-bg: var(--raw-amber-100);
+  --status-warning-border: var(--raw-amber-300);
+
+  --status-danger: var(--raw-crimson-700);
+  --status-danger-bg: var(--raw-crimson-100);
+  --status-danger-border: var(--raw-crimson-300);
+
+  /* Layer 3: Component Tokens */
+  --radius-btn: 6px;
+  --radius-card: 6px;
+  --radius-modal: 8px;
+  --border-width: 1.5px;
+
+  --shadow-card: 0 2px 0 var(--border-default);
+  --shadow-card-hover: 0 4px 0 var(--accent-secondary);
+  --shadow-control: 0 1px 0 var(--border-default);
+  --shadow-modal: 0 16px 40px rgba(17, 24, 39, 0.18), 0 4px 0 var(--raw-ink-900);
+
+  --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-canvas: #0D1117;
+  --bg-surface: #161B22;
+  --bg-surface-alt: #21262D;
+  --bg-surface-muted: #1C2128;
+
+  --text-primary: #F0F6FC;
+  --text-secondary: #C9D1D9;
+  --text-muted: #8B949E;
+
+  --border-default: #30363D;
+  --border-strong: #484F58;
+
+  --accent-primary: #DC2626;
+  --accent-primary-hover: #EF4444;
+  --accent-primary-soft: rgba(220, 38, 38, 0.16);
+
+  --accent-secondary: #2563EB;
+  --accent-secondary-hover: #3B82F6;
+  --accent-secondary-soft: rgba(37, 99, 235, 0.18);
+
+  --pokedex-lens: #38BDF8;
+
+  --status-success: #4ADE80;
+  --status-success-bg: rgba(34, 197, 94, 0.14);
+  --status-success-border: rgba(74, 222, 128, 0.35);
+
+  --status-warning: #FBBF24;
+  --status-warning-bg: rgba(245, 158, 11, 0.14);
+  --status-warning-border: rgba(251, 191, 36, 0.35);
+
+  --status-danger: #F87171;
+  --status-danger-bg: rgba(239, 68, 68, 0.16);
+  --status-danger-border: rgba(248, 113, 113, 0.38);
+
+  --shadow-card: 0 2px 0 #010409;
+  --shadow-card-hover: 0 4px 0 #2563EB;
+  --shadow-control: 0 1px 0 #010409;
+  --shadow-modal: 0 20px 48px rgba(0, 0, 0, 0.72), 0 3px 0 #30363D;
+}

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, Tag, TrendingDown, Sparkles } from 'lucide-react';
+import { Check, AlertCircle, Tag, TrendingDown } from 'lucide-react';
+import { formatPrice } from '../utils/format';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import ConditionBadge from './ui/ConditionBadge';
 
 export default function EditListingPriceModal({
   isOpen,
@@ -24,7 +28,7 @@ export default function EditListingPriceModal({
 
   const currentPrice = Number(listing.price || 0);
   const parsedNewPrice = parseFloat(newPrice);
-  const isValidPrice = !isNaN(parsedNewPrice) && parsedNewPrice > 0 && parsedNewPrice <= 100000;
+  const isValidPrice = !Number.isNaN(parsedNewPrice) && parsedNewPrice > 0 && parsedNewPrice <= 100000;
   const priceDiff = isValidPrice ? parsedNewPrice - currentPrice : 0;
 
   const handleApplyDiscount = (pct) => {
@@ -35,7 +39,7 @@ export default function EditListingPriceModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isValidPrice) {
-      setError("Veuillez saisir un prix valide supérieur à 0 €.");
+      setError('Veuillez saisir un prix valide supérieur à 0 €.');
       return;
     }
 
@@ -59,95 +63,67 @@ export default function EditListingPriceModal({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Erreur lors de la mise à jour du prix.");
+        throw new Error(data.detail || 'Erreur lors de la mise à jour du prix.');
       }
 
       const updated = await res.json();
-      if (showToast) {
-        showToast(`🏷️ Prix mis à jour : ${parsedNewPrice.toFixed(2).replace('.', ',')} € !`);
-      }
-      if (onSuccess) {
-        onSuccess(updated);
-      }
+      showToast?.(`Prix mis à jour : ${formatPrice(parsedNewPrice)}`, 'success');
+      onSuccess?.(updated);
       onClose();
     } catch (err) {
-      setError(err.message || "Une erreur inattendue est survenue.");
+      setError(err.message || 'Une erreur est survenue.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !loading) onClose();
-      }}
-    >
-      <div className="bg-[#0f172a] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#007782]/20 border border-[#007782]/30 flex items-center justify-center text-[#00a8b5]">
-              <Tag size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-tight">Modifier le prix</h3>
-              <p className="text-xs text-slate-400 truncate max-w-[260px]">
-                {listing.card_name} ({listing.set_name})
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
+    <Modal isOpen={isOpen} onClose={loading ? undefined : onClose} size="sm" closeOnBackdrop={!loading}>
+      <Modal.Header
+        title="Modifier le prix"
+        subtitle={`${listing.card_name} (${listing.set_name})`}
+        icon={<Tag size={17} />}
+        hideClose={loading}
+      />
 
-        {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-xs flex items-center gap-2">
-            <AlertCircle size={15} className="shrink-0 text-red-400" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Card Recap preview */}
-        <div className="bg-[#1a2236]/70 border border-white/[0.08] rounded-xl p-3 mb-4 flex items-center gap-3">
-          {listing.image_url && (
-            <img
-              src={listing.image_url}
-              alt={listing.card_name}
-              className="w-10 h-14 object-contain rounded bg-slate-900 border border-white/10 shrink-0"
-            />
+      <form onSubmit={handleSubmit}>
+        <Modal.Body className="space-y-4">
+          {error && (
+            <div role="alert" className="p-3 rounded-[6px] bg-[#FEE2E2] border-[1.5px] border-[#FCA5A5] text-[#B91C1C] text-xs font-medium flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{error}</span>
+            </div>
           )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-slate-400">Prix actuel :</span>
-              <span className="font-semibold text-slate-300 tabular-nums">
-                {currentPrice.toFixed(2).replace('.', ',')} €
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">État :</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/5">
-                {listing.condition || 'NEAR_MINT'}
-              </span>
+
+          <div className="flex items-center gap-3 p-3 rounded-[6px] bg-neo-muted border-[1.5px] border-neo-border">
+            {listing.image_url && (
+              <img
+                src={listing.image_url}
+                alt={listing.card_name}
+                className="w-10 h-14 object-contain rounded-[4px] bg-neo-surface border border-neo-border shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neo-ink-3">Prix actuel</span>
+                <span className="font-mono font-bold text-neo-ink tabular-nums">
+                  {formatPrice(currentPrice)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-neo-ink-3">État</span>
+                <ConditionBadge condition={listing.condition} />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-200 mb-1.5">
-              Nouveau prix de vente (€)
+            <label htmlFor="edit-listing-price-input" className="block text-xs font-semibold text-neo-ink mb-1.5">
+              Nouveau prix (€)
             </label>
             <div className="relative">
               <input
+                id="edit-listing-price-input"
                 type="number"
                 step="0.01"
                 min="0.50"
@@ -155,83 +131,56 @@ export default function EditListingPriceModal({
                 required
                 value={newPrice}
                 onChange={(e) => setNewPrice(e.target.value)}
-                placeholder="Ex: 24.50"
-                className="w-full h-11 px-3.5 pr-10 rounded-xl bg-slate-900 border border-white/10 text-white font-bold text-base focus:outline-none focus:border-[#007782] focus:ring-1 focus:ring-[#007782] transition-colors tabular-nums"
+                placeholder="24.50"
                 autoFocus
+                className="neo-input pr-9 font-mono font-bold text-base tabular-nums"
               />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-neo-ink-3 font-bold text-sm">
                 €
               </span>
             </div>
 
-            {/* Price change badge */}
             {isValidPrice && priceDiff !== 0 && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs">
+              <p className="mt-1.5 text-xs font-medium flex items-center gap-1">
                 {priceDiff < 0 ? (
-                  <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    <TrendingDown size={13} />
-                    Baisse de {Math.abs(priceDiff).toFixed(2).replace('.', ',')} € (-{Math.round((Math.abs(priceDiff) / currentPrice) * 100)} %)
+                  <span className="text-[#15803D] flex items-center gap-1">
+                    <TrendingDown size={13} aria-hidden="true" />
+                    Baisse de {formatPrice(Math.abs(priceDiff))} (-{Math.round((Math.abs(priceDiff) / currentPrice) * 100)} %)
                   </span>
                 ) : (
-                  <span className="text-indigo-300 font-medium">
-                    Hausse de +{priceDiff.toFixed(2).replace('.', ',')} €
+                  <span className="text-neo-cobalt">
+                    Hausse de +{formatPrice(priceDiff)}
                   </span>
                 )}
-              </div>
+              </p>
             )}
           </div>
 
-          {/* Quick adjustment pills */}
-          <div>
-            <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">
-              Ajustements rapides recommandés :
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleApplyDiscount(5)}
-                className="px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-white/5 cursor-pointer"
-              >
-                -5 %
-              </button>
-              <button
-                type="button"
-                onClick={() => handleApplyDiscount(10)}
-                className="px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-white/5 cursor-pointer"
-              >
-                -10 %
-              </button>
-              <button
-                type="button"
-                onClick={() => handleApplyDiscount(15)}
-                className="px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-white/5 cursor-pointer"
-              >
-                -15 %
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neo-ink-3">Ajustement :</span>
+            {[5, 10, 15].map((pct) => (
+              <Button key={pct} variant="subtle" size="xs" onClick={() => handleApplyDiscount(pct)}>
+                -{pct} %
+              </Button>
+            ))}
           </div>
+        </Modal.Body>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/5">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={onClose}
-              className="h-10 px-4 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 transition-colors cursor-pointer"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !isValidPrice || parsedNewPrice === currentPrice}
-              className="h-10 px-5 rounded-lg text-xs font-semibold bg-[#007782] hover:bg-[#00656f] active:bg-[#00555e] text-white transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Check size={14} />
-              <span>{loading ? "Enregistrement..." : "Enregistrer le prix"}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Modal.Footer>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={loading || !isValidPrice || parsedNewPrice === currentPrice}
+          >
+            <Check size={14} aria-hidden="true" />
+            <span>{loading ? 'Enregistrement…' : 'Enregistrer'}</span>
+          </Button>
+        </Modal.Footer>
+      </form>
+    </Modal>
   );
 }

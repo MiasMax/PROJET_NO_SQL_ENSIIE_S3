@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { X, UserPlus, Sparkles, ShieldCheck, Wallet, AlertCircle, Lock, Mail, User } from 'lucide-react';
+import { UserPlus, ShieldCheck, Wallet, AlertCircle, Lock, Mail, User } from 'lucide-react';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
 
 export default function RegisterModal({ isOpen, onClose, onUserRegistered, onOpenLogin }) {
   const [username, setUsername] = useState('');
@@ -17,7 +19,7 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered, onOpe
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !name.trim()) {
-      setError("Veuillez renseigner un pseudo et un nom complet.");
+      setError('Veuillez renseigner un pseudo et un nom affiché.');
       return;
     }
 
@@ -32,16 +34,16 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered, onOpe
           username: username.trim(),
           name: name.trim(),
           email: email.trim(),
-          password: password,
-          role: isAdmin ? "Administrateur" : (role.trim() || "Dresseur"),
+          password,
+          role: isAdmin ? 'Administrateur' : role.trim() || 'Dresseur',
           balance: parseFloat(balance) || 100.0,
           is_admin: isAdmin,
         }),
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Échec de la création du compte.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Échec de la création du compte.');
       }
 
       const newUser = await response.json();
@@ -65,200 +67,170 @@ export default function RegisterModal({ isOpen, onClose, onUserRegistered, onOpe
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
-        {/* Modal header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '8px', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '8px' }}>
-              <UserPlus size={22} color="var(--accent-primary)" />
+    <Modal isOpen={isOpen} onClose={onClose} size="md">
+      <Modal.Header
+        title="Créer un compte"
+        subtitle="Achetez et vendez vos cartes sur PokéVinted"
+        icon={<UserPlus size={18} className="text-neo-vermilion" />}
+      />
+
+      <form onSubmit={handleSubmit}>
+        <Modal.Body className="space-y-4">
+          {error && (
+            <div role="alert" className="p-3 rounded-[6px] bg-[#FEE2E2] border-[1.5px] border-[#FCA5A5] text-[#B91C1C] text-xs font-medium flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{error}</span>
             </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>Créer un Compte Dresseur</h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Rejoignez la communauté officielle PokéVinted</p>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-            <X size={22} />
-          </button>
-        </div>
-
-        {error && (
-          <div style={{ margin: '16px 24px 0', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
-            <AlertCircle size={18} /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Pseudo d'artiste / Dresseur</label>
-              <div style={{ position: 'relative' }}>
-                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <label htmlFor="reg-username" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Identifiant
+              </label>
+              <div className="relative">
+                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neo-ink-3" aria-hidden="true" />
                 <input
+                  id="reg-username"
                   type="text"
                   placeholder="ex: Red_Pallet"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
+                  className="neo-input pl-9"
                   required
                 />
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Nom complet affiché</label>
+            <div>
+              <label htmlFor="reg-name" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Nom affiché
+              </label>
               <input
+                id="reg-name"
                 type="text"
-                placeholder="ex: Red du Mont Argenté"
+                placeholder="ex: Red"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="form-input"
+                className="neo-input"
                 required
               />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="reg-email" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Email
+              </label>
+              <div className="relative">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neo-ink-3" aria-hidden="true" />
                 <input
+                  id="reg-email"
                   type="email"
-                  placeholder="votre@email.com"
+                  placeholder="vous@exemple.fr"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
+                  className="neo-input pl-9"
                 />
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Mot de passe</label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div>
+              <label htmlFor="reg-password" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Mot de passe
+              </label>
+              <div className="relative">
+                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neo-ink-3" aria-hidden="true" />
                 <input
+                  id="reg-password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
+                  className="neo-input pl-9"
                 />
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Titre / Rôle</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="reg-role" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Statut collectionneur
+              </label>
               <select
+                id="reg-role"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="form-select"
                 disabled={isAdmin}
+                className="neo-input"
               >
-                <option value="Dresseur">🧢 Dresseur</option>
-                <option value="Collectionneur">💎 Collectionneur</option>
-                <option value="Champion d'Arène">⚡ Champion d'Arène</option>
-                <option value="Maître Pokémon">🏆 Maître Pokémon</option>
+                <option value="Dresseur">Dresseur</option>
+                <option value="Collectionneur">Collectionneur</option>
+                <option value="Champion d'Arène">Champion d&apos;Arène</option>
+                <option value="Maître Pokémon">Maître Pokémon</option>
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Solde de départ (€)</label>
-              <div style={{ position: 'relative' }}>
-                <Wallet size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div>
+              <label htmlFor="reg-balance" className="block text-xs font-semibold text-neo-ink mb-1.5">
+                Solde initial (€)
+              </label>
+              <div className="relative">
+                <Wallet size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neo-ink-3" aria-hidden="true" />
                 <input
+                  id="reg-balance"
                   type="number"
                   min="0"
                   step="10"
                   value={balance}
                   onChange={(e) => setBalance(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
+                  className="neo-input pl-9 font-mono tabular-nums"
                 />
               </div>
             </div>
           </div>
 
-          <div style={{
-            background: 'var(--bg-surface-elevated)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '14px 16px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
+          <label className="flex items-center justify-between gap-3 p-3.5 rounded-[6px] bg-neo-muted border-[1.5px] border-neo-border cursor-pointer">
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.95rem' }}>
-                <ShieldCheck size={18} color="var(--accent-secondary)" />
-                Privilèges Administrateur
+              <div className="flex items-center gap-1.5 text-xs font-bold text-neo-ink">
+                <ShieldCheck size={15} className="text-neo-cobalt" aria-hidden="true" />
+                <span>Accès administrateur</span>
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Donne accès au tableau de bord NoSQL et aux métriques Grafana / Elasticsearch
+              <p className="text-[11px] text-neo-ink-3 mt-0.5">
+                Active les outils de modération et de supervision NoSQL.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={isAdmin}
-                onChange={(e) => setIsAdmin(e.target.checked)}
-                style={{ opacity: 0, width: 0, height: 0 }}
-              />
-              <span style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: isAdmin ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                borderRadius: '24px',
-                transition: '0.2s',
-              }}>
-                <span style={{
-                  position: 'absolute',
-                  content: '""',
-                  height: '18px',
-                  width: '18px',
-                  left: isAdmin ? '24px' : '3px',
-                  bottom: '3px',
-                  backgroundColor: 'white',
-                  borderRadius: '50%',
-                  transition: '0.2s',
-                }} />
-              </span>
-            </label>
-          </div>
+            <input
+              type="checkbox"
+              checked={isAdmin}
+              onChange={(e) => setIsAdmin(e.target.checked)}
+              className="w-4 h-4 accent-neo-cobalt cursor-pointer"
+            />
+          </label>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', justifyContent: 'center', fontSize: '1rem', fontWeight: 700 }}
-            disabled={loading}
-          >
-            {loading ? 'Création en cours...' : 'Finaliser mon Inscription'}
-          </button>
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
+            {loading ? 'Création en cours…' : 'Créer mon compte'}
+          </Button>
 
           {onOpenLogin && (
-            <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Vous possédez déjà un compte ?{' '}
+            <p className="text-center text-xs text-neo-ink-3">
+              Déjà inscrit ?{' '}
               <button
                 type="button"
                 onClick={() => {
                   onClose();
                   onOpenLogin();
                 }}
-                style={{ background: 'none', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                className="font-semibold text-neo-cobalt hover:underline bg-transparent border-0 p-0 cursor-pointer"
               >
                 Se connecter
               </button>
-            </div>
+            </p>
           )}
-        </form>
-      </div>
-    </div>
+        </Modal.Body>
+      </form>
+    </Modal>
   );
 }

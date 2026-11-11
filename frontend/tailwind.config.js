@@ -1,58 +1,57 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        poke: {
-          dark: '#0a0d14',
-          surface: '#121826',
-          elevated: '#1a2236',
-          card: '#121824',
-          border: 'rgba(255, 255, 255, 0.08)',
-          gold: '#f59e0b',
-          red: '#ef4444',
-          blue: '#3b82f6',
-          teal: '#09B1BA',
-          emerald: '#10b981',
-          purple: '#8b5cf6',
-          indigo: '#6366f1',
-          cyan: '#06b6d4',
+        neo: {
+          canvas: 'var(--bg-canvas)',
+          bg: 'var(--bg-canvas)',
+          surface: 'var(--bg-surface)',
+          alt: 'var(--bg-surface-alt)',
+          muted: 'var(--bg-surface-muted)',
+          ink: 'var(--text-primary)',
+          'ink-2': 'var(--text-secondary)',
+          'ink-3': 'var(--text-muted)',
+          border: 'var(--border-default)',
+          'border-strong': 'var(--border-strong)',
+          vermilion: 'var(--accent-primary)',
+          'vermilion-hover': 'var(--accent-primary-hover)',
+          cobalt: 'var(--accent-secondary)',
+          'cobalt-hover': 'var(--accent-secondary-hover)',
+          lens: 'var(--pokedex-lens)',
         },
       },
       fontFamily: {
-        sans: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['Space Grotesk', 'Outfit', 'sans-serif'],
+        sans: ['DM Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Space Grotesk', 'DM Sans', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        'holo': '0 0 25px rgba(59, 130, 246, 0.4)',
-        'gold-glow': '0 0 30px rgba(245, 158, 11, 0.35)',
-        'indigo-glow': '0 0 25px rgba(99, 102, 241, 0.3)',
+        tactile: 'var(--shadow-card)',
+        'tactile-cobalt': 'var(--shadow-card-hover)',
+        'tactile-sm': 'var(--shadow-control)',
+        'tactile-modal': 'var(--shadow-modal)',
       },
       keyframes: {
-        'modal-enter': {
-          from: { opacity: '0', transform: 'scale(0.96) translateY(10px)' },
-          to: { opacity: '1', transform: 'scale(1) translateY(0)' },
-        },
-        'card-appear': {
-          from: { opacity: '0', transform: 'translateY(10px) scale(0.985)' },
+        'modal-pop': {
+          from: { opacity: '0', transform: 'translateY(8px) scale(0.98)' },
           to: { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
-        'hub-shimmer': {
-          '0%': { backgroundPosition: '100% 0' },
-          '100%': { backgroundPosition: '-100% 0' },
+        'drawer-in': {
+          from: { opacity: '0', transform: 'translateX(24px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
         },
       },
       animation: {
-        'modal': 'modal-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        'appear': 'card-appear 0.28s cubic-bezier(0.16, 1, 0.3, 1) both',
-        'shimmer': 'hub-shimmer 1.2s infinite linear',
+        'modal-pop': 'modal-pop 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
+        'drawer-in': 'drawer-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },
   plugins: [],
-}
+};
