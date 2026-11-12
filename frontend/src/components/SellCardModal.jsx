@@ -306,9 +306,13 @@ export default function SellCardModal({
     setLoading(true);
 
     try {
+      const token = localStorage.getItem('pokevinted_token');
       const response = await fetch('/api/listings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-session-token': token } : {}),
+        },
         body: JSON.stringify({
           card_id: selectedCardId,
           price: numericPrice,

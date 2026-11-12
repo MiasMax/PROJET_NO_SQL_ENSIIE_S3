@@ -161,7 +161,7 @@
       }
     }
   ],
-  "refresh": "5s",
+  "refresh": "15s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["pokevinted", "nosql", "elasticsearch"],

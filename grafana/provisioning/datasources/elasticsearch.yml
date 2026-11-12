@@ -6,6 +6,7 @@ datasources:
     uid: pokevinted-elasticsearch
     access: proxy
     url: http://elasticsearch:9200
+    database: "pokevinted_listings"
     isDefault: true
     jsonData:
       database: "pokevinted_listings"
@@ -22,6 +23,7 @@ datasources:
     uid: pokevinted-health
     access: proxy
     url: http://elasticsearch:9200
+    database: "pokevinted_health"
     isDefault: false
     jsonData:
       database: "pokevinted_health"

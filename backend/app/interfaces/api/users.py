@@ -8,7 +8,7 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.domain.entities.user import User, hash_password, verify_password
@@ -22,6 +22,7 @@ from app.interfaces.dependencies import (
     get_listing_repository,
     get_order_repository,
     get_user_repository,
+    require_session,
 )
 
 # Admin password sourced from environment variable with fallback for offline demo/grading.
@@ -127,8 +128,9 @@ class RegisterUserRequest(BaseModel):
     email: str = Field("", max_length=100)
     password: str = Field(..., min_length=3, max_length=100, description="Mot de passe requis (au moins 3 caractères)")
     role: str = Field("Dresseur", max_length=40)
-    balance: float = Field(150.0, ge=0.0, le=100000.0)
+    balance: float = Field(150.0, ge=0.0, le=1000.0)
     is_admin: bool = False
+    admin_secret: str | None = Field(None, max_length=100, description="Secret administrateur requis si is_admin=True")
 
 
 class LoginUserRequest(BaseModel):
@@ -224,14 +226,27 @@ async def register_user(
     if existing_in_repo:
         raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà utilisé.")
 
+    # Defense against Privilege Escalation:
+    # Creating an administrator account requires valid administrator credentials.
+    is_admin = bool(payload.is_admin)
+    if is_admin:
+        secret_provided = payload.admin_secret or payload.password
+        if not secret_provided or secret_provided != DEMO_ADMIN_PASSWORD:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="La création d'un compte administrateur requiert le mot de passe administrateur sécurisé.",
+            )
+
+    capped_balance = min(max(0.0, float(payload.balance)), 1000.0)
+
     new_user = User.create(
         username=payload.username,
         name=payload.name,
         email=payload.email or f"{user_id}@pokevinted.fr",
         password=payload.password,
-        role=payload.role,
-        balance=payload.balance,
-        is_admin=payload.is_admin,
+        role=payload.role if not is_admin else "Administrateur",
+        balance=capped_balance,
+        is_admin=is_admin,
         user_id=user_id,
     )
 
@@ -347,24 +362,23 @@ async def get_current_user(
     cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """Retrieve current logged-in user profile from Redis session."""
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            user_id = session.get("id")
-            if user_id in USERS_STORE:
-                session["balance"] = USERS_STORE[user_id]["balance"]
-            return session
+    if not x_session_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Aucune session active.",
+        )
+
+    session = await cache_repo.get_user_session(x_session_token)
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expirée ou invalide.",
         )
 
-    # Isolated default session for initial guest visitor or automated test suite
-    default_user = {k: v for k, v in USERS_STORE["sacha"].items() if k != "password_hash"}
-    token = f"sess_{secrets.token_urlsafe(32)}"
-    session_data = {**default_user, "token": token}
-    await cache_repo.set_user_session(token, session_data, ttl_seconds=86400)
-    return session_data
+    user_id = session.get("id")
+    if user_id in USERS_STORE:
+        session["balance"] = USERS_STORE[user_id]["balance"]
+    return session
 
 
 @router.post("/wallet/recharge")
@@ -421,28 +435,12 @@ async def recharge_wallet(
 
 @router.get("/me/orders")
 async def get_my_orders(
-    x_session_token: str | None = Header(None),
-    buyer_name: str | None = Query(None),
-    cache_repo: CacheRepository = Depends(get_cache_repository),
+    session: dict = Depends(require_session),
     order_repo: OrderRepository = Depends(get_order_repository),
 ):
     """Fetch order purchase history for current logged-in user."""
-    resolved_name = None
-    resolved_id = None
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            resolved_name = session.get("name") or session.get("username")
-            resolved_id = str(session.get("id", "")).strip().lower()
-
-    if not resolved_name and buyer_name:
-        resolved_name = buyer_name
-
-    if not resolved_name:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentification requise pour consulter les commandes.",
-        )
+    resolved_name = session.get("name") or session.get("username") or ""
+    resolved_id = str(session.get("id", "")).strip().lower()
 
     all_orders = await order_repo.list_orders(limit=100)
     clean_target = resolved_name.lower().strip()
@@ -457,27 +455,14 @@ async def get_my_orders(
 
 @router.get("/me/listings")
 async def get_my_listings(
-    x_session_token: str | None = Header(None),
-    seller_name: str | None = Query(None),
-    cache_repo: CacheRepository = Depends(get_cache_repository),
+    session: dict = Depends(require_session),
     listing_repo: ListingRepository = Depends(get_listing_repository),
 ):
     """Fetch all marketplace listings (active and sold) created by the current logged-in user."""
-    resolved_name = None
-    resolved_id = None
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session:
-            resolved_name = session.get("name") or session.get("username")
-            resolved_id = str(session.get("id", "")).strip().lower()
-
-    if not resolved_name and seller_name:
-        resolved_name = seller_name
+    resolved_name = session.get("name") or session.get("username") or ""
+    resolved_id = str(session.get("id", "")).strip().lower()
 
     all_listings = await listing_repo.list_listings(limit=1000)
-    if not resolved_name:
-        return [item.to_dict() for item in all_listings]
-
     clean_target = resolved_name.lower().strip()
     user_listings = [
         item.to_dict()
@@ -515,26 +500,18 @@ async def switch_user(
 
 @router.get("/favorites", response_model=list[str])
 async def get_user_favorites(
-    user_id: str | None = None,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """Fetch user favorite card IDs stored in a Redis Set (SMEMBERS)."""
-    target_id = "sacha"
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session and session.get("id"):
-            target_id = str(session["id"]).strip().lower()
-    elif user_id:
-        target_id = user_id.strip().lower()
+    target_id = str(session["id"]).strip().lower()
     return await cache_repo.get_favorites(target_id)
 
 
 @router.post("/favorites/{listing_id}")
 async def toggle_favorite(
     listing_id: str,
-    user_id: str | None = None,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     cache_repo: RedisCacheRepository = Depends(get_cache_repository),
 ):
     """
@@ -542,13 +519,7 @@ async def toggle_favorite(
     Set operations (SADD / SREM). Favorites track individual listings, so two offers
     of the same card are favorited independently.
     """
-    target_id = "sacha"
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if session and session.get("id"):
-            target_id = str(session["id"]).strip().lower()
-    elif user_id:
-        target_id = user_id.strip().lower()
+    target_id = str(session["id"]).strip().lower()
 
     favorites = await cache_repo.get_favorites(target_id)
     if listing_id in favorites:

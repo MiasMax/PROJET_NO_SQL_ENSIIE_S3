@@ -3,7 +3,7 @@ Marketplace Listings API Router.
 Handles listing creation, faceted search, and card purchasing.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.application.dtos.listing_dtos import (
     CreateListingRequest,
@@ -40,6 +40,7 @@ from app.interfaces.dependencies import (
     get_search_listings_use_case,
     get_update_listing_price_use_case,
     get_user_repository,
+    require_session,
 )
 
 router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
@@ -48,24 +49,15 @@ router = APIRouter(prefix="/api/listings", tags=["Marketplace Listings"])
 @router.post("", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)
 async def create_listing(
     payload: CreateListingRequest,
-    x_session_token: str | None = Header(None),
-    cache_repo: CacheRepository = Depends(get_cache_repository),
+    session: dict = Depends(require_session),
     create_uc: CreateListingUseCase = Depends(get_create_listing_use_case),
 ):
     """
     Publish a new card listing.
     Persists simultaneously into MongoDB, Elasticsearch, and Redis.
-    Anchors seller identity to authenticated session when provided.
+    The seller is always the authenticated session user, never the payload's seller_name.
     """
-    seller = payload.seller_name
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session expirée ou invalide.",
-            )
-        seller = session.get("name") or session.get("username") or seller
+    seller = session.get("name") or session.get("username")
 
     command = CreateListingCommand(
         card_id=payload.card_id,
@@ -212,7 +204,7 @@ async def get_listing_detail(
 async def purchase_listing(
     listing_id: str,
     payload: PurchaseListingRequest,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     purchase_uc: PurchaseListingUseCase = Depends(get_purchase_listing_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
     cache_repo: CacheRepository = Depends(get_cache_repository),
@@ -235,13 +227,8 @@ async def purchase_listing(
     if current_status == "SOLD":
         raise HTTPException(status_code=400, detail="Cette annonce a déjà été vendue.")
 
-    # Identify buyer from session when available to prevent buyer identity forgery
-    buyer_identifier = payload.buyer_id or payload.buyer_name
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if not session:
-            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
-        buyer_identifier = session.get("id") or session.get("username") or session.get("name") or buyer_identifier
+    # The buyer is always the session user: buyer_id / buyer_name in the payload are ignored
+    buyer_identifier = session.get("id") or session.get("username") or session.get("name")
 
     from app.interfaces.api.users import find_user
     matched_user = find_user(buyer_identifier)
@@ -271,8 +258,17 @@ async def purchase_listing(
             charge_price = listing.price
             validated_agreed_price = listing.price
         else:
-            # Check if an accepted offer exists in messages for this listing
+            # Check if an accepted offer exists in messages for this listing and includes this buyer
             is_valid_negotiation = False
+            buyer_aliases = {
+                b.lower().strip() for b in [
+                    resolved_buyer_name,
+                    payload.buyer_name,
+                    (matched_user["username"] if matched_user else ""),
+                    (matched_user["name"] if matched_user else ""),
+                    (str(matched_user["id"]) if matched_user else ""),
+                ] if b
+            }
             try:
                 from app.interfaces.api.messages import _IN_MEMORY_MESSAGES, _can_try_mongo, _get_db
                 if _can_try_mongo():
@@ -283,7 +279,10 @@ async def purchase_listing(
                         "offer_price": payload.agreed_price,
                     })
                     if accepted:
-                        is_valid_negotiation = True
+                        p_sender = str(accepted.get("sender_name", "")).lower().strip()
+                        p_recipient = str(accepted.get("recipient_name", "")).lower().strip()
+                        if p_sender in buyer_aliases or p_recipient in buyer_aliases:
+                            is_valid_negotiation = True
                 if not is_valid_negotiation:
                     for m in _IN_MEMORY_MESSAGES:
                         if (
@@ -291,8 +290,11 @@ async def purchase_listing(
                             and m.get("offer_type") == "accept"
                             and m.get("offer_price") == payload.agreed_price
                         ):
-                            is_valid_negotiation = True
-                            break
+                            p_sender = str(m.get("sender_name", "")).lower().strip()
+                            p_recipient = str(m.get("recipient_name", "")).lower().strip()
+                            if p_sender in buyer_aliases or p_recipient in buyer_aliases:
+                                is_valid_negotiation = True
+                                break
             except Exception:
                 pass
 
@@ -358,7 +360,7 @@ async def purchase_listing(
 @router.post("/cart/checkout", response_model=CheckoutCartResponse)
 async def checkout_cart(
     payload: CheckoutCartRequest,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     checkout_uc: CheckoutCartUseCase = Depends(get_checkout_cart_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
     cache_repo: CacheRepository = Depends(get_cache_repository),
@@ -374,13 +376,8 @@ async def checkout_cart(
     if not payload.listing_ids:
         raise HTTPException(status_code=400, detail="Votre panier est vide.")
 
-    # Identify buyer from session when available to prevent buyer identity forgery
-    buyer_identifier = payload.buyer_id or payload.buyer_name
-    if x_session_token:
-        session = await cache_repo.get_user_session(x_session_token)
-        if not session:
-            raise HTTPException(status_code=401, detail="Session expirée ou invalide.")
-        buyer_identifier = session.get("id") or session.get("username") or session.get("name") or buyer_identifier
+    # The buyer is always the session user: buyer_id / buyer_name in the payload are ignored
+    buyer_identifier = session.get("id") or session.get("username") or session.get("name")
 
     matched_user = find_user(buyer_identifier)
     resolved_buyer_name = matched_user["name"] if matched_user else (payload.buyer_name.strip() or "Acheteur")
@@ -478,29 +475,15 @@ async def checkout_cart(
 @router.delete("/{listing_id}", status_code=status.HTTP_200_OK)
 async def delete_listing(
     listing_id: str,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     delete_uc: DeleteListingUseCase = Depends(get_delete_listing_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
-    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Delete a marketplace listing.
     Verifies that the caller owns the listing or possesses administrator privileges.
     Removes from MongoDB, deletes from Elasticsearch, and purges Redis cache.
     """
-    if not x_session_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentification requise pour supprimer une annonce.",
-        )
-
-    session = await cache_repo.get_user_session(x_session_token)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expirée ou invalide.",
-        )
-
     listing = await listing_repo.get_by_id(listing_id)
     if not listing:
         raise HTTPException(
@@ -537,13 +520,13 @@ async def delete_listing(
 async def update_listing_price(
     listing_id: str,
     payload: UpdateListingPriceRequest,
-    x_session_token: str | None = Header(None),
+    session: dict = Depends(require_session),
     update_price_uc: UpdateListingPriceUseCase = Depends(get_update_listing_price_use_case),
     listing_repo: ListingRepository = Depends(get_listing_repository),
-    cache_repo: CacheRepository = Depends(get_cache_repository),
 ):
     """
     Update asking price of an active marketplace listing.
+    The session is checked first (require_session), so anonymous callers get 401 before any lookup.
     Verifies that the caller owns the listing or possesses administrator privileges.
     Synchronizes MongoDB document, updates Elasticsearch index, and purges Redis cache.
     """
@@ -554,15 +537,6 @@ async def update_listing_price(
     price = payload.get_price() if hasattr(payload, "get_price") else payload.price
     if price <= 0:
         raise HTTPException(status_code=400, detail="Le prix doit être strictement positif.")
-
-    if not x_session_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentification requise pour modifier le prix d'une annonce.",
-        )
-    session = await cache_repo.get_user_session(x_session_token)
-    if not session:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée ou invalide.")
 
     resolved_seller_name: str | None = None
     if session.get("is_admin"):

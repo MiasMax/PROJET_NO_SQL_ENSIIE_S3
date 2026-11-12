@@ -1,6 +1,6 @@
 # PokéVinted
 
-Projet NoSQL, ENSIIE S3. Maxence Tournaud et Tony UY.
+Projet NoSQL, ENSIIE S3. Maxence Tournaud, Arthur Pinel et Tony UY.
 
 PokéVinted est une marketplace de cartes Pokémon entre particuliers, dans l'esprit de Vinted et Cardmarket, avec son propre nom et sa propre charte. Les annonces sont stockées dans MongoDB, indexées dans Elasticsearch et comptées dans Redis. Grafana affiche les statistiques du marché et l'état des services. Le tout tourne sous Docker Compose.
 
@@ -193,6 +193,9 @@ Il faut [Docker](https://docs.docker.com/get-docker/) et [Docker Compose](https:
 git clone https://github.com/MiasMax/PROJET_NO_SQL_ENSIIE_S3.git
 cd PROJET_NO_SQL_ENSIIE_S3
 docker compose up --build
+
+# (Alternative sur Windows si Docker est installé dans WSL2) :
+# wsl docker compose up --build
 ```
 
 Le `docker-compose.yml` contient des valeurs par défaut, donc pas besoin de `.env` pour lancer le projet. Pour changer les mots de passe, copiez `.env.example` en `.env` et modifiez-le : ses valeurs remplacent les valeurs par défaut.

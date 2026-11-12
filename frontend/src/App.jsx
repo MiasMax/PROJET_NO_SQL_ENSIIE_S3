@@ -157,20 +157,9 @@ export default function App() {
     try {
       const token = localStorage.getItem('pokevinted_token');
       if (!token) {
-        const res = await fetch('/api/users/me');
-        if (res.ok) {
-          const user = await res.json();
-          setCurrentUser(user);
-          if (user.token) {
-            localStorage.setItem('pokevinted_token', user.token);
-          }
-          try {
-            localStorage.setItem('pokevinted_cached_user', JSON.stringify(user));
-          } catch {}
-          if (user.id) {
-            loadUserFavorites(user.id);
-          }
-        }
+        // No session: stay logged out until the user signs in explicitly
+        localStorage.removeItem('pokevinted_cached_user');
+        setCurrentUser(null);
         return;
       }
 
@@ -202,7 +191,9 @@ export default function App() {
 
   const loadUserFavorites = async (userId) => {
     try {
-      const res = await fetch(`/api/users/favorites?user_id=${userId}`);
+      const token = localStorage.getItem('pokevinted_token');
+      const authHeaders = token ? { 'x-session-token': token } : {};
+      const res = await fetch('/api/users/favorites', { headers: authHeaders });
       if (res.ok) {
         const favList = await res.json();
         let cachedArr = [];
@@ -214,7 +205,7 @@ export default function App() {
         // If backend Redis was flushed/restarted but browser still has favorites, re-sync to backend
         if (favList.length === 0 && cachedArr.length > 0) {
           for (const fid of cachedArr) {
-            fetch(`/api/users/favorites/${fid}?user_id=${userId}`, { method: 'POST' }).catch(() => {});
+            fetch(`/api/users/favorites/${fid}`, { method: 'POST', headers: authHeaders }).catch(() => {});
           }
         }
 
@@ -295,7 +286,11 @@ export default function App() {
     if (!listingId) return;
 
     try {
-      const res = await fetch(`/api/users/favorites/${listingId}?user_id=${currentUser.id}`, { method: 'POST' });
+      const token = localStorage.getItem('pokevinted_token');
+      const res = await fetch(`/api/users/favorites/${listingId}`, {
+        method: 'POST',
+        headers: token ? { 'x-session-token': token } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setFavorites((prev) => {
@@ -659,10 +654,10 @@ export default function App() {
               type="button"
               onClick={() => setIsBoosterOpen(true)}
               className="nav-btn-action"
-              title="Ouvrir un booster Pokémon (simulation avec vrais taux)"
+              title="Ouvrir un booster virtuel (simulation avec vrais taux, cartes non vendables)"
             >
               <Package size={14} className="text-slate-400" />
-              <span>Booster</span>
+              <span>Booster Virtuel</span>
             </button>
 
             {/* Messages Button */}
@@ -719,7 +714,7 @@ export default function App() {
           </div>
 
           {/* Visual Separator */}
-          <div className="h-5 w-px bg-white/10 hidden sm:block mx-0.5" />
+          <div className="h-5 w-px bg-white/10 hidden xl:block mx-0.5" />
 
           {/* Cluster 2: User Account */}
           {currentUser ? (
@@ -850,7 +845,7 @@ export default function App() {
           )}
 
           {/* Visual Separator */}
-          <div className="h-5 w-px bg-white/10 hidden sm:block mx-0.5" />
+          <div className="h-5 w-px bg-white/10 hidden xl:block mx-0.5" />
 
           {/* Cluster 3: Primary Action (Vendre) */}
           <button
@@ -1042,6 +1037,7 @@ export default function App() {
       {isBoosterOpen && (
         <BoosterOpeningPage
           onClose={() => setIsBoosterOpen(false)}
+          currentUser={currentUser}
         />
       )}
 

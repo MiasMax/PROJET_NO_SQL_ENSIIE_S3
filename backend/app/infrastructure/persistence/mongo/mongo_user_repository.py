@@ -4,7 +4,7 @@ Persists member and admin accounts in the 'users' collection.
 """
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -55,9 +55,9 @@ class MongoUserRepository(UserRepository):
             try:
                 created_at = datetime.fromisoformat(created_at)
             except Exception:
-                created_at = datetime.utcnow()
+                created_at = datetime.now(UTC)
         elif not isinstance(created_at, datetime):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(UTC)
 
         return User(
             id=doc["_id"],

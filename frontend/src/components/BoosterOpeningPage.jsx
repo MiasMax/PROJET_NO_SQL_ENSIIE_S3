@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Sparkles,
   Star,
@@ -79,7 +79,7 @@ const saveCollectionToStorage = (cards) => {
   } catch {}
 };
 
-// ─── Pure Web Audio API Sound Synthesizer ──────────────────────────────────
+// ─── Pure Web Audio API Sound Synthesizer (Ultra-Realistic TCG Audio) ────────
 const playBoosterAudio = (type, enabled = true) => {
   if (!enabled || typeof window === 'undefined') return;
   try {
@@ -89,72 +89,222 @@ const playBoosterAudio = (type, enabled = true) => {
     const now = ctx.currentTime;
 
     if (type === 'tear') {
-      // Crisp metallic foil tearing sound
-      const bufferSize = Math.floor(ctx.sampleRate * 0.45);
+      // 1. Initial crisp metallic foil tear snap & friction
+      const bufferSize = Math.floor(ctx.sampleRate * 0.55);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = buffer.getChannelData(0);
+      const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
+        const env =
+          Math.exp(-i / (ctx.sampleRate * 0.15)) +
+          (i > ctx.sampleRate * 0.1
+            ? 0.35 * Math.exp(-(i - ctx.sampleRate * 0.1) / (ctx.sampleRate * 0.12))
+            : 0);
+        data[i] = (Math.random() * 2 - 1) * env;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const bpf = ctx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.setValueAtTime(3200, now);
+      bpf.frequency.exponentialRampToValueAtTime(1400, now + 0.45);
+      bpf.Q.setValueAtTime(2.5, now);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.65, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      noise.connect(bpf);
+      bpf.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+
+      // 2. Low-frequency foil tear friction rumble
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+      oscGain.gain.setValueAtTime(0.35, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.36);
+    } else if (type === 'crinkle') {
+      // Short metallic cellophane plastic rustle (on hover / drag)
+      const bufferSize = Math.floor(ctx.sampleRate * 0.08);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
       const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(2200, now);
-      filter.Q.setValueAtTime(3.2, now);
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(4500, now);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.45, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
       noise.start(now);
+    } else if (type === 'slide') {
+      // Soft card glide whoosh (drawing card from foil sleeve)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(450, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.19);
     } else if (type === 'flip') {
-      // Clean tactile card glide swoosh
+      // Clean tactile card snap / flip whoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(740, now + 0.11);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'holo') {
+      // Shimmering celestial harmonic crystal chords
+      [880, 1174.66, 1396.91, 1760].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.045);
+        gain.gain.setValueAtTime(0.22, now + idx * 0.045);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.55);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.045);
+        osc.stop(now + idx * 0.045 + 0.6);
+      });
+    } else if (type === 'god_pull') {
+      // 1. Sub-bass cinematic boom
+      const bass = ctx.createOscillator();
+      const bassGain = ctx.createGain();
+      bass.type = 'sine';
+      bass.frequency.setValueAtTime(95, now);
+      bass.frequency.exponentialRampToValueAtTime(30, now + 0.45);
+      bassGain.gain.setValueAtTime(0.65, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+      bass.connect(bassGain);
+      bassGain.connect(ctx.destination);
+      bass.start(now);
+      bass.stop(now + 0.5);
+
+      // 2. Celebratory Golden Fanfare Arpeggio
+      const notes = [261.63, 329.63, 392.0, 523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = i > 5 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.06);
+        gain.gain.setValueAtTime(0.3, now + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.85);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.06);
+        osc.stop(now + i * 0.06 + 0.9);
+      });
+    } else if (type === 'warp') {
+      // Rising cosmic warp drive whoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, now);
+      osc.frequency.exponentialRampToValueAtTime(750, now + 0.9);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
+      filter.frequency.exponentialRampToValueAtTime(3500, now + 0.9);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.96);
+    } else if (type === 'supernova') {
+      // Deep sub-bass boom + crystal nova blast
+      const boom = ctx.createOscillator();
+      const boomGain = ctx.createGain();
+      boom.type = 'sine';
+      boom.frequency.setValueAtTime(130, now);
+      boom.frequency.exponentialRampToValueAtTime(32, now + 0.65);
+      boomGain.gain.setValueAtTime(0.85, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      boom.connect(boomGain);
+      boomGain.connect(ctx.destination);
+      boom.start(now);
+      boom.stop(now + 0.72);
+
+      [1200, 1600, 2400, 3200].forEach((freq, idx) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(freq, now + idx * 0.03);
+        g.gain.setValueAtTime(0.18, now + idx * 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.03 + 0.4);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now + idx * 0.03);
+        o.stop(now + idx * 0.03 + 0.42);
+      });
+    } else if (type === 'tease_tick') {
+      // Cinematic sub-thud for Year / Rarity slam
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+      gain.gain.setValueAtTime(0.55, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'slab_rise') {
+      // Ascending acrylic crystal glide
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(680, now + 0.12);
-      gain.gain.setValueAtTime(0.22, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc.frequency.exponentialRampToValueAtTime(680, now + 0.35);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === 'holo') {
-      // High-pitched crystalline shimmer
-      [900, 1350, 1800].forEach((freq, idx) => {
+      osc.stop(now + 0.4);
+    } else if (type === 'cash_jackpot') {
+      // Dual high register chime
+      [1046.5, 1318.51].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-        gain.gain.setValueAtTime(0.2, now + idx * 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.45);
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        gain.gain.setValueAtTime(0.35, now + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.45);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + idx * 0.05);
-        osc.stop(now + idx * 0.05 + 0.5);
-      });
-    } else if (type === 'god_pull') {
-      // Grand celebratory fanfare arpeggio
-      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
-      notes.forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + i * 0.07);
-        gain.gain.setValueAtTime(0.28, now + i * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.7);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + i * 0.07);
-        osc.stop(now + i * 0.07 + 0.75);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.5);
       });
     }
-  } catch {
-    // Audio Context might require prior interaction
-  }
+  } catch {}
 };
 
 // ─── Rarity Configuration & Styling ─────────────────────────────────────────
@@ -550,7 +700,7 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-400">Mode</span>
-              <span className="font-bold text-violet-300">Simulation de Collection</span>
+              <span className="font-bold text-violet-300">Carte Virtuelle • Simulation</span>
             </div>
           </div>
 
@@ -573,7 +723,7 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
               }`}
             >
               {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-              <span>{isSaved ? 'Enregistrée dans mon classeur' : 'Conserver dans mon classeur'}</span>
+              <span>{isSaved ? 'Enregistrée dans mon classeur virtuel' : 'Conserver dans mon classeur virtuel'}</span>
             </button>
           </div>
 
@@ -586,21 +736,415 @@ function Card3DInspectModal({ card, onClose, isSaved, onToggleSave }) {
   );
 }
 
+// ─── High-Performance Canvas Particle System (Stardust, Foil Shards & Confetti) ──
+function BoosterFXCanvas({ tearTrigger, celebrationTrigger, accentColor = '#ffd700' }) {
+  const canvasRef = useRef(null);
+  const particlesRef = useRef([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Initial ambient stardust
+    const list = particlesRef.current;
+    if (list.length === 0) {
+      for (let i = 0; i < 30; i++) {
+        list.push({
+          type: 'stardust',
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: -0.2 - Math.random() * 0.4,
+          size: 1 + Math.random() * 2.2,
+          alpha: 0.15 + Math.random() * 0.55,
+          color: Math.random() > 0.4 ? '#facc15' : '#c7d2fe',
+          pulseSpeed: 0.01 + Math.random() * 0.02,
+        });
+      }
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const parts = particlesRef.current;
+
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.type === 'stardust') {
+          p.alpha += Math.sin(Date.now() * p.pulseSpeed) * 0.008;
+          if (p.y < -10) p.y = canvas.height + 10;
+          if (p.x < -10) p.x = canvas.width + 10;
+          if (p.x > canvas.width + 10) p.x = -10;
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0.1, Math.min(0.85, p.alpha));
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else if (p.type === 'foil' || p.type === 'confetti') {
+          p.vy += p.gravity || 0.18;
+          p.vx *= 0.985;
+          p.rot += p.vRot;
+          p.life -= p.decay || 0.014;
+
+          if (p.life <= 0 || p.y > canvas.height + 25) {
+            parts.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.scale(Math.cos(p.rot * 1.8), 1);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.max(0, p.life);
+
+          if (p.isStar) {
+            ctx.beginPath();
+            for (let s = 0; s < 5; s++) {
+              ctx.lineTo(
+                Math.cos(((18 + s * 72) * Math.PI) / 180) * p.size,
+                -Math.sin(((18 + s * 72) * Math.PI) / 180) * p.size
+              );
+              ctx.lineTo(
+                Math.cos(((54 + s * 72) * Math.PI) / 180) * (p.size * 0.45),
+                -Math.sin(((54 + s * 72) * Math.PI) / 180) * (p.size * 0.45)
+              );
+            }
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            ctx.fillRect(-p.size / 2, -p.size2 / 2, p.size, p.size2);
+          }
+          ctx.restore();
+        }
+      }
+      animId = requestAnimationFrame(render);
+    };
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  // Listen for pack tear trigger -> burst metallic foil shards
+  useEffect(() => {
+    if (!tearTrigger) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height * 0.36;
+    const colors = ['#f59e0b', '#fbbf24', '#fef08a', '#e2e8f0', '#ffffff', accentColor, '#ec4899', '#38bdf8'];
+
+    for (let i = 0; i < 60; i++) {
+      const angle = Math.random() * Math.PI + Math.PI; // Upwards fan
+      const speed = 4 + Math.random() * 13;
+      particlesRef.current.push({
+        type: 'foil',
+        x: centerX + (Math.random() - 0.5) * 220,
+        y: centerY + (Math.random() - 0.5) * 25,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 5,
+        vy: Math.sin(angle) * speed - 2.5,
+        gravity: 0.22,
+        size: 5 + Math.random() * 9,
+        size2: 3 + Math.random() * 7,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.35,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+        decay: 0.012 + Math.random() * 0.015,
+        isStar: Math.random() > 0.6,
+      });
+    }
+  }, [tearTrigger, accentColor]);
+
+  // Listen for celebratory card pull trigger -> full fireworks confetti
+  useEffect(() => {
+    if (!celebrationTrigger) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#facc15', '#ffffff'];
+
+    for (let c = 0; c < 100; c++) {
+      const fromLeft = c % 2 === 0;
+      const originX = fromLeft ? canvas.width * 0.15 : canvas.width * 0.85;
+      const originY = canvas.height * 0.65;
+      const angle = fromLeft
+        ? -Math.PI / 4 + (Math.random() - 0.5) * 0.55
+        : (-3 * Math.PI) / 4 + (Math.random() - 0.5) * 0.55;
+      const speed = 10 + Math.random() * 15;
+
+      particlesRef.current.push({
+        type: 'confetti',
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: 0.24,
+        size: 7 + Math.random() * 9,
+        size2: 4 + Math.random() * 8,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.28,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+        decay: 0.008 + Math.random() * 0.008,
+        isStar: Math.random() > 0.5,
+      });
+    }
+  }, [celebrationTrigger]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-[350]"
+      style={{ width: '100vw', height: '100vh' }}
+    />
+  );
+}
+
+// ─── PSA GRADED SLAB (Authentic Lucite Acrylic Case with Red PSA Header) ────
+function PsaSlab({
+  card,
+  series,
+  tilt = { x: 0, y: 0 },
+  isRevealed = true,
+  onClick,
+  onInspect,
+  isHero = false,
+}) {
+  const rarityCfg = getRarityCfg(card?.pull_rarity);
+  const certNumber = useMemo(() => {
+    if (card?.cert_number) return card.cert_number;
+    const base = Math.abs(
+      (card?.id || 'pkmn')
+        .split('')
+        .reduce((acc, ch) => (acc << 5) - acc + ch.charCodeAt(0), 0)
+    );
+    return (90000000 + (base % 9999999)).toString();
+  }, [card?.id, card?.cert_number]);
+
+  const year = card?.year || series?.release_year || '2023';
+  const gradeText =
+    card?.grade ||
+    (card?.is_hit
+      ? 'GEM MT 10'
+      : card?.market_price && card.market_price > 35
+      ? 'GEM MT 10'
+      : 'MINT 9');
+  const gradeParts = gradeText.split(' ');
+  const gradeLabel = gradeParts.slice(0, -1).join(' ') || 'GEM MT';
+  const gradeNum = gradeParts[gradeParts.length - 1] || '10';
+
+  return (
+    <div
+      onClick={onClick}
+      className={`relative select-none cursor-pointer transition-transform duration-200 group ${
+        isHero ? 'scale-100' : 'scale-90 hover:scale-95'
+      }`}
+      style={{
+        width: '315px',
+        height: '515px',
+        perspective: '1200px',
+      }}
+    >
+      {/* 3D tilt shell */}
+      <div
+        className="w-full h-full relative transition-transform duration-300 ease-out"
+        style={{
+          transform: `rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        {/* Ambient Backlight matching rarity */}
+        <div
+          className="absolute inset-4 rounded-3xl blur-2xl opacity-40 pointer-events-none transition-opacity duration-300"
+          style={{ background: rarityCfg.color }}
+        />
+
+        {/* Acrylic outer slab casing */}
+        <div
+          className="w-full h-full rounded-2xl p-2.5 flex flex-col justify-between relative overflow-hidden"
+          style={{
+            background:
+              'linear-gradient(145deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 30%, rgba(0,0,0,0.55) 100%)',
+            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(255,255,255,0.4)',
+            boxShadow: `0 25px 50px rgba(0,0,0,0.9), inset 0 2px 4px rgba(255,255,255,0.7), inset 0 -2px 4px rgba(0,0,0,0.8), 0 0 35px ${rarityCfg.glow}`,
+          }}
+        >
+          {/* Frosted Lucite Bevel Edge */}
+          <div className="absolute inset-1 rounded-[14px] border border-white/20 pointer-events-none" />
+
+          {/* ── PSA HEADER LABEL ─────────────────────────────────── */}
+          <div className="w-full h-[80px] rounded-lg bg-[#fafafa] border-2 border-red-600 relative overflow-hidden flex flex-col justify-between p-1.5 shadow-md">
+            {/* Top red border bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-red-600" />
+
+            <div className="flex items-start justify-between">
+              {/* Left text column */}
+              <div className="flex flex-col text-[10px] font-black leading-tight text-black tracking-tight uppercase">
+                <span className="truncate max-w-[190px]">
+                  {year} POKÉMON {series?.code || 'SV'} #{card?.number || '001'}
+                </span>
+                <span className="truncate max-w-[190px] font-black text-black">
+                  FA/{card?.name?.toUpperCase() || 'POKÉMON'}
+                </span>
+                <span className="truncate max-w-[190px] text-[8.5px] font-bold text-gray-700">
+                  {card?.pull_rarity?.toUpperCase() || 'COMMON'}
+                </span>
+              </div>
+
+              {/* Right Grade Box */}
+              <div className="border-2 border-red-600 rounded bg-white px-1.5 py-0.5 flex flex-col items-center justify-center min-w-[54px] shadow-xs">
+                <span className="text-[7.5px] font-black text-red-600 leading-none uppercase tracking-tighter">
+                  {gradeLabel}
+                </span>
+                <span className="text-sm font-black text-red-600 leading-tight">
+                  {gradeNum}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Bar: Barcode + PSA Shield Hologram + Cert Number + QR code */}
+            <div className="flex items-center justify-between pt-1 border-t border-gray-300">
+              {/* Scaled Barcode Graphic */}
+              <div
+                className="h-3 w-28 opacity-85"
+                style={{
+                  background:
+                    'repeating-linear-gradient(90deg, #000 0px, #000 1.5px, transparent 1.5px, transparent 3px, #000 3px, #000 5px, transparent 5px, transparent 6px, #000 6px, #000 7.5px)',
+                }}
+              />
+              {/* PSA Silver Holographic Shield */}
+              <div className="px-1.5 py-0.2 rounded bg-gradient-to-r from-slate-200 via-white to-slate-300 border border-slate-400 text-[7px] font-black text-slate-800 flex items-center gap-0.5 shadow-xs">
+                <span className="text-red-600 font-black">PSA VIRTUEL</span>
+              </div>
+              {/* Cert Number */}
+              <span className="font-mono text-[9px] font-bold text-gray-800">
+                {certNumber}
+              </span>
+              {/* Mini QR code pattern */}
+              <div className="w-3.5 h-3.5 border border-black p-0.2 flex items-center justify-center">
+                <div className="w-2 h-2 bg-black" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── CARD RECESSED CHAMBER ────────────────────────────── */}
+          <div className="w-full flex-1 mt-2 rounded-xl relative overflow-hidden bg-black/70 border border-white/20 shadow-inner flex items-center justify-center p-2">
+            {/* Corner Holding Tabs (frosted acrylic spacers) */}
+            <div className="absolute top-1 left-1 w-3 h-3 rounded-tl border-t-2 border-l-2 border-white/40 pointer-events-none" />
+            <div className="absolute top-1 right-1 w-3 h-3 rounded-tr border-t-2 border-r-2 border-white/40 pointer-events-none" />
+            <div className="absolute bottom-1 left-1 w-3 h-3 rounded-bl border-b-2 border-l-2 border-white/40 pointer-events-none" />
+            <div className="absolute bottom-1 right-1 w-3 h-3 rounded-br border-b-2 border-r-2 border-white/40 pointer-events-none" />
+
+            {/* Card Artwork or Card Back */}
+            <div className="w-[235px] aspect-[63/88] rounded-lg overflow-hidden relative shadow-2xl">
+              {isRevealed ? (
+                <>
+                  <img
+                    src={card?.image_large || card?.image_small || '/placeholder-card.png'}
+                    alt={card?.name}
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
+                  {/* Holographic foil sweep for special rarities */}
+                  {(card?.is_holo || card?.is_hit || card?.is_reverse) && (
+                    <div
+                      className="absolute inset-0 pointer-events-none opacity-45 mix-blend-color-dodge animate-[rainbowSweep_3.5s_ease_infinite]"
+                      style={{
+                        background:
+                          'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.7) 45%, transparent 70%)',
+                        backgroundSize: '250% 250%',
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <PokemonCardBack />
+              )}
+            </div>
+
+            {/* Dynamic Glass Refraction Glare tracking mouse tilt */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-60 mix-blend-color-dodge transition-opacity"
+              style={{
+                background: `radial-gradient(circle at ${50 + tilt.x * 3}% ${
+                  50 - tilt.y * 3
+                }%, rgba(255,255,255,0.85) 0%, rgba(200,240,255,0.3) 30%, transparent 65%)`,
+              }}
+            />
+
+            {/* Diagonal acrylic surface sheen */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(135deg, transparent 35%, rgba(255,255,255,0.2) 48%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.2) 52%, transparent 65%)',
+                mixBlendMode: 'overlay',
+              }}
+            />
+          </div>
+
+          {/* Quick 3D inspect button */}
+          {onInspect && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onInspect(card);
+              }}
+              className="absolute bottom-4 right-4 p-1.5 rounded-lg bg-black/80 hover:bg-black text-amber-300 border border-white/20 shadow-lg text-[10px] font-bold flex items-center gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Inspecter en 3D"
+            >
+              <Eye size={12} />
+              <span>3D</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 3D Booster Pack Wrapper with Authentic Tear Ritual ─────────────────────
-function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
+function BoosterPackFoil({ series, isTorn, onTear, isShaking, audioEnabled = true, onRipAll }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const foilRef = useRef(null);
 
   const handleMouseMove = (e) => {
     if (!foilRef.current || isTorn) return;
     const rect = foilRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -20;
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -22;
     setTilt({ x, y });
   };
 
   const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
+
   const packImg = series?.pack_image || `/boosters/${series?.id}.jpg`;
+
+  // Top serrated teeth clip-path
+  const topTeethClip =
+    'polygon(0% 0%, 2% 5px, 4% 0%, 6% 5px, 8% 0%, 10% 5px, 12% 0%, 14% 5px, 16% 0%, 18% 5px, 20% 0%, 22% 5px, 24% 0%, 26% 5px, 28% 0%, 30% 5px, 32% 0%, 34% 5px, 36% 0%, 38% 5px, 40% 0%, 42% 5px, 44% 0%, 46% 5px, 48% 0%, 50% 5px, 52% 0%, 54% 5px, 56% 0%, 58% 5px, 60% 0%, 62% 5px, 64% 0%, 66% 5px, 68% 0%, 70% 5px, 72% 0%, 74% 5px, 76% 0%, 78% 5px, 80% 0%, 82% 5px, 84% 0%, 86% 5px, 88% 0%, 90% 5px, 92% 0%, 94% 5px, 96% 0%, 98% 5px, 100% 0%, 100% 100%, 0% 100%)';
+
+  // Bottom serrated teeth clip-path
+  const bottomTeethClip =
+    'polygon(0% 0%, 100% 0%, 100% 100%, 98% calc(100% - 5px), 96% 100%, 94% calc(100% - 5px), 92% 100%, 90% calc(100% - 5px), 88% 100%, 86% calc(100% - 5px), 84% 100%, 82% calc(100% - 5px), 80% 100%, 78% calc(100% - 5px), 76% 100%, 74% calc(100% - 5px), 72% 100%, 70% calc(100% - 5px), 68% 100%, 66% calc(100% - 5px), 64% 100%, 62% calc(100% - 5px), 60% 100%, 58% calc(100% - 5px), 56% 100%, 54% calc(100% - 5px), 52% 100%, 50% calc(100% - 5px), 48% 100%, 46% calc(100% - 5px), 44% 100%, 42% calc(100% - 5px), 40% 100%, 38% calc(100% - 5px), 36% 100%, 34% calc(100% - 5px), 32% 100%, 30% calc(100% - 5px), 28% 100%, 26% calc(100% - 5px), 24% 100%, 22% calc(100% - 5px), 20% 100%, 18% calc(100% - 5px), 16% 100%, 14% calc(100% - 5px), 12% 100%, 10% calc(100% - 5px), 8% 100%, 6% calc(100% - 5px), 4% 100%, 2% calc(100% - 5px), 0% 100%)';
 
   return (
     <div
@@ -611,11 +1155,13 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
         isShaking ? 'animate-[shake_0.2s_infinite]' : ''
       }`}
       style={{
-        width: '300px',
-        height: '460px',
+        width: '320px',
+        height: '500px',
         perspective: '1200px',
       }}
-      onClick={onTear}
+      onClick={() => {
+        if (!isTorn) onTear();
+      }}
     >
       {/* 3D tilt container */}
       <div
@@ -625,95 +1171,167 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
           transformStyle: 'preserve-3d',
         }}
       >
-        {/* Atmospheric backlight matching series theme */}
+        {/* Dynamic Studio Overhead Spotlight Cone */}
         <div
-          className="absolute inset-4 rounded-3xl blur-3xl opacity-50 group-hover:opacity-80 transition-opacity pointer-events-none"
+          className="absolute -top-28 left-1/2 -translate-x-1/2 w-72 h-36 rounded-full blur-3xl opacity-35 pointer-events-none"
           style={{ background: series.accent_color }}
         />
 
-        {/* CARDS EMERGING OUT OF THE FOIL (Exact 63/88 aspect ratio, perfectly centered) */}
+        {/* Ambient Backlight matching series theme */}
         <div
-          className={`absolute inset-x-8 top-12 z-10 transition-all duration-700 ease-out pointer-events-none flex flex-col items-center ${
-            isTorn ? 'translate-y-[-70px] opacity-100 scale-100' : 'translate-y-8 opacity-0 scale-95'
+          className="absolute inset-2 rounded-3xl blur-3xl opacity-50 group-hover:opacity-85 transition-opacity pointer-events-none"
+          style={{ background: series.accent_color }}
+        />
+
+        {/* Ground Contact Shadow on Studio Table */}
+        <div
+          className="absolute -bottom-8 left-6 right-6 h-10 rounded-[100%] blur-xl opacity-80 pointer-events-none transition-transform duration-300"
+          style={{
+            background: 'radial-gradient(ellipse, rgba(0,0,0,0.95) 0%, transparent 75%)',
+            transform: `scale(${1 - tilt.y * 0.01}) translateX(${tilt.x * 0.8}px)`,
+          }}
+        />
+
+        {/* CARDS EMERGING OUT OF THE OPEN FOIL SLEEVE */}
+        <div
+          className={`absolute inset-x-8 top-10 z-10 transition-all duration-[800ms] ease-out pointer-events-none flex flex-col items-center ${
+            isTorn ? 'translate-y-[-85px] opacity-100 scale-100' : 'translate-y-12 opacity-0 scale-95'
           }`}
           style={{
-            filter: 'drop-shadow(0 0 25px rgba(251,191,36,0.9))',
+            filter: 'drop-shadow(0 0 30px rgba(251,191,36,0.95))',
           }}
         >
-          <div className="w-[230px] aspect-[63/88] rounded-2xl overflow-hidden ring-2 ring-amber-400/80 shadow-2xl">
+          <div className="w-[240px] aspect-[63/88] rounded-2xl overflow-hidden ring-2 ring-amber-400/90 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
             <PokemonCardBack />
           </div>
-          {/* Prismatic flare beam */}
+          {/* Prismatic flare beam explosion */}
           <div
-            className="absolute -inset-4 rounded-3xl animate-ping opacity-75 pointer-events-none"
+            className="absolute -inset-6 rounded-3xl animate-ping opacity-85 pointer-events-none"
             style={{
-              background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(251,191,36,0.5) 45%, transparent 75%)',
+              background:
+                'radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(251,191,36,0.6) 40%, transparent 75%)',
             }}
           />
         </div>
 
-        {/* Physical Booster Pack Wrapper Container */}
+        {/* PHYSICAL BOOSTER PACK WRAPPER CONTAINER */}
         <div
-          className="w-full h-full relative overflow-hidden rounded-2xl"
+          className="w-full h-full relative overflow-visible rounded-2xl"
           style={{
-            filter: `drop-shadow(0 25px 35px rgba(0,0,0,0.9)) drop-shadow(0 0 25px ${series.accent_color}50)`,
+            filter: `drop-shadow(0 25px 40px rgba(0,0,0,0.95)) drop-shadow(0 0 25px ${series.accent_color}60)`,
           }}
         >
-          {/* Top Foil Crimp (The serrated sealed hanger strip that rips away) */}
+          {/* ── TOP FOIL CRIMP SEAL (Severs and flutters away in 3D on tear) ── */}
           <div
-            className="absolute inset-0 z-30 transition-all duration-700 ease-out pointer-events-none"
+            className="absolute inset-x-0 top-0 h-[17%] z-30 transition-all duration-[800ms] ease-out pointer-events-none overflow-hidden"
             style={{
-              clipPath: 'polygon(0% 0%, 100% 0%, 100% 16%, 85% 18%, 70% 15%, 50% 19%, 30% 16%, 15% 20%, 0% 17%)',
-              transform: isTorn ? 'translateY(-140px) rotate(-16deg) scale(0.85)' : 'translateY(0) rotate(0deg)',
+              clipPath: topTeethClip,
+              transform: isTorn
+                ? 'translateY(-165px) rotate(-22deg) rotateX(45deg) scale(0.85)'
+                : 'translateY(0) rotate(0deg)',
               opacity: isTorn ? 0 : 1,
             }}
           >
+            {/* Top portion of authentic booster packaging */}
             <img
               src={packImg}
               alt={series.name}
-              className="w-full h-full object-cover"
+              className="w-full h-[500px] object-cover object-top absolute top-0 left-0"
               loading="eager"
             />
-            {/* Shimmer on top crimp */}
+            {/* Metallic vertical crimping ridges */}
             <div
               className="absolute inset-0"
               style={{
-                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% 15%, rgba(255,255,255,0.6) 0%, transparent 60%)`,
+                background:
+                  'repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0px, rgba(255,255,255,0.15) 2px, rgba(0,0,0,0.3) 4px, rgba(255,255,255,0.35) 6px)',
                 mixBlendMode: 'overlay',
               }}
             />
-          </div>
-
-          {/* Lower Booster Foil Sleeve (Slides downward slightly when ripped) */}
-          <div
-            className="absolute inset-0 z-20 transition-all duration-700 ease-out"
-            style={{
-              clipPath: 'polygon(0% 17%, 15% 20%, 30% 16%, 50% 19%, 70% 15%, 85% 18%, 100% 16%, 100% 100%, 0% 100%)',
-              transform: isTorn ? 'translateY(28px)' : 'translateY(0)',
-            }}
-          >
-            <img
-              src={packImg}
-              alt={series.name}
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
-            {/* Metallic holographic foil glare following mouse tilt */}
+            {/* Euro-Slot Hanger Hole in center of top seal */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-14 h-3.5 rounded-full bg-slate-950/80 border border-white/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none flex items-center justify-center">
+              <div className="w-10 h-1.5 rounded-full bg-black/60" />
+            </div>
+            {/* Holographic light shimmer */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% ${50 - tilt.y * 2.5}%, rgba(255,255,255,0.45) 0%, rgba(255,220,150,0.2) 35%, transparent 65%)`,
+                background: `radial-gradient(circle at ${50 + tilt.x * 2.5}% 20%, rgba(255,255,255,0.7) 0%, transparent 60%)`,
+                mixBlendMode: 'color-dodge',
+              }}
+            />
+          </div>
+
+          {/* ── TEAR PERFORATION LINE (decorative) ─────────────────────────── */}
+          {!isTorn && (
+            <div className="absolute top-[16.5%] inset-x-4 h-[2px] z-40 border-b-2 border-dashed border-amber-300/80 shadow-[0_0_8px_rgba(251,191,36,0.9)] pointer-events-none" />
+          )}
+
+          {/* ── LOWER FOIL SLEEVE (Body holding the 10-card deck with 3D bevel) ── */}
+          <div
+            className="absolute inset-x-0 top-[17%] bottom-0 z-20 transition-all duration-700 ease-out overflow-hidden rounded-b-2xl"
+            style={{
+              clipPath: bottomTeethClip,
+              transform: isTorn ? 'translateY(28px)' : 'translateY(0)',
+              boxShadow: 'inset 0 0 25px rgba(255,255,255,0.22), inset 0 0 45px rgba(0,0,0,0.7)',
+            }}
+          >
+            {/* Authentic Packaging Artwork */}
+            <img
+              src={packImg}
+              alt={series.name}
+              className="w-full h-[500px] object-cover absolute top-[-85px] left-0"
+              loading="eager"
+            />
+
+            {/* 3D Pillow Bulge (10 cards inside create a rounded center bevel) */}
+            <div
+              className="absolute inset-x-4 top-2 bottom-8 rounded-2xl pointer-events-none"
+              style={{
+                boxShadow:
+                  'inset 0 0 25px rgba(255,255,255,0.25), inset 0 0 40px rgba(0,0,0,0.65), 0 0 20px rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            />
+
+            {/* Cellophane Foil Diagonal Wrinkle Glare */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(135deg, transparent 38%, rgba(255,255,255,0.3) 48%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0.3) 52%, transparent 62%)',
+                mixBlendMode: 'overlay',
+              }}
+            />
+
+            {/* Dynamic Holographic Foil Glare Tracking Mouse Tilt */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at ${50 + tilt.x * 2.2}% ${
+                  50 - tilt.y * 2.2
+                }%, rgba(255,255,255,0.65) 0%, rgba(255,220,180,0.35) 25%, rgba(180,220,255,0.2) 45%, transparent 70%)`,
+                mixBlendMode: 'color-dodge',
+              }}
+            />
+
+            {/* Bottom Crimp Metallic Ridges */}
+            <div
+              className="absolute inset-x-0 bottom-0 h-10 pointer-events-none"
+              style={{
+                background:
+                  'repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0px, rgba(255,255,255,0.15) 2px, rgba(0,0,0,0.3) 4px, rgba(255,255,255,0.35) 6px)',
                 mixBlendMode: 'overlay',
               }}
             />
           </div>
 
-          {/* Tear notch / pull cue ribbon when intact */}
+          {/* Floating Instructions Ribbon when intact */}
           {!isTorn && (
-            <div className="absolute top-12 left-4 right-4 z-40 text-center pointer-events-none animate-pulse">
-              <span className="px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider text-white bg-black/90 border border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] inline-flex items-center gap-1.5">
-                <Zap size={14} className="text-amber-400" />
-                <span>Cliquer pour déchirer le booster ⚡</span>
+            <div className="absolute bottom-6 inset-x-4 z-40 text-center pointer-events-none">
+              <span className="px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider text-white bg-black/90 backdrop-blur-md border border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.7)] inline-flex items-center gap-2 animate-bounce">
+                <Sparkles size={14} className="text-amber-400" />
+                <span>Cliquer pour ouvrir ⚡</span>
               </span>
             </div>
           )}
@@ -724,7 +1342,7 @@ function BoosterPackFoil({ series, isTorn, onTear, isShaking }) {
 }
 
 // ─── Main Booster Studio Component ──────────────────────────────────────────
-export default function BoosterOpeningPage({ onClose }) {
+export default function BoosterOpeningPage({ onClose, currentUser }) {
   // Phase: 'SELECT_SERIES' | 'TEAR_PACK' | 'REVEAL_STACK' | 'SUMMARY_BINDER' | 'BINDER_COLLECTION'
   const [phase, setPhase] = useState('SELECT_SERIES');
   const [seriesList, setSeriesList] = useState(FALLBACK_SERIES);
@@ -737,15 +1355,28 @@ export default function BoosterOpeningPage({ onClose }) {
   const [currentSlotIndex, setCurrentSlotIndex] = useState(0); // 0 to 9
   const [revealedCardIndices, setRevealedCardIndices] = useState(new Set());
   const [isCardFlipping, setIsCardFlipping] = useState(false);
+  const [isPeeking, setIsPeeking] = useState(false);
+  const [isCardSliding, setIsCardSliding] = useState(false);
+  const [isScreenShaking, setIsScreenShaking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isTorn, setIsTorn] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [tearTrigger, setTearTrigger] = useState(0);
+  const [celebrationTrigger, setCelebrationTrigger] = useState(0);
+
+  // Gacha Angels / Graded Slab state
+  const [isRipAll, setIsRipAll] = useState(false);
+  const [teaseStep, setTeaseStep] = useState(0); // 0: Year, 1: Rarity, 2: Slab Revealed
+  const [summaryViewMode, setSummaryViewMode] = useState('SLABS'); // 'SLABS' | 'GRID'
+  const animTimersRef = useRef([]);
+  const ripStartedRef = useRef(false);
 
   // 3D Tilt for active card in stack
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
 
-  // Virtual Binder Collection State (loaded from localStorage)
-  const [collection, setCollection] = useState(() => loadCollectionFromStorage());
+  // Virtual Binder Collection State: MongoDB for logged-in members, localStorage for guests
+  const isLoggedIn = !!currentUser;
+  const [collection, setCollection] = useState(() => (isLoggedIn ? [] : loadCollectionFromStorage()));
   const [binderSearch, setBinderSearch] = useState('');
   const [binderSeriesFilter, setBinderSeriesFilter] = useState('ALL');
   const [binderRarityFilter, setBinderRarityFilter] = useState('ALL');
@@ -791,15 +1422,41 @@ export default function BoosterOpeningPage({ onClose }) {
             is_hit: !!card.is_hit,
             is_holo: !!card.is_holo,
             is_reverse: !!card.is_reverse,
+            grade: card.grade || 'GEM MT 10',
+            cert_number: card.cert_number,
+            year: card.year || series?.release_year || '2023',
             count: 1,
             first_pulled_at: new Date().toISOString(),
           });
         }
       });
-      saveCollectionToStorage(copy);
+      if (!isLoggedIn) saveCollectionToStorage(copy);
       return copy;
     });
   };
+
+  // Load the member's full binder from the backend (cards are persisted server-side on pack open)
+  const fetchServerCollection = useCallback(async () => {
+    const token = localStorage.getItem('pokevinted_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/analytics/boosters/collection', {
+        headers: { 'x-session-token': token },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setCollection(data);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) fetchServerCollection();
+    else setCollection(loadCollectionFromStorage());
+  }, [isLoggedIn, fetchServerCollection]);
+
+  useEffect(() => {
+    if (isLoggedIn && phase === 'BINDER_COLLECTION') fetchServerCollection();
+  }, [isLoggedIn, phase, fetchServerCollection]);
 
   // Fetch available series from backend API
   useEffect(() => {
@@ -833,20 +1490,25 @@ export default function BoosterOpeningPage({ onClose }) {
         } else {
           onClose?.();
         }
-      } else if ((e.key === ' ' || e.key === 'Enter') && phase === 'REVEAL_STACK') {
+      } else if ((e.key === ' ' || e.key === 'Enter') && phase === 'REVEAL_SLAB') {
         e.preventDefault();
-        handleCardClick();
-      } else if (e.key === 'ArrowRight' && phase === 'REVEAL_STACK') {
+        if (teaseStep < 2) {
+          handleSkipTease();
+        } else {
+          handleNextCard();
+        }
+      } else if (e.key === 'ArrowRight' && phase === 'REVEAL_SLAB') {
         e.preventDefault();
-        handleCardClick();
-      } else if (e.key === 'ArrowLeft' && phase === 'REVEAL_STACK') {
-        e.preventDefault();
-        handlePreviousCard();
+        if (teaseStep < 2) {
+          handleSkipTease();
+        } else {
+          handleNextCard();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase, currentSlotIndex, packData, inspectCard, revealedCardIndices]);
+  }, [phase, currentSlotIndex, packData, inspectCard, teaseStep]);
 
   // Start pack opening process
   const handleSelectSeriesAndOpen = async (series) => {
@@ -855,13 +1517,42 @@ export default function BoosterOpeningPage({ onClose }) {
     setError(null);
     setPackData(null);
     setIsTorn(false);
+    clearAnimTimers();
+    ripStartedRef.current = false;
 
     try {
+      const token = isLoggedIn ? localStorage.getItem('pokevinted_token') : null;
       const res = await fetch(`/api/analytics/boosters/open?set_id=${encodeURIComponent(series.id)}`, {
         method: 'POST',
+        headers: token ? { 'x-session-token': token } : {},
       });
-      if (!res.ok) throw new Error('Échec de la génération du booster.');
+      if (!res.ok) throw new Error('Échec de la génération du booster virtuel.');
       const data = await res.json();
+      // Enrich cards with authentic PSA slab grading attributes
+      if (Array.isArray(data?.cards)) {
+        data.cards = data.cards.map((card, idx) => {
+          const isHit = !!card.is_hit || card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare';
+          const grade = isHit
+            ? 'GEM MT 10'
+            : card.market_price && card.market_price > 35
+            ? 'GEM MT 10'
+            : (idx * 23) % 100 > 20
+            ? 'GEM MT 10'
+            : 'MINT 9';
+          const base = Math.abs(
+            (card.id || 'card')
+              .split('')
+              .reduce((acc, ch) => (acc << 5) - acc + ch.charCodeAt(0), 0)
+          );
+          const cert = (90000000 + (base % 9999999)).toString();
+          return {
+            ...card,
+            grade,
+            cert_number: cert,
+            year: series.release_year || '2023',
+          };
+        });
+      }
       setPackData(data);
       setPhase('TEAR_PACK');
     } catch (err) {
@@ -871,106 +1562,115 @@ export default function BoosterOpeningPage({ onClose }) {
     }
   };
 
-  // Perform the physical rip of the pack wrapper
-  const handleTearPack = () => {
-    if (isTorn || !packData) return;
-    playBoosterAudio('tear', audioEnabled);
-    setIsShaking(true);
-    setTimeout(() => {
-      setIsShaking(false);
-      setIsTorn(true);
-      // Automatically add cards to user's collection binder
-      addCardsToCollection(packData.cards, selectedSeries);
-      setTimeout(() => {
-        setPhase('REVEAL_STACK');
-        setCurrentSlotIndex(0);
-        setRevealedCardIndices(new Set());
-      }, 1100);
-    }, 300);
+  // Every pending animation timer is tracked so a skip / close can cancel it
+  const scheduleAnim = (fn, ms) => {
+    const id = setTimeout(() => {
+      animTimersRef.current = animTimersRef.current.filter((t) => t !== id);
+      fn();
+    }, ms);
+    animTimersRef.current.push(id);
   };
 
-  // Fast forward directly into reveal stack
-  const handleSkipTear = () => {
-    if (!packData) return;
+  const clearAnimTimers = () => {
+    animTimersRef.current.forEach(clearTimeout);
+    animTimersRef.current = [];
+  };
+
+  useEffect(() => clearAnimTimers, []);
+
+  // Start Gacha Angels rip animation (Cosmic Warp -> Supernova -> Slabs)
+  const handleStartRip = (ripAll = false) => {
+    if (ripStartedRef.current || isTorn || !packData) return;
+    ripStartedRef.current = true;
     setIsTorn(true);
+    setIsRipAll(ripAll);
+    setPhase('COSMIC_WARP');
+    playBoosterAudio('warp', audioEnabled);
+
+    // Supernova explosion & particle burst at 650ms
+    scheduleAnim(() => {
+      playBoosterAudio('supernova', audioEnabled);
+      setTearTrigger(Date.now());
+    }, 650);
+
+    // Add cards to collection binder
     addCardsToCollection(packData.cards, selectedSeries);
-    setPhase('REVEAL_STACK');
-    setCurrentSlotIndex(0);
-    setRevealedCardIndices(new Set());
+
+    // After warp completes (~1600ms)
+    scheduleAnim(() => finishWarp(ripAll), 1600);
   };
 
-  // Reveal current card on the stack
-  const handleRevealCurrentCard = () => {
-    if (!packData || isCardFlipping) return;
-    const card = packData.cards[currentSlotIndex];
-    if (!card) return;
-
-    if (!revealedCardIndices.has(currentSlotIndex)) {
-      setIsCardFlipping(true);
-
-      // Play audio matching rarity tier
-      if (card.hit_tier === 'sar' || card.hit_tier === 'hyper_rare') {
-        playBoosterAudio('god_pull', audioEnabled);
-      } else if (card.is_holo || card.is_reverse || card.is_hit) {
-        playBoosterAudio('holo', audioEnabled);
-      } else {
-        playBoosterAudio('flip', audioEnabled);
-      }
-
-      setRevealedCardIndices((prev) => new Set(prev).add(currentSlotIndex));
-      setTimeout(() => setIsCardFlipping(false), 300);
-    }
-  };
-
-  // Card click handler: if facedown, reveal. If already revealed, advance to next card!
-  const handleCardClick = () => {
-    if (!packData) return;
-    if (!revealedCardIndices.has(currentSlotIndex)) {
-      handleRevealCurrentCard();
-    } else {
-      handleNextCard();
-    }
-  };
-
-  // Proceed to next card in the stack
-  const handleNextCard = () => {
-    if (!packData) return;
-    if (currentSlotIndex < packData.cards.length - 1) {
-      setCurrentSlotIndex((prev) => prev + 1);
-      setCardTilt({ x: 0, y: 0 });
-    } else {
-      // Reached the end of the 10-card pack! Update session statistics and view summary
-      const hitsCount = packData.cards.filter((c) => c.is_hit).length;
-      setSessionStats((prev) => ({
-        openedCount: prev.openedCount + 1,
-        hitsCount: prev.hitsCount + hitsCount,
-        totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
-      }));
-      setPhase('SUMMARY_BINDER');
-    }
-  };
-
-  // Previous card navigation
-  const handlePreviousCard = () => {
-    if (currentSlotIndex > 0) {
-      setCurrentSlotIndex((prev) => prev - 1);
-      setCardTilt({ x: 0, y: 0 });
-    }
-  };
-
-  // Skip step-by-step reveal and reveal all cards instantly
-  const handleRevealAllInstantly = () => {
-    if (!packData) return;
-    playBoosterAudio('god_pull', audioEnabled);
-    const allIndices = new Set(packData.cards.map((_, i) => i));
-    setRevealedCardIndices(allIndices);
+  const recordPackInSessionStats = () => {
     const hitsCount = packData.cards.filter((c) => c.is_hit).length;
     setSessionStats((prev) => ({
       openedCount: prev.openedCount + 1,
       hitsCount: prev.hitsCount + hitsCount,
       totalValue: Number((prev.totalValue + packData.total_estimated_value).toFixed(2)),
     }));
-    setPhase('SUMMARY_BINDER');
+  };
+
+  const finishWarp = (ripAll) => {
+    clearAnimTimers();
+    if (ripAll) {
+      playBoosterAudio('god_pull', audioEnabled);
+      setCelebrationTrigger(Date.now());
+      recordPackInSessionStats();
+      setPhase('SUMMARY_BINDER');
+    } else {
+      setPhase('REVEAL_SLAB');
+      setCurrentSlotIndex(0);
+      setCardTilt({ x: 0, y: 0 });
+      startTeaseForCard(packData.cards[0]);
+    }
+  };
+
+  const handleFastForwardWarp = () => finishWarp(isRipAll);
+
+  const revealSlab = (card) => {
+    setTeaseStep(2);
+    playBoosterAudio('slab_rise', audioEnabled);
+    if (card && (card.is_hit || (card.market_price && card.market_price > 50))) {
+      scheduleAnim(() => {
+        playBoosterAudio('cash_jackpot', audioEnabled);
+        setCelebrationTrigger(Date.now());
+      }, 250);
+    }
+  };
+
+  // Orchestrate Gacha Angels Year -> Rarity -> PSA Slab tease
+  const startTeaseForCard = (card) => {
+    clearAnimTimers();
+    setTeaseStep(0);
+    playBoosterAudio('tease_tick', audioEnabled);
+
+    scheduleAnim(() => {
+      setTeaseStep(1);
+      playBoosterAudio('tease_tick', audioEnabled);
+      scheduleAnim(() => revealSlab(card), 500);
+    }, 450);
+  };
+
+  const handleSkipTease = () => {
+    if (teaseStep >= 2) return;
+    clearAnimTimers();
+    revealSlab(currentCard);
+  };
+
+  const handleNextCard = () => {
+    if (!packData) return;
+    if (currentSlotIndex < packData.cards.length - 1) {
+      const nextIdx = currentSlotIndex + 1;
+      setCurrentSlotIndex(nextIdx);
+      setCardTilt({ x: 0, y: 0 });
+      startTeaseForCard(packData.cards[nextIdx]);
+    } else {
+      // Reached the end of the 10-card pack! Update session statistics and view summary
+      clearAnimTimers();
+      recordPackInSessionStats();
+      playBoosterAudio('god_pull', audioEnabled);
+      setCelebrationTrigger(Date.now());
+      setPhase('SUMMARY_BINDER');
+    }
   };
 
   // Bookmark card to personal collection binder
@@ -1033,7 +1733,9 @@ export default function BoosterOpeningPage({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col justify-start overflow-hidden"
+      className={`fixed inset-0 z-[300] flex flex-col justify-start overflow-hidden ${
+        isScreenShaking ? 'animate-[cameraShake_0.6s_ease-in-out]' : ''
+      }`}
       style={{
         background: 'radial-gradient(ellipse at 50% 20%, #151828 0%, #0c0e18 60%, #06070c 100%)',
       }}
@@ -1058,35 +1760,101 @@ export default function BoosterOpeningPage({ onClose }) {
           0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(251,191,36,0.5)); }
           50% { transform: scale(1.02); filter: drop-shadow(0 0 35px rgba(251,191,36,0.9)); }
         }
+        @keyframes sunburstSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes cameraShake {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          10% { transform: translate(-6px, -4px) scale(1.02); }
+          20% { transform: translate(6px, 4px) scale(1.01); }
+          30% { transform: translate(-5px, 2px); }
+          40% { transform: translate(5px, -2px); }
+          50% { transform: translate(-3px, -1px); }
+          60% { transform: translate(3px, 1px); }
+          70% { transform: translate(-2px, 0); }
+          80% { transform: translate(2px, 0); }
+          90% { transform: translate(-1px, 0); }
+        }
+        @keyframes floatGently {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-8px) rotate(0.5deg); }
+        }
+        @keyframes godRays {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 0.95; transform: scale(1.08); }
+        }
+        @keyframes cosmicTunnelSpin {
+          0% { transform: rotate(0deg) scale(0.9); }
+          50% { transform: rotate(180deg) scale(1.4); }
+          100% { transform: rotate(360deg) scale(2.2); }
+        }
+        @keyframes packTumble3D {
+          0% { transform: translate(-50%, -50%) scale(1) rotate(0deg) rotateX(0deg) rotateY(0deg); opacity: 1; }
+          30% { transform: translate(-50%, -50%) scale(0.85) rotate(-18deg) rotateX(25deg) rotateY(90deg); opacity: 1; }
+          60% { transform: translate(-50%, -50%) scale(1.15) rotate(12deg) rotateX(-20deg) rotateY(220deg); opacity: 1; }
+          85% { transform: translate(-50%, -50%) scale(1.35) rotate(-6deg) rotateX(15deg) rotateY(320deg); opacity: 0.9; }
+          100% { transform: translate(-50%, -50%) scale(1.6) rotate(0deg) rotateX(0deg) rotateY(400deg); opacity: 0; }
+        }
+        @keyframes supernovaExpand {
+          0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+          25% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: drop-shadow(0 0 60px #fff); }
+          60% { transform: translate(-50%, -50%) scale(3.5); opacity: 0.9; }
+          100% { transform: translate(-50%, -50%) scale(6.5); opacity: 0; }
+        }
+        @keyframes slabRiseUp {
+          0% { transform: translateY(180px) scale(0.9); opacity: 0; }
+          100% { transform: translateY(0px) scale(1); opacity: 1; }
+        }
+        @keyframes spotlightGlow {
+          0%, 100% { opacity: 0.45; transform: scaleX(1); }
+          50% { opacity: 0.85; transform: scaleX(1.18); }
+        }
+        @keyframes pulseTeaseText {
+          0% { transform: scale(0.85); opacity: 0; filter: blur(4px); }
+          65% { transform: scale(1.08); opacity: 1; filter: blur(0px); }
+          100% { transform: scale(1); opacity: 1; filter: blur(0px); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
+      {/* ── 60 FPS Canvas Particle Engine (Ambient Stardust, Foil Shards & Confetti) ── */}
+      <BoosterFXCanvas
+        tearTrigger={tearTrigger}
+        celebrationTrigger={celebrationTrigger}
+        accentColor={selectedSeries?.accent_color || '#ffd700'}
+      />
+
       {/* ── Top Bar / Header ──────────────────────────────────────────────── */}
-      <header className="shrink-0 w-full px-4 sm:px-6 py-3 flex items-center justify-between border-b border-white/[0.08] bg-black/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-3">
+      <header className="shrink-0 w-full px-3 sm:px-6 py-3 flex items-center justify-between gap-2 border-b border-white/[0.08] bg-black/80 backdrop-blur-md z-40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center shadow-lg border border-white/20 shrink-0">
             <Sparkles size={18} className="text-white drop-shadow" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
-                PokéVinted Booster Studio
+              <h1 className="text-[11px] leading-tight sm:text-base font-black text-white uppercase tracking-wider">
+                PokéVinted Booster Studio Virtuel
               </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+              <span className="hidden sm:inline text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                 TCG SIMULATOR
               </span>
             </div>
             <p className="text-[11px] text-gray-400 hidden sm:block">
-              Ouverture de boosters & simulation de collection • 100% Fun
+              Ouverture de boosters virtuels & simulation de collection • 100% Fun
             </p>
           </div>
         </div>
 
         {/* Global session counter & controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Virtual Binder Access Button */}
           <button
             onClick={() => setPhase(phase === 'BINDER_COLLECTION' ? 'SELECT_SERIES' : 'BINDER_COLLECTION')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-lg ${
+            className={`flex items-center gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-lg ${
               phase === 'BINDER_COLLECTION'
                 ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]'
                 : 'bg-white/10 hover:bg-white/15 text-white border-white/15'
@@ -1094,7 +1862,7 @@ export default function BoosterOpeningPage({ onClose }) {
             title="Consulter votre classeur de cartes virtuelles"
           >
             <BookOpen size={15} />
-            <span>Mon Classeur</span>
+            <span className="hidden sm:inline">Mon Classeur Virtuel</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-black/40 text-amber-300">
               {collectionMetrics.totalCount}
             </span>
@@ -1131,7 +1899,7 @@ export default function BoosterOpeningPage({ onClose }) {
       </header>
 
       {/* ── Main Dynamic Stage (Scroll starts at the top, NEVER clipped by header) ── */}
-      <main className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto relative scroll-smooth">
+      <main className="flex-1 w-full flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto overflow-x-hidden relative scroll-smooth">
         {/* Error notification */}
         {error && (
           <div className="mb-4 px-4 py-2.5 rounded-xl bg-red-900/40 border border-red-500/40 text-red-200 text-xs font-bold flex items-center gap-2">
@@ -1145,13 +1913,13 @@ export default function BoosterOpeningPage({ onClose }) {
           <div className="w-full max-w-6xl flex flex-col items-center gap-6 py-2 pb-12">
             <div className="text-center max-w-xl">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">
-                Mode Découverte & Simulation Gratuite
+                Mode Découverte • Boosters Virtuels Gratuits
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-white mt-2">
-                Choisissez votre Booster Pokémon
+                Choisissez votre Booster Virtuel
               </h2>
               <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                Ouvrez des packs virtuels pour le plaisir de collectionner, admirez les illustrations et enrichissez votre classeur personnel.
+                Ouvrez des packs virtuels pour le plaisir de collectionner, admirez les illustrations et enrichissez votre classeur virtuel.
               </p>
             </div>
 
@@ -1269,10 +2037,10 @@ export default function BoosterOpeningPage({ onClose }) {
                 Étape 2 • Le Rituel de Déchirement
               </span>
               <h2 className="text-2xl font-black text-white mt-2">
-                Déchirez le scellé de votre booster
+                Déchirez le scellé de votre booster virtuel
               </h2>
               <p className="text-xs text-gray-400 mt-1">
-                Booster officiel <span className="text-white font-bold">{selectedSeries.name}</span> • 10 cartes sous scellé
+                Booster virtuel <span className="text-white font-bold">{selectedSeries.name}</span> • 10 cartes virtuelles sous scellé
               </p>
             </div>
 
@@ -1280,29 +2048,34 @@ export default function BoosterOpeningPage({ onClose }) {
             <BoosterPackFoil
               series={selectedSeries}
               isTorn={isTorn}
-              onTear={handleTearPack}
+              onTear={() => handleStartRip(false)}
               isShaking={isShaking}
+              audioEnabled={audioEnabled}
             />
 
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-3 w-full">
+              {/* Single reveal rip button */}
               <button
-                onClick={handleTearPack}
+                onClick={() => handleStartRip(false)}
                 disabled={isTorn}
-                className="px-8 py-3 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-white/20"
+                className="w-full px-8 py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 shadow-[0_0_30px_rgba(244,63,94,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 border border-white/20"
               >
-                <Zap size={16} className="text-yellow-300 animate-pulse" />
+                <Zap size={18} className="text-yellow-300 fill-yellow-300 animate-pulse" />
                 <span>{isTorn ? 'OUVERTURE DU PACK...' : 'DÉCHIRER LE SCELLÉ HOLOGRAPHIQUE'}</span>
               </button>
 
-              <div className="flex items-center gap-4 mt-2">
-                <button
-                  onClick={handleSkipTear}
-                  className="text-xs text-amber-400/80 hover:text-amber-300 transition-colors flex items-center gap-1"
-                >
-                  <Zap size={12} />
-                  <span>Passer l'animation</span>
-                </button>
-                <span className="text-gray-600">•</span>
+              {/* Rip all 10 at once (Directly from Gacha Angels video) */}
+              <button
+                onClick={() => handleStartRip(true)}
+                disabled={isTorn}
+                className="w-full px-6 py-2.5 rounded-2xl text-xs font-black text-amber-300 bg-black/85 hover:bg-black border border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                title="Ouvrir toutes les 10 cartes d'un coup comme dans la vidéo Gacha Angels"
+              >
+                <Sparkles size={14} className="text-amber-400" />
+                <span>✨ RIP ALL 10 AT ONCE (GACHA ANGELS)</span>
+              </button>
+
+              <div className="flex items-center gap-4 mt-1">
                 <button
                   onClick={() => setPhase('SELECT_SERIES')}
                   className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
@@ -1315,260 +2088,253 @@ export default function BoosterOpeningPage({ onClose }) {
           </div>
         )}
 
-        {/* ── STAGE 3: REVEAL DECK STACK (CLICK CARD OR ARROWS TO ADVANCE) ───── */}
-        {phase === 'REVEAL_STACK' && packData && currentCard && (
-          <div className="my-auto flex flex-col items-center gap-5 w-full max-w-4xl py-2">
-            {/* Top slot pill & indicator */}
-            <div className="flex items-center justify-between w-full max-w-md px-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold text-gray-400">
-                  CARTE {currentSlotIndex + 1} / 10
-                </span>
-                <span
-                  className="text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm"
-                  style={{
-                    background: `${currentRarityCfg.color}20`,
-                    borderColor: currentRarityCfg.border,
-                    color: currentRarityCfg.color,
-                  }}
-                >
-                  {currentCard.slot_label || currentRarityCfg.label}
-                </span>
-              </div>
+        {/* ── STAGE 2.5: COSMIC WARP & SUPERNOVA (GACHA ANGELS HYPERSPACE) ── */}
+        {phase === 'COSMIC_WARP' && selectedSeries && (
+          <div className="fixed inset-0 z-[400] flex flex-col items-center justify-center overflow-hidden bg-black select-none">
+            {/* Hyperspace Radial Tunnel Rays */}
+            <div
+              className="absolute inset-[-60%] pointer-events-none opacity-85 animate-[cosmicTunnelSpin_3s_linear_infinite]"
+              style={{
+                background:
+                  'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(56,189,248,0.7) 15%, rgba(139,92,246,0.4) 40%, rgba(3,7,18,0.95) 75%)',
+                maskImage:
+                  'repeating-conic-gradient(from 0deg, #000 0deg 8deg, transparent 8deg 16deg)',
+                WebkitMaskImage:
+                  'repeating-conic-gradient(from 0deg, #000 0deg 8deg, transparent 8deg 16deg)',
+              }}
+            />
 
-              {currentCard.is_hit && isCurrentCardRevealed && (
-                <span className="flex items-center gap-1 text-xs font-black text-amber-400 animate-bounce">
-                  <Star size={14} fill="currentColor" />
-                  <span>HIT DÉBLOQUÉ !</span>
-                </span>
+            {/* Radiant Center Light Beam */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.35)_0%,transparent_65%)] pointer-events-none" />
+
+            {/* 3D Tumbling Booster Pack */}
+            <div
+              className="absolute left-1/2 top-1/2 pointer-events-none animate-[packTumble3D_1.6s_cubic-bezier(0.2,0.8,0.2,1)_forwards]"
+              style={{ perspective: '1200px' }}
+            >
+              <div className="w-[280px] h-[440px] rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(56,189,248,0.9)] border-2 border-white/60 relative">
+                <img
+                  src={selectedSeries.pack_image}
+                  alt={selectedSeries.name}
+                  className="w-full h-full object-cover"
+                />
+                {/* Ripping Tear Light Line */}
+                <div className="absolute top-12 left-0 right-0 h-2 bg-white shadow-[0_0_20px_#fff] animate-ping" />
+                {/* Prismatic rainbow reflection */}
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-60 mix-blend-color-dodge animate-pulse"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, transparent 20%, rgba(255,255,255,0.9) 50%, transparent 80%)',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Supernova Expansion Sphere */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full pointer-events-none z-30 animate-[supernovaExpand_1.4s_ease-out_0.6s_forwards] opacity-0"
+              style={{ background: 'radial-gradient(circle, #ffffff 0%, #67e8f9 45%, transparent 70%)' }}
+            />
+
+            {/* Floating Petal Flakes */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-25">
+              {Array.from({ length: 30 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="absolute rounded-full pointer-events-none animate-ping"
+                  style={{
+                    left: `${20 + (idx * 27) % 65}%`,
+                    top: `${20 + (idx * 31) % 65}%`,
+                    width: `${6 + (idx % 8)}px`,
+                    height: `${6 + (idx % 8)}px`,
+                    background: idx % 2 === 0 ? '#ec4899' : '#facc15',
+                    animationDuration: `${0.8 + (idx % 10) * 0.1}s`,
+                    animationDelay: `${idx * 0.04}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Top Skip Button */}
+            <button
+              onClick={handleFastForwardWarp}
+              className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-xl flex items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 z-50"
+            >
+              <Zap size={14} className="text-amber-400" />
+              <span>Passer (Skip)</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── STAGE 3: GACHA ANGELS TEASE & PSA SLAB REVEAL ────────────────── */}
+        {phase === 'REVEAL_SLAB' && packData && currentCard && (
+          <div
+            className="my-auto flex flex-col items-center justify-center w-full max-w-4xl py-2 relative select-none"
+            onClick={() => {
+              if (teaseStep < 2) handleSkipTease();
+            }}
+          >
+            {/* Dynamic Top Spotlight Beam */}
+            <div
+              className="absolute -top-32 left-1/2 -translate-x-1/2 w-[480px] h-[650px] pointer-events-none opacity-45 animate-[spotlightGlow_3s_ease-in-out_infinite]"
+              style={{
+                background:
+                  'radial-gradient(ellipse at 50% 0%, rgba(147,197,253,0.45) 0%, rgba(99,102,241,0.2) 40%, transparent 75%)',
+                clipPath: 'polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%)',
+              }}
+            />
+
+            {/* Top Tease Typography Sequence (Gacha Angels: YEAR -> RARITY -> SLAB) */}
+            <div className="h-20 flex flex-col items-center justify-center text-center z-20">
+              {teaseStep === 0 && (
+                <div className="animate-[pulseTeaseText_0.35s_ease-out]">
+                  <span className="text-[11px] font-black tracking-[0.35em] text-gray-400 uppercase">
+                    YEAR
+                  </span>
+                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-widest mt-0.5 drop-shadow-[0_0_20px_rgba(255,255,255,0.7)] font-mono">
+                    {currentCard.year || selectedSeries?.release_year || '2023'}
+                  </h2>
+                </div>
+              )}
+
+              {teaseStep === 1 && (
+                <div className="animate-[pulseTeaseText_0.35s_ease-out]">
+                  <span className="text-[11px] font-black tracking-[0.35em] text-gray-400 uppercase">
+                    RARITY
+                  </span>
+                  <h2
+                    className="text-3xl sm:text-4xl font-black tracking-wider mt-0.5 uppercase drop-shadow-[0_0_25px_currentColor]"
+                    style={{ color: currentRarityCfg.color }}
+                  >
+                    {currentCard.pull_rarity || 'COMMUNE'}
+                  </h2>
+                </div>
+              )}
+
+              {teaseStep >= 2 && (
+                <div className="animate-[fadeIn_0.3s_ease-out] flex flex-col items-center">
+                  <span className="text-[11px] font-bold tracking-[0.25em] text-gray-400 uppercase font-mono">
+                    YEAR {currentCard.year || selectedSeries?.release_year || '2023'} | GRADE{' '}
+                    <strong className="text-red-500 font-black">
+                      {currentCard.grade || (currentCard.is_hit ? 'GEM-MT 10' : 'MINT 9')}
+                    </strong>
+                  </span>
+                  <h3 className="text-lg font-black text-white mt-0.5 flex items-center gap-2">
+                    <span>{currentCard.name}</span>
+                    {currentCard.is_hit && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                        HIT 🔥
+                      </span>
+                    )}
+                  </h3>
+                </div>
               )}
             </div>
 
-            {/* 3D Stack Area with Side Navigation Arrows */}
-            <div className="flex items-center justify-center gap-3 sm:gap-6 w-full">
-              {/* Floating Left Arrow (Previous Card) */}
-              <button
-                onClick={handlePreviousCard}
-                disabled={currentSlotIndex === 0}
-                className={`p-3 rounded-2xl border transition-all ${
-                  currentSlotIndex === 0
-                    ? 'opacity-20 cursor-not-allowed border-white/5 bg-white/[0.02] text-gray-600'
-                    : 'hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl'
-                }`}
-                title="Carte précédente (Flèche gauche)"
-              >
-                <ChevronLeft size={24} />
-              </button>
-
-              {/* The Card Container with Click-to-Flip and Click-to-Next */}
+            {/* Center PSA Graded Slab Stage with mouse tilt tracking */}
+            <div
+              className="relative z-10 my-1 [@media(max-height:880px)]:[zoom:0.85]"
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
+                const y = ((e.clientY - rect.top) / rect.height - 0.5) * -20;
+                setCardTilt({ x, y });
+              }}
+              onMouseLeave={() => setCardTilt({ x: 0, y: 0 })}
+            >
+              {/* Slab container with slide-up entrance */}
               <div
-                className="relative cursor-pointer select-none"
-                style={{
-                  width: '290px',
-                  height: '406px',
-                  perspective: '1200px',
-                }}
-                onClick={handleCardClick}
-                onMouseMove={handleCardMouseMove}
-                onMouseLeave={handleCardMouseLeave}
+                className={teaseStep >= 2 ? 'animate-[slabRiseUp_0.5s_cubic-bezier(0.2,0.8,0.2,1)_forwards]' : 'opacity-0 pointer-events-none'}
               >
-                {/* Stack depth perspective cards underneath with authentic Pokémon back */}
-                {Array.from({ length: Math.min(3, 9 - currentSlotIndex) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="absolute inset-0 rounded-2xl pointer-events-none transition-transform"
-                    style={{
-                      transform: `translateY(${(i + 1) * 4}px) scale(${1 - (i + 1) * 0.02})`,
-                      zIndex: -i - 1,
-                      opacity: 0.85 - i * 0.2,
-                    }}
-                  >
-                    <PokemonCardBack />
-                  </div>
-                ))}
-
-                {/* The Active Top Card */}
-                <div
-                  className={`w-full h-full relative rounded-2xl transition-transform duration-500 ease-out ${
-                    currentCard.is_hit && isCurrentCardRevealed ? 'animate-[hitPulse_2s_infinite]' : ''
-                  }`}
-                  style={{
-                    transformStyle: 'preserve-3d',
-                    transform: isCurrentCardRevealed
-                      ? `rotateY(0deg) rotateX(${cardTilt.y}deg) rotateY(${cardTilt.x}deg)`
-                      : 'rotateY(180deg)',
-                    boxShadow:
-                      currentCard.is_hit && isCurrentCardRevealed
-                        ? `0 0 35px ${currentRarityCfg.glow}, 0 20px 40px rgba(0,0,0,0.8)`
-                        : '0 15px 35px rgba(0,0,0,0.7)',
-                  }}
-                >
-                  {/* BACK FACE (Unrevealed Authentic Pokémon Card Back) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      transform: 'rotateY(180deg)',
-                    }}
-                  >
-                    <PokemonCardBack />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/0 transition-colors">
-                      <span className="px-4 py-2 rounded-xl bg-black/85 backdrop-blur-md text-white text-xs font-bold border border-white/20 shadow-xl animate-pulse flex items-center gap-1.5">
-                        <Sparkles size={14} className="text-amber-400" />
-                        <span>Cliquer pour révéler ⚡</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* FRONT FACE (Revealed official card artwork) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl overflow-hidden shadow-2xl"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      border: `3px solid ${currentRarityCfg.color}`,
-                      background: '#0f111a',
-                    }}
-                  >
-                    {/* Card Artwork */}
-                    <img
-                      src={currentCard.image_large || currentCard.image_small || '/placeholder-card.png'}
-                      alt={currentCard.name}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-
-                    {/* Holographic foil sweep for Holo/Reverse */}
-                    {currentCard.is_holo && (
-                      <div
-                        className="absolute inset-0 pointer-events-none opacity-40 mix-blend-color-dodge"
-                        style={{
-                          background:
-                            'linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.7) 45%, transparent 70%)',
-                          backgroundSize: '250% 250%',
-                          animation: 'rainbowSweep 3s ease infinite',
-                        }}
-                      />
-                    )}
-
-                    {/* Top overlay pills */}
-                    <div className="absolute top-2 left-2 flex items-center gap-1 z-20">
-                      <span
-                        className="text-[10px] font-black px-2 py-0.5 rounded-md text-white shadow-md backdrop-blur-md"
-                        style={{
-                          background: currentRarityCfg.bg,
-                          border: `1px solid ${currentRarityCfg.color}80`,
-                        }}
-                      >
-                        {currentCard.pull_rarity || currentCard.rarity}
-                      </span>
-                      {currentCard.is_reverse && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-600/80 text-white border border-white/20">
-                          REVERSE
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Market value badge */}
-                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/80 border border-white/20 text-emerald-400 font-black text-xs shadow-md">
-                      {currentCard.market_price ? `${currentCard.market_price.toFixed(2)} €` : '—'}
-                    </div>
-
-                    {/* Bottom title gradient */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black via-black/80 to-transparent">
-                      <p className="text-sm font-black text-white truncate drop-shadow">
-                        {currentCard.name}
-                      </p>
-                      <p className="text-[10px] text-gray-300 flex items-center justify-between mt-0.5">
-                        <span>
-                          N° {currentCard.number} • {currentCard.set_name}
-                        </span>
-                        {currentCard.is_hit && (
-                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
-                            <Flame size={11} /> Chase Card
-                          </span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Advance Cue on Card hover */}
-                    <div className="absolute inset-x-0 bottom-12 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <span className="px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-[10px] font-bold text-amber-300 border border-amber-400/30">
-                        Cliquer sur la carte pour la suivante →
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <PsaSlab
+                  card={currentCard}
+                  series={selectedSeries}
+                  tilt={cardTilt}
+                  isRevealed={true}
+                  isHero={true}
+                  onInspect={() => setInspectCard(currentCard)}
+                />
               </div>
 
-              {/* Floating Right Arrow (Next Card / Reveal) */}
-              <button
-                onClick={handleCardClick}
-                className="p-3 rounded-2xl border transition-all hover:scale-110 active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white shadow-xl"
-                title={isCurrentCardRevealed ? 'Carte suivante (Flèche droite ou clic)' : 'Révéler la carte (Flèche droite ou clic)'}
-              >
-                <ChevronRight size={24} />
-              </button>
+              {/* When teaseStep < 2: frosted placeholder laid over the (still hidden) slab footprint */}
+              {teaseStep < 2 && (
+                <div className="absolute inset-0 rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center p-4 shadow-2xl animate-pulse">
+                  <Sparkles size={36} className="text-white/40 animate-spin" />
+                  <span className="text-xs font-mono font-bold text-gray-500 mt-3 tracking-widest uppercase">
+                    CERTIFICATION PSA VIRTUELLE EN COURS...
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Suspense progress indicator & controls */}
-            <div className="flex flex-col items-center gap-3 w-full max-w-md mt-1">
-              {/* Dots tracker */}
-              <div className="flex items-center justify-center gap-1.5 w-full">
-                {packData.cards.map((c, idx) => {
-                  const isCurrent = idx === currentSlotIndex;
-                  const isPast = idx < currentSlotIndex;
-                  const isSlotHit = c.is_hit;
-                  return (
+            {/* Bottom Insured Value & Actions (Mirrors Gacha Angels frame 12s) */}
+            <div className="h-28 flex flex-col items-center justify-center z-20 mt-1">
+              {teaseStep >= 2 ? (
+                <div className="flex flex-col items-center gap-2 animate-[fadeIn_0.35s_ease-out]">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                      INSURED VALUE
+                    </span>
+                    <span className="text-3xl font-black text-emerald-400 font-mono drop-shadow-[0_0_15px_rgba(52,211,153,0.9)]">
+                      {currentCard.market_price ? `${currentCard.market_price.toFixed(2)} €` : '12.50 €'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
                     <button
-                      key={idx}
-                      onClick={() => {
-                        setCurrentSlotIndex(idx);
-                        if (!revealedCardIndices.has(idx)) {
-                          handleRevealCurrentCard();
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNextCard();
                       }}
-                      className={`h-2 rounded-full transition-all ${
-                        isCurrent
-                          ? 'w-7 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                          : isPast
-                          ? isSlotHit
-                            ? 'w-3 bg-pink-500'
-                            : 'w-2 bg-emerald-500'
-                          : 'w-2 bg-white/20'
+                      className="px-8 py-2.5 rounded-full font-black text-sm text-black bg-[#7df844] hover:bg-[#8eff5a] shadow-[0_0_20px_rgba(125,248,68,0.7)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                      <span>{currentSlotIndex === 9 ? 'Bilan du Pack 🏆' : 'Next Card →'}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSavePortfolio(currentCard.id);
+                      }}
+                      className={`p-2.5 rounded-full border transition-all ${
+                        savedToPortfolio.has(currentCard.id)
+                          ? 'bg-amber-500 border-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)]'
+                          : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
                       }`}
-                      title={`Carte ${idx + 1}`}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 w-full justify-center">
-                {!isCurrentCardRevealed ? (
-                  <button
-                    onClick={handleRevealCurrentCard}
-                    className="flex-1 py-3 px-6 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Zap size={16} />
-                    <span>Révéler la carte (Clic ou Espace)</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleNextCard}
-                    className="flex-1 py-3 px-6 rounded-xl font-black text-sm text-white bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>{currentSlotIndex === 9 ? 'Voir le Bilan du Pack 🏆' : 'Carte Suivante → (ou Clic)'}</span>
-                  </button>
-                )}
-
+                      title="Ajouter au classeur virtuel"
+                    >
+                      <Bookmark size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <button
-                  onClick={handleRevealAllInstantly}
-                  className="px-4 py-3 rounded-xl text-xs font-bold text-gray-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] transition-colors"
-                  title="Tout révéler d'un coup"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSkipTease();
+                  }}
+                  className="text-xs text-gray-500 hover:text-white transition-colors flex items-center gap-1.5 py-2 px-4 rounded-full bg-black/60 border border-white/10"
                 >
-                  Tout Révéler ⚡
+                  <Zap size={12} className="text-amber-400" />
+                  <span>Passer l'animation (Skip)</span>
                 </button>
-              </div>
+              )}
+            </div>
+
+            {/* Dots Tracker at Bottom */}
+            <div className="flex items-center justify-center gap-1.5 w-full mt-1">
+              {packData.cards.map((c, idx) => (
+                <div
+                  key={idx}
+                  className={`h-1.5 rounded-full transition-all ${
+                    idx === currentSlotIndex
+                      ? 'w-6 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                      : idx < currentSlotIndex
+                      ? 'w-2 bg-emerald-700'
+                      : 'w-1.5 bg-white/20'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -1588,7 +2354,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   </span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-white mt-1">
-                  Bilan de votre Booster Pokémon
+                  Bilan de votre Booster Virtuel
                 </h2>
                 {packData.best_hit ? (
                   <p className="text-xs md:text-sm text-amber-300 flex items-center gap-1.5 mt-1">
@@ -1604,27 +2370,84 @@ export default function BoosterOpeningPage({ onClose }) {
                   </p>
                 )}
                 <p className="text-[11px] text-gray-400 mt-2 italic">
-                  Ces cartes ont été automatiquement ajoutées à votre classeur personnel ! (Simulation 100% fun, non vendables).
+                  Ces cartes ont été automatiquement ajoutées à votre classeur virtuel ! (Cartes virtuelles, simulation 100% fun, non vendables).
                 </p>
               </div>
 
               {/* Total Pack Valuation */}
               <div className="relative z-10 flex flex-col items-center md:items-end">
                 <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-                  Valeur totale indicative du pack
+                  Valeur indicative du pack virtuel
                 </span>
                 <span className="text-3xl md:text-4xl font-black text-emerald-400 drop-shadow">
                   {packData.total_estimated_value.toFixed(2)} €
                 </span>
                 <span className="text-[11px] font-bold text-gray-400 mt-0.5">
-                  10 cartes authentiques • Sortie de booster (MINT)
+                  10 cartes virtuelles • slabs PSA simulés
                 </span>
               </div>
             </div>
 
-            {/* 10-Card Collector Binder Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 w-full">
-              {packData.cards.map((card, idx) => {
+            {/* View Mode Toggle: Slabs vs Grid */}
+            <div className="flex items-center justify-between w-full px-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSummaryViewMode('SLABS')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${
+                    summaryViewMode === 'SLABS'
+                      ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+                  }`}
+                >
+                  <Trophy size={14} />
+                  <span>Vue Slabs PSA Virtuels (Gacha Angels)</span>
+                </button>
+
+                <button
+                  onClick={() => setSummaryViewMode('GRID')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${
+                    summaryViewMode === 'GRID'
+                      ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]'
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+                  }`}
+                >
+                  <Layers size={14} />
+                  <span>Vue Classeur Grille</span>
+                </button>
+              </div>
+              <span className="text-xs text-gray-500 hidden sm:block">
+                10 cartes virtuelles • slabs PSA simulés GEM-MT 10 / MINT 9
+              </span>
+            </div>
+
+            {summaryViewMode === 'SLABS' ? (
+              /* Horizontal Carousel of all 10 PSA Slabs (Matching frame 88s of video) */
+              <div className="w-full overflow-x-auto py-6 px-2 flex items-center gap-6 scrollbar-thin scrollbar-thumb-white/20 snap-x">
+                {packData.cards.map((card, idx) => (
+                  <div
+                    key={`${card.id}-${idx}`}
+                    className="shrink-0 flex flex-col items-center gap-2 snap-center group"
+                  >
+                    <PsaSlab
+                      card={card}
+                      series={selectedSeries}
+                      isHero={false}
+                      onInspect={() => setInspectCard(card)}
+                    />
+                    <div className="flex flex-col items-center mt-1">
+                      <span className="text-[10px] font-black uppercase text-gray-400">
+                        {card.grade || 'GEM MT 10'}
+                      </span>
+                      <span className="text-sm font-black text-emerald-400 font-mono drop-shadow">
+                        Valued {card.market_price ? `${card.market_price.toFixed(2)} €` : '15.00 €'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 w-full">
+                {packData.cards.map((card, idx) => {
                 const cfg = getRarityCfg(card.pull_rarity);
                 const isSaved = savedToPortfolio.has(card.id);
                 return (
@@ -1723,6 +2546,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 );
               })}
             </div>
+          )}
 
             {/* Bottom action bar */}
             <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
@@ -1732,7 +2556,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 className="px-6 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-red-600 shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
               >
                 <RefreshCw size={15} />
-                <span>Ouvrir un autre booster ({selectedSeries.name})</span>
+                <span>Ouvrir un autre booster virtuel ({selectedSeries.name})</span>
               </button>
 
               <button
@@ -1740,7 +2564,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 className="px-5 py-3 rounded-xl font-bold text-sm text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-2"
               >
                 <BookOpen size={15} />
-                <span>Consulter mon Classeur ({collectionMetrics.totalCount} cartes)</span>
+                <span>Consulter mon Classeur Virtuel ({collectionMetrics.totalCount} cartes virtuelles)</span>
               </button>
 
               <button
@@ -1768,17 +2592,17 @@ export default function BoosterOpeningPage({ onClose }) {
                   <span className="text-xs text-gray-400">Simulation de Collection</span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-white mt-1">
-                  Ma Collection de Cartes Pokémon
+                  Ma Collection Virtuelle de Cartes Pokémon
                 </h2>
                 <p className="text-xs md:text-sm text-gray-300 mt-1 max-w-xl">
-                  Toutes les cartes tirées lors de vos ouvertures de boosters sont automatiquement archivées dans ce classeur.
+                  Toutes les cartes tirées lors de vos ouvertures de boosters sont automatiquement archivées dans ce classeur virtuel. Ces cartes ne sont pas vendables sur la marketplace.
                 </p>
               </div>
 
               {/* Binder Metrics Cards */}
               <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
-                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Total Cartes</span>
+                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cartes Virtuelles</span>
                   <span className="text-lg font-black text-white">{collectionMetrics.totalCount}</span>
                 </div>
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
@@ -1790,7 +2614,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   <span className="text-lg font-black text-amber-400">{collectionMetrics.hitsCount}</span>
                 </div>
                 <div className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-center">
-                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cote Estimée</span>
+                  <span className="text-[10px] text-gray-400 block uppercase font-bold">Cote Virtuelle</span>
                   <span className="text-lg font-black text-emerald-400">{collectionMetrics.totalValue.toFixed(2)} €</span>
                 </div>
               </div>
@@ -1855,7 +2679,7 @@ export default function BoosterOpeningPage({ onClose }) {
                 <h3 className="text-base font-bold text-white">Aucune carte dans cette vue</h3>
                 <p className="text-xs text-gray-400 mt-1 max-w-sm">
                   {collection.length === 0
-                    ? 'Votre classeur est vide pour l\'instant ! Ouvrez votre premier booster pour commencer votre collection.'
+                    ? 'Votre classeur virtuel est vide pour l\'instant ! Ouvrez votre premier booster virtuel pour commencer votre collection.'
                     : 'Aucune carte ne correspond à vos critères de recherche.'}
                 </p>
                 <button
@@ -1863,7 +2687,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   className="mt-4 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={14} />
-                  <span>Ouvrir un Booster</span>
+                  <span>Ouvrir un Booster Virtuel</span>
                 </button>
               </div>
             ) : (
@@ -1959,7 +2783,7 @@ export default function BoosterOpeningPage({ onClose }) {
                   className="px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 to-rose-600 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={14} />
-                  <span>Ouvrir un nouveau booster</span>
+                  <span>Ouvrir un nouveau booster virtuel</span>
                 </button>
 
                 {packData && (
@@ -1980,13 +2804,21 @@ export default function BoosterOpeningPage({ onClose }) {
                     );
                     if (ok) {
                       setCollection([]);
-                      saveCollectionToStorage([]);
+                      if (isLoggedIn) {
+                        const token = localStorage.getItem('pokevinted_token');
+                        fetch('/api/analytics/boosters/collection', {
+                          method: 'DELETE',
+                          headers: token ? { 'x-session-token': token } : {},
+                        }).catch(() => {});
+                      } else {
+                        saveCollectionToStorage([]);
+                      }
                     }
                   }}
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 bg-red-950/30 hover:bg-red-950/60 border border-red-500/20 transition-colors flex items-center gap-1.5"
                 >
                   <Trash2 size={13} />
-                  <span>Vider mon classeur</span>
+                  <span>Vider mon classeur virtuel</span>
                 </button>
               )}
             </div>

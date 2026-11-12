@@ -16,11 +16,15 @@ from app.application.use_cases.seed_catalog import SeedCatalogUseCase
 from app.config import settings
 from app.domain.exceptions import (
     CardNotFoundError,
+    InsufficientFundsError,
     InvalidConditionError,
+    InvalidCredentialsError,
     InvalidPriceError,
     ListingAlreadySoldError,
     ListingNotFoundError,
     SelfPurchaseNotAllowedError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
 )
 from app.infrastructure.monitoring.health_monitor import run_health_monitor
 from app.infrastructure.persistence.elastic.client import ElasticClientManager
@@ -189,6 +193,26 @@ async def invalid_condition_handler(request: Request, exc: InvalidConditionError
 @app.exception_handler(SelfPurchaseNotAllowedError)
 async def self_purchase_not_allowed_handler(request: Request, exc: SelfPurchaseNotAllowedError):
     return JSONResponse(status_code=400, content={"detail": str(exc), "code": "SELF_PURCHASE_NOT_ALLOWED"})
+
+
+@app.exception_handler(InsufficientFundsError)
+async def insufficient_funds_handler(request: Request, exc: InsufficientFundsError):
+    return JSONResponse(status_code=400, content={"detail": str(exc), "code": "INSUFFICIENT_FUNDS"})
+
+
+@app.exception_handler(UserNotFoundError)
+async def user_not_found_handler(request: Request, exc: UserNotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc), "code": "USER_NOT_FOUND"})
+
+
+@app.exception_handler(UserAlreadyExistsError)
+async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsError):
+    return JSONResponse(status_code=400, content={"detail": str(exc), "code": "USER_ALREADY_EXISTS"})
+
+
+@app.exception_handler(InvalidCredentialsError)
+async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError):
+    return JSONResponse(status_code=401, content={"detail": str(exc), "code": "INVALID_CREDENTIALS"})
 
 
 @app.exception_handler(RequestValidationError)
